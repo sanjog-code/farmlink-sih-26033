@@ -37,6 +37,8 @@ Deno.serve(async (request) => {
 
   const farmerId = `FLR-${crypto.randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`
   const { data, error } = await admin.auth.admin.createUser({
+    email: `${farmerId.toLowerCase()}@farmer.farmlink.local`,
+    email_confirm: true,
     phone,
     phone_confirm: false,
     user_metadata: { full_name: fullName.trim(), mobile: phone, address: address.trim() },
