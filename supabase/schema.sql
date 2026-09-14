@@ -185,5 +185,7 @@ create policy "public reads produce photos" on storage.objects for select using 
 create policy "farmers manage own produce photos" on storage.objects for update to authenticated using (bucket_id = 'produce-photos' and owner_id = auth.uid()) with check (bucket_id = 'produce-photos' and owner_id = auth.uid());
 create policy "farmers delete own produce photos" on storage.objects for delete to authenticated using (bucket_id = 'produce-photos' and owner_id = auth.uid());
 
+-- See supabase/migrations/20260914_bulk_negotiation.sql for the MSP-protected bulk negotiation schema.
+
 -- Promote an approved user to admin from SQL Editor only:
 -- update public.profiles set role = 'admin' where email = 'your-admin-email@example.com';
