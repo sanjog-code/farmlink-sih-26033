@@ -117,6 +117,26 @@ create table public.farmer_listings (
   created_at timestamptz not null default now()
 );
 
+create table public.bulk_requests (
+  id uuid primary key default gen_random_uuid(),
+  buyer_id uuid not null references public.profiles(id),
+  buyer_name text not null,
+  crop text not null,
+  quantity_kg numeric not null check (quantity_kg > 0),
+  status text not null default 'pending' check (status in ('pending', 'verified', 'quoted', 'rejected')),
+  created_at timestamptz not null default now()
+);
+
+create table public.logistics_jobs (
+  id uuid primary key default gen_random_uuid(),
+  requested_by uuid not null references public.profiles(id),
+  source_type text not null,
+  source_id uuid,
+  details text not null,
+  status text not null default 'pending_verification' check (status in ('pending_verification', 'verified', 'scheduled', 'in_transit', 'completed', 'cancelled')),
+  created_at timestamptz not null default now()
+);
+
 insert into storage.buckets (id, name, public) values ('produce-photos', 'produce-photos', true)
 on conflict (id) do update set public = true;
 
@@ -132,6 +152,8 @@ alter table public.produce_requests enable row level security;
 alter table public.consumer_orders enable row level security;
 alter table public.order_items enable row level security;
 alter table public.farmer_listings enable row level security;
+alter table public.bulk_requests enable row level security;
+alter table public.logistics_jobs enable row level security;
 
 create policy "users read own profile" on public.profiles for select using (id = auth.uid() or public.is_admin());
 create policy "users update own profile" on public.profiles for update using (id = auth.uid()) with check (id = auth.uid() and role = (select role from public.profiles where id = auth.uid()));
@@ -152,6 +174,12 @@ create policy "anyone reads published farmer listings" on public.farmer_listings
 create policy "farmers create own listings" on public.farmer_listings for insert with check (farmer_id = auth.uid() and exists (select 1 from public.profiles where id = auth.uid() and role = 'farmer'));
 create policy "farmers manage own listings" on public.farmer_listings for update using (farmer_id = auth.uid() or public.is_admin()) with check (farmer_id = auth.uid() or public.is_admin());
 create policy "farmers delete own listings" on public.farmer_listings for delete using (farmer_id = auth.uid() or public.is_admin());
+create policy "buyers create own bulk requests" on public.bulk_requests for insert with check (buyer_id = auth.uid());
+create policy "buyers and admins read bulk requests" on public.bulk_requests for select using (buyer_id = auth.uid() or public.is_admin());
+create policy "admins verify bulk requests" on public.bulk_requests for update using (public.is_admin()) with check (public.is_admin());
+create policy "users create own logistics jobs" on public.logistics_jobs for insert with check (requested_by = auth.uid());
+create policy "users and admins read logistics jobs" on public.logistics_jobs for select using (requested_by = auth.uid() or public.is_admin());
+create policy "admins verify logistics jobs" on public.logistics_jobs for update using (public.is_admin()) with check (public.is_admin());
 create policy "authenticated users upload produce photos" on storage.objects for insert to authenticated with check (bucket_id = 'produce-photos' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "public reads produce photos" on storage.objects for select using (bucket_id = 'produce-photos');
 create policy "farmers manage own produce photos" on storage.objects for update to authenticated using (bucket_id = 'produce-photos' and owner_id = auth.uid()) with check (bucket_id = 'produce-photos' and owner_id = auth.uid());
