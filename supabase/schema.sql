@@ -104,6 +104,22 @@ create table public.order_items (
   unit_price numeric not null check (unit_price >= 0)
 );
 
+create table public.farmer_listings (
+  id uuid primary key default gen_random_uuid(),
+  farmer_id uuid not null references public.profiles(id) on delete cascade,
+  crop text not null,
+  category text not null,
+  description text not null default '',
+  quantity_kg numeric not null check (quantity_kg > 0),
+  price_per_kg numeric not null check (price_per_kg >= 0),
+  image_url text not null,
+  status text not null default 'published' check (status in ('published', 'pending', 'rejected')),
+  created_at timestamptz not null default now()
+);
+
+insert into storage.buckets (id, name, public) values ('produce-photos', 'produce-photos', true)
+on conflict (id) do update set public = true;
+
 create or replace function public.is_admin()
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin');
@@ -115,6 +131,7 @@ alter table public.produce_lots enable row level security;
 alter table public.produce_requests enable row level security;
 alter table public.consumer_orders enable row level security;
 alter table public.order_items enable row level security;
+alter table public.farmer_listings enable row level security;
 
 create policy "users read own profile" on public.profiles for select using (id = auth.uid() or public.is_admin());
 create policy "users update own profile" on public.profiles for update using (id = auth.uid()) with check (id = auth.uid() and role = (select role from public.profiles where id = auth.uid()));
@@ -131,6 +148,14 @@ create policy "consumers read own orders" on public.consumer_orders for select u
 create policy "admins update orders" on public.consumer_orders for update using (public.is_admin()) with check (public.is_admin());
 create policy "order owners and admins read order items" on public.order_items for select using (exists (select 1 from public.consumer_orders o where o.id = order_id and (o.consumer_id = auth.uid() or public.is_admin())));
 create policy "consumers add items to own orders" on public.order_items for insert with check (exists (select 1 from public.consumer_orders o where o.id = order_id and o.consumer_id = auth.uid()));
+create policy "anyone reads published farmer listings" on public.farmer_listings for select using (status = 'published' or farmer_id = auth.uid() or public.is_admin());
+create policy "farmers create own listings" on public.farmer_listings for insert with check (farmer_id = auth.uid() and exists (select 1 from public.profiles where id = auth.uid() and role = 'farmer'));
+create policy "farmers manage own listings" on public.farmer_listings for update using (farmer_id = auth.uid() or public.is_admin()) with check (farmer_id = auth.uid() or public.is_admin());
+create policy "farmers delete own listings" on public.farmer_listings for delete using (farmer_id = auth.uid() or public.is_admin());
+create policy "authenticated users upload produce photos" on storage.objects for insert to authenticated with check (bucket_id = 'produce-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "public reads produce photos" on storage.objects for select using (bucket_id = 'produce-photos');
+create policy "farmers manage own produce photos" on storage.objects for update to authenticated using (bucket_id = 'produce-photos' and owner_id = auth.uid()) with check (bucket_id = 'produce-photos' and owner_id = auth.uid());
+create policy "farmers delete own produce photos" on storage.objects for delete to authenticated using (bucket_id = 'produce-photos' and owner_id = auth.uid());
 
 -- Promote an approved user to admin from SQL Editor only:
 -- update public.profiles set role = 'admin' where email = 'your-admin-email@example.com';
