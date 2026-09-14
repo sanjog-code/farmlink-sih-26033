@@ -16,6 +16,8 @@ create table public.profiles (
   created_at timestamptz not null default now()
 );
 
+create unique index if not exists profiles_mobile_unique on public.profiles (mobile) where mobile is not null;
+
 create or replace function public.create_profile_for_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin

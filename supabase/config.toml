@@ -2,3 +2,6 @@ project_id = "farmlink-sih-26033"
 
 [functions.register-farmer]
 verify_jwt = false
+
+[functions.transcribe-audio]
+verify_jwt = true
