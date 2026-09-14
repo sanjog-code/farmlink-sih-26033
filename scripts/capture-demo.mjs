@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+import { mkdir } from 'node:fs/promises';
+await mkdir('work/demo-frames', { recursive: true });
+const browser = await chromium.launch({headless:true, executablePath:'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'});
+const page = await browser.newPage({viewport:{width:1440,height:900}, deviceScaleFactor:1});
+const shot = async (name) => { await page.screenshot({path:`work/demo-frames/${name}.jpg`, type:'jpeg', quality:86}); };
+await page.goto('http://127.0.0.1:5173/', {waitUntil:'networkidle'}); await shot('01-home');
+await page.getByRole('button',{name:'Marketplace',exact:true}).click(); await shot('02-marketplace');
+await page.getByRole('button',{name:'Warehouse',exact:true}).click(); await shot('04-warehouse');
+await page.getByRole('button',{name:'Create lot & QR record'}).click(); await shot('05-live-ledger');
+await page.getByRole('button',{name:'Farmer',exact:true}).click(); await shot('06-farmer');
+await page.getByText('View price guidance').click(); await shot('07-ai-pricing');
+await page.getByText('I’ll hold').click();
+await page.goto('http://127.0.0.1:5173/', {waitUntil:'networkidle'}); await page.getByText('Try voice demo').click(); await page.getByRole('button',{name:'Start speaking'}).click(); await shot('08-voice');
+await browser.close();
