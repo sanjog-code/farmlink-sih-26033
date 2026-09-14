@@ -49,6 +49,7 @@ insert into public.warehouses(name, address) values
   ('Sanganer Hub', 'Sanganer warehouse hub')
 on conflict (name) do nothing;
 
+
 create table public.produce_lots (
   id uuid primary key default gen_random_uuid(),
   lot_code text not null unique,
@@ -60,6 +61,16 @@ create table public.produce_lots (
   warehouse_id uuid not null references public.warehouses(id),
   received_at timestamptz not null default now()
 );
+
+insert into public.produce_lots (lot_code, farmer_id, crop, grade, quantity_kg, price_per_kg, warehouse_id)
+select 'FL-24091', null, 'Tomato', 'A', 820, 27, id from public.warehouses where name = 'Jaipur North'
+where not exists (select 1 from public.produce_lots where lot_code = 'FL-24091');
+insert into public.produce_lots (lot_code, farmer_id, crop, grade, quantity_kg, price_per_kg, warehouse_id)
+select 'FL-24092', null, 'Onion', 'A', 1150, 31, id from public.warehouses where name = 'Jaipur North'
+where not exists (select 1 from public.produce_lots where lot_code = 'FL-24092');
+insert into public.produce_lots (lot_code, farmer_id, crop, grade, quantity_kg, price_per_kg, warehouse_id)
+select 'FL-24093', null, 'Potato', 'B', 540, 22, id from public.warehouses where name = 'Sanganer Hub'
+where not exists (select 1 from public.produce_lots where lot_code = 'FL-24093');
 
 create table public.produce_requests (
   id uuid primary key default gen_random_uuid(),
