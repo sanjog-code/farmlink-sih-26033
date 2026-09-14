@@ -15,8 +15,11 @@ Open the URL printed by Vite. The demo intentionally uses browser memory/local s
 
 1. Create a Supabase project in an India-appropriate region for the actual pilot.
 2. Run `supabase/schema.sql` in SQL Editor.
-3. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to Vercel project environment variables.
-4. Replace the demo repository in `src/main.jsx` with Supabase queries only after adding RLS policies and Supabase Auth. Never expose the service-role key.
+3. Deploy the farmer registration function: `supabase functions deploy register-farmer`.
+4. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to Vercel project environment variables.
+5. Create the first admin user through Supabase Auth, then promote it from SQL Editor using the commented statement at the end of `supabase/schema.sql`.
+
+The app automatically uses Supabase Auth whenever both Vite environment variables are present. Farmers receive a Farmer ID through the protected `register-farmer` Edge Function; consumers use email/password registration.
 
 ## Vercel
 
