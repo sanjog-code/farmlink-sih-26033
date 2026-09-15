@@ -6,7 +6,7 @@ verify_jwt = false
 [functions.transcribe-audio]
 verify_jwt = true
 
-[functions.twilio-verify]
+[functions.firebase-phone-session]
 verify_jwt = false
 
 [functions.market-advisory]

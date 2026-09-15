@@ -2,17 +2,24 @@
 
 ## Farmer OTP
 
-Farmer login uses the deployed `twilio-verify` Supabase Edge Function. It sends and checks a Twilio Verify SMS, then creates a short-lived Supabase session only after Twilio approves the OTP. Add these secrets to Supabase; never add them to Vercel or browser code:
+Farmer login uses Firebase Phone Authentication. Firebase sends the SMS after a reCAPTCHA challenge; the deployed `firebase-phone-session` Supabase Edge Function validates Firebase’s signed token and opens the FarmLink session.
+
+In Firebase Console, create a web app, enable **Authentication → Sign-in method → Phone**, allow India in the SMS region policy, and add the FarmLink Vercel domain under Authorized domains. Then add the Firebase web configuration to Vercel as these public environment variables:
 
 ```powershell
-pnpm dlx supabase secrets set TWILIO_ACCOUNT_SID=your_account_sid --project-ref neoyrdfpvnfsnxwjbthm
-pnpm dlx supabase secrets set TWILIO_AUTH_TOKEN=your_auth_token --project-ref neoyrdfpvnfsnxwjbthm
-pnpm dlx supabase secrets set TWILIO_VERIFY_SERVICE_SID=your_verify_service_sid --project-ref neoyrdfpvnfsnxwjbthm
+VITE_FIREBASE_API_KEY=your_web_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_APP_ID=your_web_app_id
 ```
 
-Create the Verify Service in the Twilio Console and enable SMS. The phone number is normalized to `+91xxxxxxxxxx` before it is sent to Twilio.
+Also add the project ID to Supabase Edge Function secrets:
 
-The app deliberately returns a clear configuration error until all three secrets are set, rather than falling back to an insecure browser-side OTP flow.
+```powershell
+pnpm dlx supabase secrets set FIREBASE_PROJECT_ID=your_project_id --project-ref neoyrdfpvnfsnxwjbthm
+```
+
+The phone number is normalized to `+91xxxxxxxxxx`. Firebase Phone Auth has a free usage tier, but Google’s current SMS quotas and regional policies apply.
 
 ## Secure voice transcription
 
