@@ -32,6 +32,7 @@ import "./styles.css";
 import "./auth.css";
 import "./workflows.css";
 import "./checkout.css";
+import "./crop-images.css";
 import { isSupabaseConfigured, supabase } from "./supabase";
 
 const initialLots = [];
