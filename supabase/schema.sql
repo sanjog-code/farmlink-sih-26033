@@ -64,16 +64,6 @@ create table public.produce_lots (
   received_at timestamptz not null default now()
 );
 
-insert into public.produce_lots (lot_code, farmer_id, crop, grade, quantity_kg, price_per_kg, warehouse_id)
-select 'FL-24091', null, 'Tomato', 'A', 820, 27, id from public.warehouses where name = 'Jaipur North'
-where not exists (select 1 from public.produce_lots where lot_code = 'FL-24091');
-insert into public.produce_lots (lot_code, farmer_id, crop, grade, quantity_kg, price_per_kg, warehouse_id)
-select 'FL-24092', null, 'Onion', 'A', 1150, 31, id from public.warehouses where name = 'Jaipur North'
-where not exists (select 1 from public.produce_lots where lot_code = 'FL-24092');
-insert into public.produce_lots (lot_code, farmer_id, crop, grade, quantity_kg, price_per_kg, warehouse_id)
-select 'FL-24093', null, 'Potato', 'B', 540, 22, id from public.warehouses where name = 'Sanganer Hub'
-where not exists (select 1 from public.produce_lots where lot_code = 'FL-24093');
-
 create table public.produce_requests (
   id uuid primary key default gen_random_uuid(),
   farmer_id uuid not null references public.profiles(id),
@@ -93,6 +83,7 @@ create table public.consumer_orders (
   total_kg numeric not null check (total_kg > 0),
   total_amount numeric not null check (total_amount >= 0),
   status text not null default 'ready_for_pickup',
+  cancellation_expires_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -168,6 +159,18 @@ create policy "admins update requests" on public.produce_requests for update usi
 create policy "consumers create own orders" on public.consumer_orders for insert with check (consumer_id = auth.uid());
 create policy "consumers read own orders" on public.consumer_orders for select using (consumer_id = auth.uid() or public.is_admin());
 create policy "admins update orders" on public.consumer_orders for update using (public.is_admin()) with check (public.is_admin());
+create policy "consumers cancel pending orders" on public.consumer_orders for update using (consumer_id = auth.uid() and status = 'pending_verification' and cancellation_expires_at > now()) with check (consumer_id = auth.uid() and status = 'cancelled');
+
+create or replace function public.confirm_expired_consumer_orders()
+returns void language sql security definer set search_path = public as $$
+  update public.consumer_orders
+  set status = 'confirmed'
+  where status = 'pending_verification'
+    and cancellation_expires_at <= now();
+$$;
+
+revoke all on function public.confirm_expired_consumer_orders() from public;
+grant execute on function public.confirm_expired_consumer_orders() to authenticated;
 create policy "order owners and admins read order items" on public.order_items for select using (exists (select 1 from public.consumer_orders o where o.id = order_id and (o.consumer_id = auth.uid() or public.is_admin())));
 create policy "consumers add items to own orders" on public.order_items for insert with check (exists (select 1 from public.consumer_orders o where o.id = order_id and o.consumer_id = auth.uid()));
 create policy "anyone reads published farmer listings" on public.farmer_listings for select using (status = 'published' or farmer_id = auth.uid() or public.is_admin());
