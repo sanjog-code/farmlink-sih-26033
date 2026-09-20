@@ -716,14 +716,16 @@ function App() {
             .from("consumer_orders")
             .select(
               "id,order_code,total_kg,status,cancellation_expires_at,warehouses(name)",
-            )
+            ).order("created_at", { ascending: false })
         : supabase
             .from("consumer_orders")
             .select(
               "id,order_code,total_kg,status,cancellation_expires_at,warehouses(name)",
             )
-            .eq("consumer_id", session.userId);
-    query.then(({ data }) => {
+            .eq("consumer_id", session.userId)
+            .order("created_at", { ascending: false });
+    query.then(({ data, error }) => {
+      if (error) { notify(`Orders could not be loaded: ${error.message}`); return; }
       if (data)
         setOrders(
           data.map((order) => ({
@@ -878,10 +880,9 @@ function App() {
     );
     expired.forEach((order) => {
       if (isSupabaseConfigured && order.dbId)
-        supabase
-          .from("consumer_orders")
-          .update({ status: "confirmed" })
-          .eq("id", order.dbId);
+        supabase.rpc("confirm_expired_consumer_order", { p_order_id: order.dbId }).then(({ error }) => {
+          if (!error) setLiveTick((tick) => tick + 1);
+        });
     });
   }, [now, orders]);
   const placeOrder = async (pickupWarehouse) => {
@@ -971,6 +972,18 @@ function App() {
     }
   };
   const confirmOrder = (id) => setOrderStatus(id, "Confirmed");
+  const confirmOrderNow = async (id) => {
+    const order = orders.find((item) => item.id === id);
+    if (!order || String(order.status).toLowerCase() !== "pending verification") return false;
+    if (isSupabaseConfigured && order.dbId) {
+      const { error } = await supabase.rpc("confirm_consumer_order_now", { p_order_id: order.dbId });
+      if (error) { notify(error.message); return false; }
+    }
+    setOrders((current) => current.map((item) => item.id === id ? { ...item, status: "Confirmed", cancellationDeadline: null } : item));
+    setLiveTick((tick) => tick + 1);
+    notify("Order confirmed. The cancellation window has been closed and warehouse fulfillment can begin.");
+    return true;
+  };
   const orderAgain = (id) => {
     const order = orders.find((item) => item.id === id);
     if (!order?.lineItems?.length) {
@@ -1128,6 +1141,7 @@ function App() {
             orders={orders}
             now={now}
             cancelOrder={cancelOrder}
+            confirmOrderNow={confirmOrderNow}
             orderAgain={orderAgain}
             setView={setView}
             notify={notify}
@@ -1735,12 +1749,14 @@ function ConsumerHub({
   orders,
   now,
   cancelOrder,
+  confirmOrderNow,
   orderAgain,
   setView,
   notify,
 }) {
   const [tab, setTab] = useState("orders"),
-    [review, setReview] = useState("");
+    [review, setReview] = useState(""),
+    [confirmingOrder, setConfirmingOrder] = useState(null);
   const countdown = (deadline) => {
     const seconds = Math.max(0, Math.ceil((deadline - now) / 1000));
     return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
@@ -1796,6 +1812,9 @@ function ConsumerHub({
                       </small>
                       <button onClick={() => cancelOrder(order.id)}>
                         Cancel order
+                      </button>
+                      <button className="primary" onClick={() => setConfirmingOrder(order)}>
+                        Confirm now
                       </button>
                     </>
                   ) : (
@@ -1895,6 +1914,7 @@ function ConsumerHub({
           </button>
         </div>
       )}
+      {confirmingOrder && <div className="confirm-order-back" role="dialog" aria-modal="true" aria-labelledby="confirm-order-title"><div className="confirm-order-card"><p className="eyebrow green">CONFIRM ORDER NOW</p><h2 id="confirm-order-title">Skip the cancellation window?</h2><p>You are confirming <b>{confirmingOrder.id}</b> for pickup at <b>{confirmingOrder.pickupWarehouse}</b>. Once confirmed, this order cannot be cancelled from your account and fulfillment can begin immediately.</p><div><button className="secondary" onClick={() => setConfirmingOrder(null)}>Keep cancellation window</button><button className="primary" onClick={async () => { if (await confirmOrderNow(confirmingOrder.id)) setConfirmingOrder(null); }}>Yes, confirm order</button></div></div></div>}
     </section>
   );
 }
