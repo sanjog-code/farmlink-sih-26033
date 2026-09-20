@@ -2203,12 +2203,50 @@ function WarehouseView({
   const [scheduledListings, setScheduledListings] = useState([]);
   const [warehousePhoto, setWarehousePhoto] = useState(null);
   const [warehousePreview, setWarehousePreview] = useState("");
+  const [cameraActive, setCameraActive] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectingListing, setRejectingListing] = useState(false);
+  const cameraVideoRef = useRef(null);
+  const cameraStreamRef = useRef(null);
   useEffect(() => {
     if (!isSupabaseConfigured) return;
-    supabase.from("farmer_listings").select("id,farmer_id,crop,category,description,quantity_kg,price_per_kg,image_url,intake_warehouse_id,warehouses(name),profiles(full_name)").eq("status", "scheduled").order("scheduled_at", { ascending: true }).then(({ data, error }) => {
+    supabase.from("farmer_listings").select("id,farmer_id,crop,category,description,quantity_kg,price_per_kg,image_url,intake_warehouse_id,harvest_date,warehouses(name),profiles(full_name)").eq("status", "scheduled").order("scheduled_at", { ascending: true }).then(({ data, error }) => {
       if (error) notify(error.message); else setScheduledListings(data || []);
     });
   }, [liveTick]);
+  useEffect(() => () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
+  useEffect(() => {
+    if (cameraActive && cameraVideoRef.current && cameraStreamRef.current) cameraVideoRef.current.srcObject = cameraStreamRef.current;
+  }, [cameraActive]);
+  const stopLiveCamera = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    setCameraActive(false);
+  };
+  const startLiveCamera = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) return notify("Live camera is not supported in this browser. Use the camera upload field instead.");
+    try {
+      stopLiveCamera();
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+      cameraStreamRef.current = stream;
+      if (cameraVideoRef.current) cameraVideoRef.current.srcObject = stream;
+      setCameraActive(true);
+    } catch (error) { notify("Camera access is needed for a live warehouse grading photo. You can use the camera upload field if permission is unavailable."); }
+  };
+  const captureLivePhoto = () => {
+    const video = cameraVideoRef.current;
+    if (!video?.videoWidth) return notify("Wait for the camera preview, then capture the live photo.");
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      if (!blob) return notify("Live photo could not be captured.");
+      const photo = new File([blob], `warehouse-live-${Date.now()}.jpg`, { type: "image/jpeg" });
+      setWarehousePhoto(photo); setWarehousePreview(URL.createObjectURL(photo)); stopLiveCamera();
+    }, "image/jpeg", 0.9);
+  };
   const submit = async (e) => {
     e.preventDefault();
     let id = `FL-${24094 + lots.length}`;
@@ -2276,7 +2314,7 @@ function WarehouseView({
   const confirmScheduledIntake = async () => {
     const listing = scheduledListings.find((item) => item.id === form.listingId);
     if (!listing) return notify("Select a scheduled farmer listing.");
-    if (!warehousePhoto) return notify("Capture or upload the live warehouse grading photo first.");
+    if (!warehousePhoto) { await startLiveCamera(); return notify("Capture the required live warehouse photo before confirming intake."); }
     try {
       const extension = (warehousePhoto.name.split(".").pop() || "jpg").replace(/[^a-z0-9]/gi, "");
       const path = `${session.userId}/warehouse-intake/${listing.id}-${crypto.randomUUID()}.${extension}`;
@@ -2291,6 +2329,17 @@ function WarehouseView({
       setForm({ ...form, listingId: "", grade: "A" }); setWarehousePhoto(null); setWarehousePreview(""); setLiveTick((tick) => tick + 1);
       notify(`${listing.crop} intake confirmed. The farmer photo and warehouse AI-grade photo are now live in the marketplace.`);
     } catch (error) { notify(error.message || "Warehouse intake confirmation failed."); }
+  };
+  const rejectScheduledIntake = async () => {
+    const listing = scheduledListings.find((item) => item.id === form.listingId);
+    if (!listing) return notify("Select a scheduled farmer listing before rejecting it.");
+    if (!rejectionReason.trim()) return notify("Enter a clear rejection reason for the farmer.");
+    const { error } = await supabase.from("farmer_listings").update({ status: "rejected", warehouse_rejection_reason: rejectionReason.trim(), warehouse_rejected_at: new Date().toISOString() }).eq("id", listing.id);
+    if (error) return notify(error.message);
+    stopLiveCamera();
+    setScheduledListings((current) => current.filter((item) => item.id !== listing.id));
+    setForm({ ...form, listingId: "" }); setRejectionReason(""); setRejectingListing(false); setWarehousePhoto(null); setWarehousePreview(""); setLiveTick((tick) => tick + 1);
+    notify(`${listing.crop} intake was rejected. The farmer has been notified with the warehouse reason.`);
   };
   return (
     <section className="page warehouse-page">
@@ -2307,26 +2356,31 @@ function WarehouseView({
           <ShieldCheck /> Admin access only
         </div>
       </div>
+      <section className="warehouse-command">
+        <div><small>INTAKE QUEUE</small><b>{scheduledListings.length}</b><span>farmer listings awaiting inspection</span></div>
+        <div><small>LIVE INVENTORY</small><b>{lots.reduce((sum, lot) => sum + Number(lot.qty || 0), 0)} kg</b><span>visible verified warehouse stock</span></div>
+        <div><small>PICKUP ORDERS</small><b>{orders.filter((order) => !["Cancelled", "Completed"].includes(order.status)).length}</b><span>active consumer fulfillment tasks</span></div>
+        <div><small>OPERATOR STANDARD</small><b>Photo + grade</b><span>every intake gets a live proof image</span></div>
+      </section>
       <div className="warehouse-grid">
-        <div className="intake">
-          <p className="eyebrow green">SCHEDULED FARMER LISTINGS</p>
-          <h3>Confirm live warehouse intake</h3>
+        <div className="intake warehouse-intake-panel">
+          <div className="warehouse-panel-head"><div><p className="eyebrow green">SCHEDULED FARMER LISTINGS</p><h3>Live intake verification</h3><small>Compare the farmer’s original image with a required live warehouse capture.</small></div><span>Step 1 of 3</span></div>
           <label>Listing scheduled by admin
             <select value={form.listingId} onChange={(event) => {
               const listing = scheduledListings.find((item) => item.id === event.target.value);
               setForm({ ...form, listingId: event.target.value, crop: listing?.crop || form.crop, weight: listing?.quantity_kg || form.weight, warehouse: listing?.warehouses?.name || form.warehouse });
+              setWarehousePhoto(null); setWarehousePreview(""); setRejectingListing(false); setRejectionReason("");
+              if (event.target.value) startLiveCamera(); else stopLiveCamera();
             }}>
               <option value="">Choose scheduled listing</option>
               {scheduledListings.map((listing) => <option key={listing.id} value={listing.id}>{cropEmoji(listing.crop, listing.category)} {listing.crop} · {listing.quantity_kg} kg · {listing.warehouses?.name || "Warehouse"}</option>)}
             </select>
           </label>
-          {form.listingId && <img className="intake-photo-preview" src={scheduledListings.find((item) => item.id === form.listingId)?.image_url} alt="Farmer submitted produce" />}
-          <label>Live warehouse photo for AI grading
-            <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(event) => { const file = event.target.files?.[0] || null; setWarehousePhoto(file); setWarehousePreview(file ? URL.createObjectURL(file) : ""); }} />
-          </label>
-          {warehousePreview && <img className="intake-photo-preview" src={warehousePreview} alt="Warehouse grading capture preview" />}
+          {form.listingId && <div className="intake-image-compare"><figure><img className="intake-photo-preview" src={scheduledListings.find((item) => item.id === form.listingId)?.image_url} alt="Farmer submitted produce"/><figcaption>Farmer listing photo</figcaption></figure><figure>{warehousePreview ? <img className="intake-photo-preview" src={warehousePreview} alt="Warehouse grading capture preview"/> : cameraActive ? <video ref={cameraVideoRef} className="intake-photo-preview live-camera" autoPlay playsInline muted/> : <div className="camera-empty"><ScanLine size={24}/><span>Live camera capture required</span></div>}<figcaption>{warehousePreview ? "Live warehouse photo captured" : "Warehouse live photo"}</figcaption></figure></div>}
+          {form.listingId && !warehousePreview && <div className="camera-actions"><button className="secondary" type="button" onClick={startLiveCamera}>{cameraActive ? "Restart camera" : "Open live camera"}</button>{cameraActive && <button className="primary" type="button" onClick={captureLivePhoto}><ScanLine size={16}/>Capture live photo</button>}<label className="camera-upload">Fallback camera upload<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(event) => { const file = event.target.files?.[0] || null; setWarehousePhoto(file); setWarehousePreview(file ? URL.createObjectURL(file) : ""); stopLiveCamera(); }} /></label></div>}
           <label>Confirmed grade<select value={form.grade} onChange={(event) => setForm({ ...form, grade: event.target.value })}><option>A</option><option>B</option><option>C</option></select></label>
-          <button className="primary" type="button" onClick={confirmScheduledIntake}><BrainCircuit size={18}/>Confirm AI grade & publish</button>
+          <div className="intake-final-actions"><button className="primary" type="button" onClick={confirmScheduledIntake}><BrainCircuit size={18}/>Confirm grade & publish</button><button className="danger" type="button" onClick={() => setRejectingListing((current) => !current)}>Reject intake</button></div>
+          {rejectingListing && <div className="rejection-box"><b>Tell the farmer why this intake is rejected</b><textarea value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} placeholder="Example: Visible spoilage and damaged packaging observed at intake."/><button className="danger" type="button" onClick={rejectScheduledIntake}>Send rejection to farmer</button></div>}
         </div>
         <form className="intake" onSubmit={submit}>
           <h3>Confirm produce intake</h3>
@@ -2785,7 +2839,7 @@ function FarmerOperations({ notify, session, liveTick }) {
   useEffect(() => {
     if (!isSupabaseConfigured || !session?.userId) return;
     Promise.all([
-      supabase.from("farmer_listings").select("id,crop,quantity_kg,price_per_kg,status,image_url,warehouse_image_url,warehouse_grade,grading_confidence,created_at,warehouses(name)").eq("farmer_id", session.userId).order("created_at", { ascending: false }),
+      supabase.from("farmer_listings").select("id,crop,quantity_kg,price_per_kg,status,image_url,warehouse_image_url,warehouse_grade,grading_confidence,warehouse_rejection_reason,warehouse_rejected_at,created_at,warehouses(name)").eq("farmer_id", session.userId).order("created_at", { ascending: false }),
       supabase.from("order_items").select("id,quantity_kg,unit_price,produce_lots!inner(farmer_id,crop),consumer_orders(order_code,status,created_at,warehouses(name))").eq("produce_lots.farmer_id", session.userId).order("id", { ascending: false }),
       supabase.from("logistics_jobs").select("id,source_type,details,status,created_at").order("created_at", { ascending: false }),
     ]).then(([listingResult, orderResult, jobsResult]) => {
@@ -2916,7 +2970,7 @@ function FarmerOperations({ notify, session, liveTick }) {
         <>
         <div className="account-panel">
           <h3>Live listing status</h3>
-          {farmerListings.length ? farmerListings.map((item) => <div className="contract-row" key={item.id}><span>{cropEmoji(item.crop)}</span><div><b>{item.crop} · {item.quantity_kg} kg</b><small>{item.warehouses?.name || "Awaiting warehouse"} · {item.warehouse_grade ? `Grade ${item.warehouse_grade} · ${item.grading_confidence || 0}% AI confidence` : "Farmer photo received"}</small></div><strong>{String(item.status).replaceAll("_", " ")}</strong></div>) : <p className="empty-state">Your submitted listings will update here live.</p>}
+          {farmerListings.length ? farmerListings.map((item) => <div className="contract-row" key={item.id}><span>{cropEmoji(item.crop)}</span><div><b>{item.crop} · {item.quantity_kg} kg</b><small>{item.warehouses?.name || "Awaiting warehouse"} · {item.warehouse_grade ? `Grade ${item.warehouse_grade} · ${item.grading_confidence || 0}% AI confidence` : "Farmer photo received"}</small>{item.status === "rejected" && <small className="listing-rejection">Warehouse decision: {item.warehouse_rejection_reason || "The intake could not be accepted. Please contact the warehouse."}</small>}</div><strong>{String(item.status).replaceAll("_", " ")}</strong></div>) : <p className="empty-state">Your submitted listings will update here live.</p>}
         </div>
         <form
           className="account-panel form-grid photo-listing"
