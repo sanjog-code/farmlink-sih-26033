@@ -893,46 +893,19 @@ function App() {
           notify("Pickup warehouse could not be found.");
           return;
         }
-        const { data: created, error } = await supabase
-          .from("consumer_orders")
-          .insert({
-            order_code: id,
-            consumer_id: session.userId,
-            pickup_warehouse_id: warehouse.id,
-            total_kg: order.quantity,
-            total_amount: cart.reduce(
-              (sum, lot) => sum + lot.price * lot.quantityKg,
-              0,
-            ),
-            status: "pending_verification",
-            cancellation_expires_at: new Date(
-              cancellationDeadline,
-            ).toISOString(),
-          })
-          .select("id")
-          .single();
-        if (error) {
-          notify(error.message);
+        const items = cart.map((lot) => ({ lotId: lot.dbId, quantityKg: lot.quantityKg }));
+        if (items.some((item) => !item.lotId)) {
+          notify("A cart item has not completed warehouse intake yet. Please refresh the marketplace and try again.");
           return;
         }
-        order.dbId = created.id;
-        const items = cart
-          .filter((lot) => lot.dbId)
-          .map((lot) => ({
-            order_id: created.id,
-            lot_id: lot.dbId,
-            quantity_kg: lot.quantityKg,
-            unit_price: lot.price,
-          }));
-        if (items.length) {
-          const { error: itemError } = await supabase
-            .from("order_items")
-            .insert(items);
-          if (itemError) {
-            notify(itemError.message);
-            return;
-          }
-        }
+        const { data: createdId, error } = await supabase.rpc("place_consumer_order", {
+          p_order_code: id,
+          p_warehouse_id: warehouse.id,
+          p_items: items,
+          p_cancellation_expires_at: new Date(cancellationDeadline).toISOString(),
+        });
+        if (error) { notify(error.message); return; }
+        order.dbId = createdId;
       }
       setOrders((existing) => [order, ...existing]);
       setCart([]);
