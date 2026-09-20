@@ -528,6 +528,7 @@ const CONSTITUTIONAL_LANGUAGES = [
 function App() {
   const [lang, setLang] = useState("en"),
     [view, setView] = useState("home"),
+    [authRole, setAuthRole] = useState("consumer"),
     [lots, setLots] = useState(initialLots),
     [cart, setCart] = useState([]),
     [wishlist, setWishlist] = useState([]),
@@ -974,6 +975,12 @@ function App() {
     );
   };
   const access = (role, destination) => {
+    if (destination === "farmer" && !["farmer", "admin"].includes(session?.role)) {
+      setAuthRole("farmer");
+      setView("auth");
+      notify("Please log in with your Farmer ID and OTP to access the farmer dashboard.");
+      return;
+    }
     if (
       session?.role === "consumer" &&
       ["farmer", "warehouse", "admin"].includes(destination)
@@ -986,6 +993,7 @@ function App() {
       setView(destination);
     else {
       setView("auth");
+      setAuthRole(role);
       notify(`Please sign in as ${role}.`);
     }
   };
@@ -1017,9 +1025,7 @@ function App() {
               Warehouse
             </button>
           )}
-          {session?.role !== "consumer" && (
-            <button onClick={() => access("farmer", "farmer")}>Farmer</button>
-          )}
+          <button onClick={() => access("farmer", "farmer")}>Farmer</button>
         </nav>
         <div className="head-actions">
           <label className="language">
@@ -1134,7 +1140,7 @@ function App() {
             notify={notify}
           />
         )}{" "}
-        {view === "farmer" && session?.role === "farmer" && (
+        {view === "farmer" && ["farmer", "admin"].includes(session?.role) && (
           <FarmerView
             session={session}
             lots={lots}
@@ -1146,7 +1152,7 @@ function App() {
           />
         )}{" "}
         {view === "auth" && (
-          <AuthView setSession={setSession} setView={setView} notify={notify} />
+          <AuthView initialRole={authRole} setSession={setSession} setView={setView} notify={notify} />
         )}{" "}
         {view === "admin" && (
           <>
@@ -2907,9 +2913,9 @@ function FarmerOperations({ notify, session, liveTick }) {
     </section>
   );
 }
-function AuthView({ setSession, setView, notify }) {
+function AuthView({ initialRole = "consumer", setSession, setView, notify }) {
   const [mode, setMode] = useState("login"),
-    [role, setRole] = useState("consumer"),
+    [role, setRole] = useState(initialRole),
     [farmerId, setFarmerId] = useState(""),
     [resendEmail, setResendEmail] = useState(""),
     [otpStep, setOtpStep] = useState(false),
@@ -2917,6 +2923,10 @@ function AuthView({ setSession, setView, notify }) {
     [busy, setBusy] = useState(false);
   const firebaseConfirmation = useRef(null);
   const firebaseVerifier = useRef(null);
+  useEffect(() => {
+    setRole(initialRole);
+    setOtpStep(false);
+  }, [initialRole]);
   const resendConfirmation = async () => {
     if (!resendEmail) {
       notify("Enter your consumer email address first.");
