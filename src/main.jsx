@@ -537,6 +537,13 @@ function App() {
     [session, setSession] = useState(null),
     [produceRequests, setProduceRequests] = useState([]),
     [orders, setOrders] = useState([]),
+    [bulkRequests, setBulkRequests] = useState([]),
+    [logisticsJobs, setLogisticsJobs] = useState([]),
+    [warehouses, setWarehouses] = useState([
+      { name: "Jaipur North", address: "Jaipur North, Rajasthan" },
+      { name: "Sanganer Hub", address: "Sanganer, Jaipur, Rajasthan" },
+    ]),
+    [liveTick, setLiveTick] = useState(0),
     [now, setNow] = useState(Date.now()),
     [placingOrder, setPlacingOrder] = useState(false),
     placingOrderRef = useRef(false);
@@ -588,7 +595,7 @@ function App() {
             })),
           );
       });
-  }, [session?.userId]);
+  }, [session?.userId, liveTick]);
   useEffect(() => {
     if (!isSupabaseConfigured || !session?.userId) return;
     supabase
@@ -619,7 +626,7 @@ function App() {
             })),
           ]);
       });
-  }, [session?.userId]);
+  }, [session?.userId, liveTick]);
   useEffect(() => {
     if (!isSupabaseConfigured || !session?.userId) return;
     const requestQuery =
@@ -652,7 +659,7 @@ function App() {
           })),
         );
     });
-  }, [session?.userId, session?.role]);
+  }, [session?.userId, session?.role, liveTick]);
   useEffect(() => {
     if (
       !isSupabaseConfigured ||
@@ -692,7 +699,33 @@ function App() {
           })),
         );
     });
-  }, [session?.role, session?.userId]);
+  }, [session?.role, session?.userId, liveTick]);
+  useEffect(() => {
+    if (!isSupabaseConfigured || !session?.userId) return;
+    const admin = session.role === "admin";
+    const bulkQuery = admin
+      ? supabase.from("bulk_requests").select("id,crop,quantity_kg,buyer_name,farmer_id,msp_per_kg,status,created_at").order("created_at", { ascending: false })
+      : supabase.from("bulk_requests").select("id,crop,quantity_kg,buyer_name,farmer_id,msp_per_kg,status,created_at").or(`buyer_id.eq.${session.userId},farmer_id.eq.${session.userId}`).order("created_at", { ascending: false });
+    bulkQuery.then(({ data }) => setBulkRequests(data || []));
+    if (admin) {
+      supabase.from("logistics_jobs").select("id,source_type,source_id,details,status,created_at").order("created_at", { ascending: false }).then(({ data }) => setLogisticsJobs(data || []));
+      supabase.from("warehouses").select("id,name,address").order("name").then(({ data }) => {
+        if (data?.length) setWarehouses(data);
+      });
+    }
+  }, [session?.userId, session?.role, liveTick]);
+  useEffect(() => {
+    if (!isSupabaseConfigured || !session?.userId) return;
+    const channel = supabase
+      .channel("farmlink-live-operations")
+      .on("postgres_changes", { event: "*", schema: "public", table: "produce_requests" }, () => setLiveTick((tick) => tick + 1))
+      .on("postgres_changes", { event: "*", schema: "public", table: "consumer_orders" }, () => setLiveTick((tick) => tick + 1))
+      .on("postgres_changes", { event: "*", schema: "public", table: "bulk_requests" }, () => setLiveTick((tick) => tick + 1))
+      .on("postgres_changes", { event: "*", schema: "public", table: "logistics_jobs" }, () => setLiveTick((tick) => tick + 1))
+      .on("postgres_changes", { event: "*", schema: "public", table: "farmer_listings" }, () => setLiveTick((tick) => tick + 1))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [session?.userId]);
   useEffect(() => {
     const root = document.body;
     if (!root) return;
@@ -1084,7 +1117,7 @@ function App() {
           />
         )}{" "}
         {view === "bulk" && (
-          <BulkMarket lots={lots} setView={setView} notify={notify} />
+          <BulkMarket lots={lots} setView={setView} notify={notify} session={session} liveTick={liveTick} setLiveTick={setLiveTick} />
         )}{" "}
         {view === "warehouse" && session?.role === "admin" && (
           <WarehouseView
@@ -1095,6 +1128,9 @@ function App() {
             setProduceRequests={setProduceRequests}
             orders={orders}
             setOrderStatus={setOrderStatus}
+            warehouses={warehouses}
+            setWarehouses={setWarehouses}
+            setLiveTick={setLiveTick}
             notify={notify}
           />
         )}{" "}
@@ -1105,6 +1141,7 @@ function App() {
             setModal={setModal}
             produceRequests={produceRequests}
             setProduceRequests={setProduceRequests}
+            liveTick={liveTick}
             notify={notify}
           />
         )}{" "}
@@ -1114,9 +1151,14 @@ function App() {
         {view === "admin" && (
           <>
             <AdminView
+              session={session}
               lots={lots}
               orders={orders}
               produceRequests={produceRequests}
+              bulkRequests={bulkRequests}
+              logisticsJobs={logisticsJobs}
+              warehouses={warehouses}
+              setLiveTick={setLiveTick}
               setView={setView}
               logout={logout}
               notify={notify}
@@ -1847,13 +1889,31 @@ function AdminOrderConfirmation({ orders, confirmOrder }) {
     </section>
   );
 }
-function BulkMarket({ lots, setView, notify }) {
+function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
   const [tab, setTab] = useState("discover"),
     [quote, setQuote] = useState(false),
-    [cropQuery, setCropQuery] = useState("");
+    [cropQuery, setCropQuery] = useState(""),
+    [quantity, setQuantity] = useState(250),
+    [offer, setOffer] = useState("");
   const visibleLots = lots.filter((lot) =>
     lot.crop.toLowerCase().includes(cropQuery.trim().toLowerCase()),
   );
+  const sendQuote = async () => {
+    if (!quote) return;
+    const kg = Number(quantity), price = Number(offer || quote.price);
+    if (kg < 250) return notify("Bulk requests must be at least 250 kg.");
+    if (!session?.userId || !isSupabaseConfigured) return notify("Sign in with a wholesale buyer account to send a live quote.");
+    try {
+      const { error } = await supabase.from("bulk_requests").insert({
+        buyer_id: session.userId, buyer_name: session.name || session.label || "Bulk buyer",
+        crop: quote.crop, quantity_kg: kg, status: "pending",
+        ...(quote.listingId ? { listing_id: quote.listingId } : {}),
+      });
+      if (error) throw error;
+      notify(`Quote request for ${kg} kg sent for admin verification. Your offer of ₹${price}/kg will be negotiated after farmer assignment.`);
+      setQuote(false); setLiveTick((tick) => tick + 1);
+    } catch (error) { notify(error.message || "Unable to create the bulk request."); }
+  };
   return (
     <section className="page">
       <div className="page-top">
@@ -1939,14 +1999,16 @@ function BulkMarket({ lots, setView, notify }) {
                 or decline.
               </p>
               <label>
-                Your proposed price
-                <input type="number" defaultValue={quote.price - 2} />
+                Quantity (minimum 250 kg)
+                <input type="number" min="250" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+              </label>
+              <label>
+                Your proposed price per kg
+                <input type="number" min="0" value={offer} placeholder={String(quote.price)} onChange={(e) => setOffer(e.target.value)} />
               </label>
               <button
                 className="primary"
-                onClick={() =>
-                  notify("Quote request sent to the verified farmer.")
-                }
+                onClick={sendQuote}
               >
                 Send negotiated quote
               </button>
@@ -2039,13 +2101,18 @@ function WarehouseView({
   setProduceRequests,
   orders,
   setOrderStatus,
+  warehouses,
+  setWarehouses,
+  setLiveTick,
   notify,
 }) {
   const [form, setForm] = useState({
     crop: "Tomato",
     weight: "350",
     grade: "A",
+    warehouse: warehouses[0]?.name || "Jaipur North",
   });
+  const [newWarehouse, setNewWarehouse] = useState({ name: "", address: "" });
   const submit = async (e) => {
     e.preventDefault();
     let id = `FL-${24094 + lots.length}`;
@@ -2057,7 +2124,7 @@ function WarehouseView({
       qty: +form.weight,
       price: form.crop === "Tomato" ? 27 : 25,
       old: 0,
-      warehouse: "Jaipur North",
+      warehouse: form.warehouse,
       farmer: "Demo Farmer",
       dist: "0 km",
       trend: 4,
@@ -2066,7 +2133,7 @@ function WarehouseView({
       const { data: warehouse, error: warehouseError } = await supabase
         .from("warehouses")
         .select("id")
-        .eq("name", "Jaipur North")
+        .eq("name", form.warehouse)
         .single();
       if (warehouseError) {
         notify("Warehouse could not be found.");
@@ -2128,6 +2195,12 @@ function WarehouseView({
       <div className="warehouse-grid">
         <form className="intake" onSubmit={submit}>
           <h3>Confirm produce intake</h3>
+          <label>
+            Intake warehouse
+            <select value={form.warehouse} onChange={(e) => setForm({ ...form, warehouse: e.target.value })}>
+              {warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}
+            </select>
+          </label>
           <label>
             Crop
             <select
@@ -2194,6 +2267,19 @@ function WarehouseView({
           </p>
         </div>
       </div>
+      <form className="account-panel form-grid" onSubmit={async (event) => {
+        event.preventDefault();
+        if (!newWarehouse.name.trim() || !newWarehouse.address.trim()) return notify("Enter a warehouse name and location.");
+        if (!isSupabaseConfigured) { setWarehouses((current) => [...current, { ...newWarehouse }]); setNewWarehouse({ name: "", address: "" }); return notify("Warehouse added in demo mode."); }
+        const { data, error } = await supabase.from("warehouses").insert({ name: newWarehouse.name.trim(), address: newWarehouse.address.trim() }).select("id,name,address").single();
+        if (error) return notify(error.message);
+        setWarehouses((current) => [...current, data]); setNewWarehouse({ name: "", address: "" }); setLiveTick((tick) => tick + 1); notify("Warehouse added and available across checkout and admin operations.");
+      }}>
+        <h3>Add warehouse location</h3>
+        <label>Warehouse name<input value={newWarehouse.name} onChange={(e) => setNewWarehouse({ ...newWarehouse, name: e.target.value })} placeholder="e.g. Ajmer Collection Hub" /></label>
+        <label>Location / address<input value={newWarehouse.address} onChange={(e) => setNewWarehouse({ ...newWarehouse, address: e.target.value })} placeholder="District, state, PIN" /></label>
+        <button className="primary" type="submit">Add warehouse</button>
+      </form>
       <div className="ops-grid">
         <QueuePanel
           title="Farmer produce & cluster requests"
@@ -2278,6 +2364,7 @@ function FarmerView({
   setModal,
   produceRequests,
   setProduceRequests,
+  liveTick,
   notify,
 }) {
   const [form, setForm] = useState({
@@ -2478,7 +2565,7 @@ function FarmerView({
           )}
         </div>
       </div>
-      <FarmerOperations notify={notify} session={session} />
+      <FarmerOperations notify={notify} session={session} liveTick={liveTick} />
       <div className="farmer-grid">
         <div className="finance">
           <p className="eyebrow">STORED STOCK FINANCE</p>
@@ -2512,19 +2599,32 @@ function FarmerView({
     </section>
   );
 }
-function FarmerOperations({ notify, session }) {
+function FarmerOperations({ notify, session, liveTick }) {
   const [tab, setTab] = useState("listings"),
     [cropSearch, setCropSearch] = useState(""),
     [image, setImage] = useState(null),
     [preview, setPreview] = useState(""),
     [saving, setSaving] = useState(false),
     [published, setPublished] = useState(null),
+    [quotes, setQuotes] = useState([]),
     [listing, setListing] = useState({
       crop: "Tomato",
       description: "Fresh produce from our verified farm cluster.",
       quantity: "100",
       price: "25",
     });
+  useEffect(() => {
+    if (!isSupabaseConfigured || !session?.userId) return;
+    supabase.from("bulk_requests").select("id,crop,quantity_kg,buyer_name,msp_per_kg,status,bulk_quotes(id,offered_price_per_kg,proposed_by,status)").eq("farmer_id", session.userId).order("created_at", { ascending: false }).then(({ data, error }) => {
+      if (error) notify(error.message); else setQuotes(data || []);
+    });
+  }, [session?.userId, liveTick]);
+  const respondToQuote = async (request, quote, action) => {
+    const { error } = await supabase.rpc("respond_to_bulk_quote", { p_request_id: request.id, p_quote_id: quote.id, p_action: action });
+    if (error) return notify(error.message);
+    notify(action === "accept" ? "Sale confirmed. Buyer and warehouse workflow have been updated." : "Offer declined. The buyer has been notified.");
+    setQuotes((current) => current.map((item) => item.id === request.id ? { ...item, status: action === "accept" ? "confirmed" : "declined" } : item));
+  };
   const matches = useMemo(
     () =>
       INDIA_CROPS.filter((item) =>
@@ -2571,7 +2671,7 @@ function FarmerOperations({ notify, session }) {
         quantity_kg: Number(listing.quantity),
         price_per_kg: Number(listing.price),
         image_url: urlData.publicUrl,
-        status: "published",
+        status: "pending",
       };
       const { data, error } = await supabase
         .from("farmer_listings")
@@ -2581,7 +2681,7 @@ function FarmerOperations({ notify, session }) {
       if (error) throw error;
       setPublished(data);
       notify(
-        "Listing published with its farmer photo. Consumers can now view it.",
+        "Photo listing submitted to the admin for verification. It will appear to consumers only after approval.",
       );
     } catch (error) {
       notify(error.message || "Photo listing could not be published.");
@@ -2598,7 +2698,7 @@ function FarmerOperations({ notify, session }) {
           "logistics",
           "payments",
           "performance",
-          "verification",
+          "verification", "quotes",
         ].map((x) => (
           <button
             key={x}
@@ -2696,8 +2796,8 @@ function FarmerOperations({ notify, session }) {
             <div className="published-note">
               <ShieldCheck size={18} />
               <span>
-                <b>{published.crop} is live.</b> Its photo is visible in the
-                consumer marketplace.
+                <b>{published.crop} is awaiting review.</b> Its photo will be
+                visible in the consumer marketplace after admin approval.
               </span>
             </div>
           )}
@@ -2792,6 +2892,16 @@ function FarmerOperations({ notify, session }) {
           >
             Continue verification
           </button>
+        </div>
+      )}
+      {tab === "quotes" && (
+        <div className="account-panel">
+          <h3>Wholesale quote desk</h3>
+          <p>Every offer is protected by the applicable MSP floor. You alone decide whether a sale is confirmed.</p>
+          {quotes.length ? quotes.map((request) => {
+            const offer = (request.bulk_quotes || []).filter((item) => item.proposed_by === "buyer" && item.status === "proposed").at(-1);
+            return <div className="contract-row" key={request.id}><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · MSP floor ₹{Number(request.msp_per_kg || 0).toFixed(2)}/kg · {request.status}</small>{offer && <strong>Buyer offer: ₹{Number(offer.offered_price_per_kg).toFixed(2)}/kg</strong>}</div>{offer ? <span><button className="primary" onClick={() => respondToQuote(request, offer, "accept")}>Accept sale</button> <button className="secondary" onClick={() => respondToQuote(request, offer, "reject")}>Decline</button></span> : <span>Waiting for buyer offer</span>}</div>;
+          }) : <p className="empty-state">No wholesale quote requests have been assigned to you yet.</p>}
         </div>
       )}
     </section>
@@ -3236,7 +3346,7 @@ function Field({ icon, label, name, type, onChange }) {
     </label>
   );
 }
-function AdminView({ lots, orders, produceRequests, setView, logout, notify }) {
+function LegacyAdminView({ lots, orders, produceRequests, setView, logout, notify }) {
   const value = lots.reduce((sum, l) => sum + l.qty * l.price, 0);
   const [tab, setTab] = useState("users");
   return (
@@ -3488,6 +3598,66 @@ function AdminView({ lots, orders, produceRequests, setView, logout, notify }) {
       </section>
     </section>
   );
+}
+function AdminView({ session, lots, orders, produceRequests, bulkRequests, logisticsJobs, warehouses, setLiveTick, setView, logout, notify }) {
+  const [tab, setTab] = useState("action");
+  const [listings, setListings] = useState([]);
+  const [farmers, setFarmers] = useState([]);
+  const [assignments, setAssignments] = useState({});
+  const [route, setRoute] = useState({ origin: warehouses[0]?.name || "", destination: warehouses[1]?.name || "" });
+  const refresh = () => setLiveTick((tick) => tick + 1);
+  useEffect(() => {
+    if (!isSupabaseConfigured || tab !== "listings") return;
+    supabase.from("farmer_listings").select("id,crop,category,description,quantity_kg,price_per_kg,image_url,created_at,profiles(full_name)").eq("status", "pending").order("created_at", { ascending: false }).then(({ data, error }) => {
+      if (error) notify(error.message); else setListings(data || []);
+    });
+  }, [tab, liveTick]);
+  useEffect(() => {
+    if (!isSupabaseConfigured || tab !== "wholesale") return;
+    supabase.from("profiles").select("id,full_name,farmer_id").eq("role", "farmer").order("full_name").then(({ data, error }) => {
+      if (error) notify(error.message); else setFarmers(data || []);
+    });
+  }, [tab]);
+  const update = async (table, id, status, message) => {
+    const { error } = await supabase.from(table).update({ status }).eq("id", id);
+    if (error) return notify(error.message);
+    refresh(); notify(message);
+  };
+  const reviewListing = async (id, status) => {
+    const { error } = await supabase.from("farmer_listings").update({ status, reviewed_at: new Date().toISOString() }).eq("id", id);
+    if (error) return notify(error.message);
+    notify(status === "published" ? "Listing verified and published with the farmer photo." : "Listing rejected; the farmer can correct it and resubmit."); refresh();
+  };
+  const assignFarmer = async (request) => {
+    const farmerId = assignments[request.id] || request.farmer_id;
+    if (!farmerId) return notify("Choose a farmer before connecting this quote.");
+    const { error } = await supabase.from("bulk_requests").update({ farmer_id: farmerId, status: "negotiation" }).eq("id", request.id);
+    if (error) return notify(error.message);
+    notify("Quote connected to the selected farmer. Only the farmer can accept the sale."); refresh();
+  };
+  const addRoute = async (event) => {
+    event.preventDefault();
+    if (!route.origin || !route.destination || route.origin === route.destination) return notify("Choose two different warehouses.");
+    const { error } = await supabase.from("logistics_routes").insert({ created_by: session.userId, route_type: "inter_warehouse", origin: route.origin, destination: route.destination, stops: [route.origin, route.destination] });
+    if (error) return notify(error.message);
+    notify("Inter-warehouse transfer route created."); refresh();
+  };
+  const pending = produceRequests.filter((item) => !["collection_scheduled", "received"].includes(item.status)).length + orders.filter((item) => !["verified", "ready for pickup"].includes(String(item.status).toLowerCase())).length + logisticsJobs.filter((item) => item.status !== "scheduled").length;
+  return <section className="page admin-page">
+    <div className="page-top"><div><p className="eyebrow green">LIVE OPERATIONS COMMAND CENTER</p><h1>FarmLink Admin</h1><p>Verify listings, coordinate collection and warehouse work, connect wholesale buyers, and map the route for every handoff.</p></div><button className="secondary" onClick={logout}><LogOut size={17}/>Sign out</button></div>
+    <div className="metric-grid"><Metric icon={<Users/>} label="Farmer requests" value={String(produceRequests.length)} note={`${pending} item(s) require attention`}/><Metric icon={<ShoppingCart/>} label="Consumer orders" value={String(orders.length)} note="Live pickup fulfilment"/><Metric icon={<Truck/>} label="Logistics jobs" value={String(logisticsJobs.length)} note="Route and schedule tracking"/><Metric icon={<PackageCheck/>} label="Live inventory" value={`${lots.reduce((sum, lot) => sum + lot.qty, 0)} kg`} note="Verified warehouse stock"/></div>
+    <section className="admin-control"><div className="tabs">{[["action","Action centre"],["listings","Listing approvals"],["wholesale","Wholesale desk"],["warehouses","Warehouse inspector"],["routes","Route map"]].map(([key,label]) => <button key={key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>
+    {tab === "action" && <div className="admin-grid">
+      <QueuePanel title="Newest farmer & cluster requests" empty="No open farmer requests." items={produceRequests.slice(0, 8)} render={(item) => <><b>{item.crop} · {item.grossWeight} kg</b><small>{item.farmer} · {item.cluster} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["collection_scheduled","received"].includes(item.status)} onClick={() => update("produce_requests", item.id, "collection_scheduled", "Collection request verified and scheduled.")}>{["collection_scheduled","received"].includes(item.status) ? "Scheduled" : "Verify & schedule"}</button>}/>
+      <QueuePanel title="Newest consumer orders" empty="No pending consumer orders." items={orders.slice(0, 8)} render={(item) => <><b>{item.id} · {item.quantity} kg</b><small>{item.pickupWarehouse} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["verified","ready for pickup"].includes(String(item.status).toLowerCase())} onClick={() => update("consumer_orders", item.dbId, "verified", "Consumer order verified across admin and warehouse queues.")}>{["verified","ready for pickup"].includes(String(item.status).toLowerCase()) ? "Verified" : "Verify order"}</button>}/>
+      <QueuePanel title="Logistics scheduling" empty="No logistics jobs awaiting action." items={logisticsJobs.slice(0, 8)} render={(item) => <><b>{item.source_type.replaceAll("_", " ")}</b><small>{item.details} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={item.status === "scheduled"} onClick={() => update("logistics_jobs", item.id, "scheduled", "Logistics job scheduled across live dashboards.")}>{item.status === "scheduled" ? "Scheduled ✓" : "Schedule job"}</button>}/>
+    </div>}
+    {tab === "listings" && <div className="admin-work-panel"><h3>Farmer photo listing verification</h3><p>Only approved images and produce data become visible in the consumer marketplace.</p>{listings.length ? listings.map((item) => <article className="listing-review" key={item.id}><img src={item.image_url} alt={`${item.crop} submitted listing`}/><div><b>{item.crop} · {item.quantity_kg} kg · ₹{item.price_per_kg}/kg</b><small>{item.profiles?.full_name || "Farmer"} · {item.category}</small><p>{item.description}</p><button className="primary" onClick={() => reviewListing(item.id, "published")}>Verify & publish</button> <button className="secondary" onClick={() => reviewListing(item.id, "rejected")}>Reject</button></div></article>) : <p className="empty-state">No photo listings are awaiting review.</p>}</div>}
+    {tab === "wholesale" && <div className="admin-work-panel"><h3>Connect verified wholesale requests to farmers</h3><p>The MSP-protected offer is sent to the chosen farmer, who can accept, decline, or counter it.</p>{bulkRequests.length ? bulkRequests.filter((request) => !["confirmed","declined"].includes(request.status)).map((request) => <div className="assignment-row" key={request.id}><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · MSP floor ₹{Number(request.msp_per_kg || 0).toFixed(2)}/kg · {request.status}</small></div><select value={assignments[request.id] || request.farmer_id || ""} onChange={(event) => setAssignments({ ...assignments, [request.id]: event.target.value })}><option value="">Choose farmer</option>{farmers.map((farmer) => <option key={farmer.id} value={farmer.id}>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""}</option>)}</select><button className="primary" onClick={() => assignFarmer(request)}>Connect quote</button></div>) : <p className="empty-state">No wholesale requests are awaiting review.</p>}</div>}
+    {tab === "warehouses" && <div className="admin-work-panel"><h3>Warehouse inspection menu</h3><p>Open a warehouse to handle intake, consumer pickups, and its associated live queue.</p>{warehouses.map((warehouse) => <div className="contract-row" key={warehouse.id || warehouse.name}><div><b>{warehouse.name}</b><small>{warehouse.address}</small></div><span>{orders.filter((order) => order.pickupWarehouse === warehouse.name).length} pickup order(s)</span><button className="primary" onClick={() => setView("warehouse")}>Inspect</button></div>)}</div>}
+    {tab === "routes" && <div className="admin-work-panel"><h3>Farm-to-warehouse route mapping</h3><p>Map collection → intake warehouse → inter-warehouse transfer → pickup fulfilment.</p><form className="route-form" onSubmit={addRoute}><select value={route.origin} onChange={(event) => setRoute({ ...route, origin: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><span>→</span><select value={route.destination} onChange={(event) => setRoute({ ...route, destination: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><button className="primary" type="submit">Add transfer route</button></form><button className="secondary" onClick={() => setView("warehouse")}>Open warehouse operations</button></div>}
+    </section>
+  </section>;
 }
 function Metric({ icon, label, value, note }) {
   return (
