@@ -225,6 +225,33 @@ const INDIA_CROPS = [
   ["Flowers & fodder", "Oats fodder"],
   ["Flowers & fodder", "Guinea grass"],
 ].map(([category, name]) => ({ category, name }));
+const cropEmoji = (crop = "", category = "") => {
+  const name = String(crop).toLowerCase();
+  const exact = {
+    tomato: "🍅", potato: "🥔", onion: "🧅", garlic: "🧄", carrot: "🥕", beetroot: "🫜", radish: "🌶️",
+    "sweet potato": "🍠", ginger: "🫚", turmeric: "🫚", chilli: "🌶️", capsicum: "🫑", cucumber: "🥒",
+    pumpkin: "🎃", "bitter gourd": "🥒", "bottle gourd": "🥒", "ridge gourd": "🥒", "snake gourd": "🥒",
+    "drumstick (moringa)": "🌿", okra: "🫛", "brinjal (eggplant)": "🍆", mushroom: "🍄", cauliflower: "🥦", broccoli: "🥦", cabbage: "🥬", spinach: "🥬",
+    lettuce: "🥬", peas: "🫛", "french bean": "🫛", corn: "🌽", maize: "🌽", rice: "🍚", wheat: "🌾", barley: "🌾", oats: "🌾",
+    mango: "🥭", banana: "🍌", apple: "🍎", orange: "🍊", mandarin: "🍊", lemon: "🍋", lime: "🍋", grapes: "🍇",
+    watermelon: "🍉", muskmelon: "🍈", papaya: "🥭", pineapple: "🍍", guava: "🍐", pomegranate: "🍎", coconut: "🥥", avocado: "🥑",
+    strawberry: "🍓", jackfruit: "🍈", litchi: "🍒", coffee: "☕", tea: "🍵", sugarcane: "🎋", cotton: "☁️", jute: "🧵",
+    coriander: "🌿", mint: "🌿", basil: "🌿", curry: "🌿", cumin: "🌿", fennel: "🌿", mustard: "🌿", sesame: "🌿", groundnut: "🥜", soybean: "🫘",
+    rose: "🌹", marigold: "🌼", jasmine: "🌸", chrysanthemum: "🌼", tuberose: "🌸", gladiolus: "🌷", gerbera: "🌸", carnation: "🌸",
+  };
+  const key = Object.keys(exact).find((item) => name.includes(item));
+  if (key) return exact[key];
+  const group = String(category).toLowerCase();
+  if (group.includes("fruit")) return "🍎";
+  if (group.includes("vegetable")) return "🥬";
+  if (group.includes("cereal") || group.includes("millet")) return "🌾";
+  if (group.includes("pulse")) return "🫘";
+  if (group.includes("oilseed")) return "🌻";
+  if (group.includes("spice") || group.includes("herb")) return "🌿";
+  if (group.includes("flower")) return "🌼";
+  if (group.includes("plantation")) return "🌴";
+  return "🌱";
+};
 const normalizeIndianPhone = (value) => {
   const digits = String(value || "").replace(/\D/g, "");
   if (digits.length === 10) return "+91" + digits;
@@ -1354,10 +1381,9 @@ function LotCard({ lot, onClick }) {
         {lot.imageUrl ? (
           <img src={lot.imageUrl} alt={lot.crop + " grown by " + lot.farmer} />
         ) : (
-          <span>
-            {lot.crop === "Tomato" ? "🍅" : lot.crop === "Onion" ? "🧅" : "🥔"}
-          </span>
+          <span>{cropEmoji(lot.crop, lot.category)}</span>
         )}
+        <i className="crop-emoji-badge" aria-label={`${lot.crop} crop icon`}>{cropEmoji(lot.crop, lot.category)}</i>
         <b>{lot.listing ? "Farmer photo" : "Grade " + lot.grade}</b>
       </div>
       <div className="lot-body">
@@ -1599,13 +1625,10 @@ function ProductDetail({
         <div className={"detail-visual " + lot.crop.toLowerCase()}>
           {lot.imageUrl ? (
             <img src={lot.imageUrl} alt={lot.crop + " listing"} />
-          ) : lot.crop === "Tomato" ? (
-            "🍅"
-          ) : lot.crop === "Onion" ? (
-            "🧅"
           ) : (
-            "🥔"
+            cropEmoji(lot.crop, lot.category)
           )}
+          <i className="crop-emoji-badge detail-crop-emoji" aria-label={`${lot.crop} crop icon`}>{cropEmoji(lot.crop, lot.category)}</i>
           <span>
             {lot.listing
               ? "Farmer photo listing"
@@ -2056,7 +2079,7 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
             delivery window, pricing method and cancellation terms.
           </p>
           <form className="form-grid" onSubmit={createContract}>
-            <label>Crop<select value={contract.crop} onChange={(e) => setContract({ ...contract, crop: e.target.value })}>{INDIA_CROPS.map((crop) => <option key={crop.name}>{crop.name}</option>)}</select></label>
+            <label>Crop<select value={contract.crop} onChange={(e) => setContract({ ...contract, crop: e.target.value })}>{INDIA_CROPS.map((crop) => <option key={crop.name}>{cropEmoji(crop.name, crop.category)} {crop.name}</option>)}</select></label>
             <label>Quantity per delivery (minimum 250 kg)<input required type="number" min="250" value={contract.quantity} onChange={(e) => setContract({ ...contract, quantity: e.target.value })}/></label>
             <label>Frequency<select value={contract.frequency} onChange={(e) => setContract({ ...contract, frequency: e.target.value })}><option>Weekly</option><option>Fortnightly</option><option>Monthly</option></select></label>
             <label>Delivery window<input required value={contract.delivery} onChange={(e) => setContract({ ...contract, delivery: e.target.value })}/></label>
@@ -2231,7 +2254,7 @@ function WarehouseView({
               onChange={(e) => setForm({ ...form, crop: e.target.value })}
             >
               {INDIA_CROPS.map((item) => (
-                <option key={item.name}>{item.name}</option>
+                <option key={item.name}>{cropEmoji(item.name, item.category)} {item.name}</option>
               ))}
             </select>
           </label>
@@ -2498,7 +2521,7 @@ function FarmerView({
               {matchingCrops.length ? (
                 matchingCrops.map((item) => (
                   <option key={item.name} value={item.name}>
-                    {item.name} · {item.category}
+                    {cropEmoji(item.name, item.category)} {item.name} · {item.category}
                   </option>
                 ))
               ) : (
@@ -2553,7 +2576,7 @@ function FarmerView({
           <h3>Your produce & requests</h3>
           {myLots.map((l) => (
             <div className="my-lot" key={l.id}>
-              <span>🍅</span>
+              <span>{cropEmoji(l.crop, l.category)}</span>
               <div>
                 <b>
                   {l.id} · {l.crop}, Grade {l.grade}
@@ -2569,7 +2592,7 @@ function FarmerView({
             .filter((r) => r.farmer === (session?.name || "Farmer"))
             .map((r) => (
               <div className="my-lot" key={r.id}>
-                <span>📋</span>
+                <span>{cropEmoji(r.crop)}</span>
                 <div>
                   <b>
                     {r.crop} · {r.grossWeight} kg gross
@@ -2754,7 +2777,7 @@ function FarmerOperations({ notify, session, liveTick }) {
             >
               {matches.map((item) => (
                 <option key={item.name} value={item.name}>
-                  {item.name} · {item.category}
+                  {cropEmoji(item.name, item.category)} {item.name} · {item.category}
                 </option>
               ))}
             </select>
@@ -3636,13 +3659,7 @@ function Checkout({ cart, updateCartQuantity, close, placeOrder, placingOrder })
         <div className="checkout-lines">
           {cart.map((lot) => (
             <div className="checkout-line" key={lot.id}>
-              <span>
-                {lot.crop === "Tomato"
-                  ? "🍅"
-                  : lot.crop === "Onion"
-                    ? "🧅"
-                    : "🥔"}
-              </span>
+              <span>{cropEmoji(lot.crop, lot.category)}</span>
               <div>
                 <b>
                   {lot.crop}, Grade {lot.grade}
