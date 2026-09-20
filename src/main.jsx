@@ -632,7 +632,7 @@ function App() {
       });
   }, [session?.userId, liveTick]);
   useEffect(() => {
-    if (!isSupabaseConfigured || !session?.userId) return;
+    if (!isSupabaseConfigured) return;
     supabase
       .from("farmer_listings")
       .select("id,produce_lot_id,crop,category,description,quantity_kg,price_per_kg,image_url,warehouse_image_url,warehouse_grade,grading_confidence,harvest_date,created_at,warehouses(name)")
