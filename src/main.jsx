@@ -1965,8 +1965,10 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
     [cropQuery, setCropQuery] = useState(""),
     [quantity, setQuantity] = useState(250),
     [offer, setOffer] = useState(""),
+    [quoteFloor, setQuoteFloor] = useState(null),
     [myQuotes, setMyQuotes] = useState([]),
     [contract, setContract] = useState({ crop: "Tomato", quantity: 250, frequency: "Weekly", delivery: "Monday · 10 AM – 1 PM", price: "" }),
+    [contractFloor, setContractFloor] = useState(null),
     [contracts, setContracts] = useState([]);
   const visibleLots = lots.filter((lot) =>
     lot.crop.toLowerCase().includes(cropQuery.trim().toLowerCase()),
@@ -1980,10 +1982,27 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
   const openQuote = (lot) => {
     setQuote(lot); setQuantity(Math.max(250, Math.min(Number(lot.qty) || 250, 1000))); setOffer(String(lot.price)); setTab("quotes");
   };
+  useEffect(() => {
+    if (!isSupabaseConfigured || !quote?.crop) return;
+    let active = true;
+    supabase.from("msp_rates").select("msp_per_kg,marketing_season,source_url,updated_at").eq("crop", quote.crop).maybeSingle().then(({ data }) => {
+      if (active) setQuoteFloor(data ? { price: Number(data.msp_per_kg), season: data.marketing_season, source: data.source_url, updatedAt: data.updated_at } : { price: 0 });
+    });
+    return () => { active = false; };
+  }, [quote?.crop]);
+  useEffect(() => {
+    if (!isSupabaseConfigured || !contract.crop) return;
+    let active = true;
+    supabase.from("msp_rates").select("msp_per_kg,marketing_season,source_url").eq("crop", contract.crop).maybeSingle().then(({ data }) => {
+      if (active) setContractFloor(data ? { price: Number(data.msp_per_kg), season: data.marketing_season, source: data.source_url } : { price: 0 });
+    });
+    return () => { active = false; };
+  }, [contract.crop]);
   const sendQuote = async () => {
     if (!quote) return;
     const kg = Number(quantity), price = Number(offer || quote.price);
     if (kg < 250) return notify("Bulk requests must be at least 250 kg.");
+    if (quoteFloor?.price > 0 && price < quoteFloor.price) return notify(`This crop's official MSP is ₹${quoteFloor.price.toFixed(2)}/kg. Your offer cannot be lower.`);
     if (!session?.userId || !isSupabaseConfigured) return notify("Sign in with a wholesale buyer account to send a live quote.");
     try {
       const { data: request, error } = await supabase.from("bulk_requests").insert({
@@ -2003,6 +2022,7 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
     const kg = Number(contract.quantity), price = Number(contract.price);
     if (kg < 250) return notify("Recurring contract quantities must be at least 250 kg.");
     if (!price || price <= 0) return notify("Enter a proposed price per kg for the contract.");
+    if (contractFloor?.price > 0 && price < contractFloor.price) return notify(`This crop's official MSP is ₹${contractFloor.price.toFixed(2)}/kg. Your contract offer cannot be lower.`);
     if (!session?.userId || !isSupabaseConfigured) return notify("Sign in before creating a contract request.");
     try {
       const { data: request, error } = await supabase.from("bulk_requests").insert({ buyer_id: session.userId, buyer_name: `${session.name || session.label || "Bulk buyer"} · ${contract.frequency} contract`, crop: contract.crop, quantity_kg: kg, status: "pending" }).select("id").single();
@@ -2093,17 +2113,17 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
                 {quote.crop}, Grade {quote.grade} · {quote.qty} kg available
               </b>
               <p>
-                Suggested opening quote: ₹{quote.price - 2}/kg for 100 kg+.
-                Farmer receives every offer and remains free to accept, counter,
+                Current lot price: ₹{quote.price}/kg. Farmer receives every offer and remains free to accept, counter,
                 or decline.
               </p>
+              <small className={quoteFloor?.price > 0 ? "floor-note" : "floor-note missing"}>{quoteFloor?.price > 0 ? <>Official MSP ({quoteFloor.season}): <b>₹{quoteFloor.price.toFixed(2)}/kg</b>{quoteFloor.updatedAt ? ` · verified ${new Date(quoteFloor.updatedAt).toLocaleDateString("en-IN")}` : ""}{quoteFloor.source ? <a href={quoteFloor.source} target="_blank" rel="noreferrer"> View Government notice</a> : ""}</> : "No official MSP is currently notified for this crop — you can make a market-based offer."}</small>
               <label>
                 Quantity (minimum 250 kg)
                 <input type="number" min="250" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
               </label>
               <label>
                 Your proposed price per kg
-                <input type="number" min="0" value={offer} placeholder={String(quote.price)} onChange={(e) => setOffer(e.target.value)} />
+                <input type="number" min={quoteFloor?.price || 0.01} value={offer} placeholder={String(quote.price)} onChange={(e) => setOffer(e.target.value)} />
               </label>
               <button
                 className="primary"
@@ -2129,7 +2149,7 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
             <label>Quantity per delivery (minimum 250 kg)<input required type="number" min="250" value={contract.quantity} onChange={(e) => setContract({ ...contract, quantity: e.target.value })}/></label>
             <label>Frequency<select value={contract.frequency} onChange={(e) => setContract({ ...contract, frequency: e.target.value })}><option>Weekly</option><option>Fortnightly</option><option>Monthly</option></select></label>
             <label>Delivery window<input required value={contract.delivery} onChange={(e) => setContract({ ...contract, delivery: e.target.value })}/></label>
-            <label>Proposed price per kg<input required type="number" min="1" value={contract.price} onChange={(e) => setContract({ ...contract, price: e.target.value })}/></label>
+            <label>Proposed price per kg<input required type="number" min={contractFloor?.price || 0.01} value={contract.price} onChange={(e) => setContract({ ...contract, price: e.target.value })}/><small className={contractFloor?.price > 0 ? "floor-note" : "floor-note missing"}>{contractFloor?.price > 0 ? <>Official MSP ({contractFloor.season}): <b>₹{contractFloor.price.toFixed(2)}/kg</b>{contractFloor.source ? <a href={contractFloor.source} target="_blank" rel="noreferrer"> View Government notice</a> : ""}</> : "No official MSP is currently notified for this crop — market-based contract offers are allowed."}</small></label>
             <button className="primary" type="submit">Create contract request</button>
           </form>
           {contracts.map((item) => <div className="contract-row" key={item.id}><b>{item.frequency} {item.crop} supply</b><span>{item.quantity} kg per delivery · ₹{item.price}/kg</span><span>{item.status}</span></div>)}
@@ -2833,13 +2853,11 @@ function FarmerOperations({ notify, session, liveTick }) {
     if (!isSupabaseConfigured || !listing.crop) return;
     let active = true;
     Promise.all([
-      supabase.from("msp_rates").select("msp_per_kg,source_url").eq("crop", listing.crop).maybeSingle(),
-      supabase.from("crop_price_floors").select("floor_price_per_kg,floor_type,source_url").eq("crop", listing.crop).maybeSingle(),
-    ]).then(([mspResult, referenceResult]) => {
+      supabase.from("msp_rates").select("msp_per_kg,marketing_season,source_url,updated_at").eq("crop", listing.crop).maybeSingle(),
+    ]).then(([mspResult]) => {
       if (!active) return;
-      if (mspResult.data) setListingFloor({ price: Number(mspResult.data.msp_per_kg), label: "Official MSP", source: mspResult.data.source_url });
-      else if (referenceResult.data) setListingFloor({ price: Number(referenceResult.data.floor_price_per_kg), label: referenceResult.data.floor_type === "official_msp" ? "Official MSP" : "Verified reference floor", source: referenceResult.data.source_url });
-      else setListingFloor(null);
+      if (mspResult.data) setListingFloor({ price: Number(mspResult.data.msp_per_kg), label: "Official MSP", season: mspResult.data.marketing_season, source: mspResult.data.source_url, updatedAt: mspResult.data.updated_at });
+      else setListingFloor({ price: 0, label: "No official MSP notified" });
     });
     return () => { active = false; };
   }, [listing.crop]);
@@ -2909,8 +2927,7 @@ function FarmerOperations({ notify, session, liveTick }) {
       notify("Sign in as a farmer to publish a listing.");
       return;
     }
-    if (!listingFloor) return notify(`No verified price floor exists for ${listing.crop}. Ask an admin to configure it before listing.`);
-    if (Number(listing.price) < listingFloor.price) return notify(`Your listing price cannot be below the ${listingFloor.label.toLowerCase()} of ₹${listingFloor.price.toFixed(2)}/kg.`);
+    if (listingFloor?.price > 0 && Number(listing.price) < listingFloor.price) return notify(`Your listing price cannot be below the official MSP of ₹${listingFloor.price.toFixed(2)}/kg.`);
     setSaving(true);
     try {
       const cropMeta = INDIA_CROPS.find((item) => item.name === listing.crop);
@@ -3027,14 +3044,14 @@ function FarmerOperations({ notify, session, liveTick }) {
             <input
               required
               type="number"
-              min={listingFloor?.price || 1}
+              min={listingFloor?.price || 0.01}
               step="0.01"
               value={listing.price}
               onChange={(e) =>
                 setListing({ ...listing, price: e.target.value })
               }
             />
-            <small className={listingFloor ? "floor-note" : "floor-note missing"}>{listingFloor ? <>{listingFloor.label}: <b>₹{listingFloor.price.toFixed(2)}/kg</b>{listingFloor.source ? <a href={listingFloor.source} target="_blank" rel="noreferrer"> View source</a> : ""}</> : "No verified floor configured yet — this crop cannot be submitted."}</small>
+            <small className={listingFloor?.price > 0 ? "floor-note" : "floor-note missing"}>{listingFloor?.price > 0 ? <>{listingFloor.label}{listingFloor.season ? ` (${listingFloor.season})` : ""}: <b>₹{listingFloor.price.toFixed(2)}/kg</b>{listingFloor.updatedAt ? ` · verified ${new Date(listingFloor.updatedAt).toLocaleDateString("en-IN")}` : ""}{listingFloor.source ? <a href={listingFloor.source} target="_blank" rel="noreferrer"> View Government notice</a> : ""}</> : "No official MSP is currently notified for this crop — you may list at a market-based price."}</small>
           </label>
           <label>
             Description
