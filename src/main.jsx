@@ -1164,6 +1164,7 @@ function App() {
               bulkRequests={bulkRequests}
               logisticsJobs={logisticsJobs}
               warehouses={warehouses}
+              liveTick={liveTick}
               setLiveTick={setLiveTick}
               setView={setView}
               logout={logout}
@@ -3609,7 +3610,7 @@ function LegacyAdminView({ lots, orders, produceRequests, setView, logout, notif
     </section>
   );
 }
-function AdminView({ session, lots, orders, produceRequests, bulkRequests, logisticsJobs, warehouses, setLiveTick, setView, logout, notify }) {
+function AdminView({ session, lots, orders, produceRequests, bulkRequests, logisticsJobs, warehouses, liveTick, setLiveTick, setView, logout, notify }) {
   const [tab, setTab] = useState("action");
   const [listings, setListings] = useState([]);
   const [farmers, setFarmers] = useState([]);
