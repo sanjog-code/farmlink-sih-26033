@@ -3259,14 +3259,12 @@ function AuthView({ initialRole = "consumer", setSession, setView, notify }) {
               type="text"
             />
           )}
-          {role !== "admin" || role === "farmer" ? (
-            <Field
-              icon={<LockKeyhole />}
-              label="Password"
-              name="password"
-              type="password"
-            />
-          ) : null}
+          <Field
+            icon={<LockKeyhole />}
+            label="Password"
+            name="password"
+            type="password"
+          />
           {farmerId && (
             <div className="farmer-id">
               <Sprout />
