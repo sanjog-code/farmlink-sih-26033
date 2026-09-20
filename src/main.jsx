@@ -1971,6 +1971,9 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
     [offer, setOffer] = useState(""),
     [quoteFloor, setQuoteFloor] = useState(null),
     [myQuotes, setMyQuotes] = useState([]),
+    [negotiation, setNegotiation] = useState(null),
+    [replyPrice, setReplyPrice] = useState(""),
+    [replyNote, setReplyNote] = useState(""),
     [contract, setContract] = useState({ crop: "Tomato", quantity: 250, frequency: "Weekly", delivery: "Monday · 10 AM – 1 PM", price: "" }),
     [contractFloor, setContractFloor] = useState(null),
     [contracts, setContracts] = useState([]);
@@ -1979,7 +1982,7 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
   );
   useEffect(() => {
     if (!session?.userId || !isSupabaseConfigured) return;
-    supabase.from("bulk_requests").select("id,crop,quantity_kg,status,created_at,bulk_quotes(offered_price_per_kg,proposed_by,status)").eq("buyer_id", session.userId).order("created_at", { ascending: false }).then(({ data, error }) => {
+    supabase.from("bulk_requests").select("id,crop,quantity_kg,msp_per_kg,status,created_at,bulk_quotes(id,offered_price_per_kg,proposed_by,status,note,created_at)").eq("buyer_id", session.userId).order("created_at", { ascending: false }).then(({ data, error }) => {
       if (!error) setMyQuotes(data || []);
     });
   }, [session?.userId, liveTick]);
@@ -2020,6 +2023,20 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
       notify(`Quote request for ${kg} kg and your ₹${price}/kg offer were sent for admin verification.`);
       setQuote(false); setTab("quotes"); setLiveTick((tick) => tick + 1);
     } catch (error) { notify(error.message || "Unable to create the bulk request."); }
+  };
+  const sendNegotiationReply = async () => {
+    if (!negotiation || !session?.userId || !isSupabaseConfigured) return;
+    const price = Number(replyPrice);
+    const floor = Number(negotiation.msp_per_kg || 0);
+    if (!Number.isFinite(price) || price <= 0) return notify("Enter a valid price for your counter-offer.");
+    if (floor > 0 && price < floor) return notify(`Your counter-offer cannot be below the official MSP of ₹${floor.toFixed(2)}/kg.`);
+    const { data, error } = await supabase.from("bulk_quotes").insert({ request_id: negotiation.id, offered_price_per_kg: price, proposed_by: "buyer", note: replyNote.trim() || null }).select("id,offered_price_per_kg,proposed_by,status,note,created_at").single();
+    if (error) return notify(error.message || "Your counter-offer could not be sent.");
+    const updated = { ...negotiation, status: "negotiation", bulk_quotes: [...(negotiation.bulk_quotes || []), data] };
+    setNegotiation(updated);
+    setMyQuotes((items) => items.map((item) => item.id === updated.id ? updated : item));
+    setReplyPrice(""); setReplyNote(""); setLiveTick((tick) => tick + 1);
+    notify("Your counter-offer was sent to the farmer. The farmer keeps final control of the sale.");
   };
   const createContract = async (event) => {
     event.preventDefault();
@@ -2136,8 +2153,10 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
                 Send negotiated quote
               </button>
             </div>
+          ) : negotiation ? (
+            <div className="quote-card"><button className="text-btn" onClick={() => setNegotiation(null)}>← All negotiations</button><h4>{negotiation.crop} · {negotiation.quantity_kg} kg</h4><small className="floor-note">{Number(negotiation.msp_per_kg || 0) > 0 ? `Official MSP floor: ₹${Number(negotiation.msp_per_kg).toFixed(2)}/kg` : "No official MSP is notified for this crop."}</small><div className="negotiation-thread">{[...(negotiation.bulk_quotes || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map((entry) => <div className={"tracking " + (entry.proposed_by === "buyer" ? "buyer-offer" : "farmer-offer")} key={entry.id}><b>{entry.proposed_by === "buyer" ? "Your offer" : "Farmer counter-offer"} · ₹{Number(entry.offered_price_per_kg).toFixed(2)}/kg</b><span>{entry.note || "No note attached."}</span><small>{new Date(entry.created_at).toLocaleString("en-IN")}</small><strong>{entry.status}</strong></div>)}</div><label>Your revised price per kg<input type="number" min={negotiation.msp_per_kg || 0.01} step="0.01" value={replyPrice} onChange={(event) => setReplyPrice(event.target.value)} /></label><label>Message to farmer<textarea maxLength="500" value={replyNote} onChange={(event) => setReplyNote(event.target.value)} placeholder="Explain delivery, quality, or price expectations…" /></label><button className="primary" onClick={sendNegotiationReply}>Send counter-offer</button></div>
           ) : (
-            <div><p className="empty-state">Choose a produce listing from Discover to start an RFQ.</p>{myQuotes.map((item) => { const buyerOffer = item.bulk_quotes?.filter((entry) => entry.proposed_by === "buyer").at(-1); const farmerCounter = item.bulk_quotes?.filter((entry) => entry.proposed_by === "farmer" && entry.status === "proposed").at(-1); return <div className="tracking" key={item.id}><b>{item.crop} · {item.quantity_kg} kg</b><span>Your offer: {buyerOffer ? `₹${buyerOffer.offered_price_per_kg}/kg` : "pending"}{farmerCounter ? ` · Farmer counter: ₹${farmerCounter.offered_price_per_kg}/kg` : ""}</span><strong>{item.status}</strong></div>; })}</div>
+            <div><p className="empty-state">Choose a produce listing from Discover to start an RFQ.</p>{myQuotes.map((item) => { const buyerOffer = item.bulk_quotes?.filter((entry) => entry.proposed_by === "buyer").at(-1); const farmerCounter = item.bulk_quotes?.filter((entry) => entry.proposed_by === "farmer" && entry.status === "proposed").at(-1); return <div className="tracking" key={item.id}><b>{item.crop} · {item.quantity_kg} kg</b><span>Your offer: {buyerOffer ? `₹${buyerOffer.offered_price_per_kg}/kg` : "pending"}{farmerCounter ? ` · Farmer counter: ₹${farmerCounter.offered_price_per_kg}/kg` : ""}</span><strong>{item.status}</strong><button onClick={() => { setNegotiation(item); setReplyPrice(farmerCounter ? String(farmerCounter.offered_price_per_kg) : ""); }}>Open negotiation</button></div>; })}</div>
           )}
         </div>
       )}
@@ -2836,6 +2855,7 @@ function FarmerOperations({ notify, session, liveTick }) {
     [published, setPublished] = useState(null),
     [quotes, setQuotes] = useState([]),
     [counterOffers, setCounterOffers] = useState({}),
+    [counterNotes, setCounterNotes] = useState({}),
     [farmerListings, setFarmerListings] = useState([]),
     [farmerOrders, setFarmerOrders] = useState([]),
     [farmerJobs, setFarmerJobs] = useState([]),
@@ -2849,7 +2869,7 @@ function FarmerOperations({ notify, session, liveTick }) {
     });
   useEffect(() => {
     if (!isSupabaseConfigured || !session?.userId) return;
-    supabase.from("bulk_requests").select("id,crop,quantity_kg,buyer_name,msp_per_kg,status,bulk_quotes(id,offered_price_per_kg,proposed_by,status)").eq("farmer_id", session.userId).order("created_at", { ascending: false }).then(({ data, error }) => {
+    supabase.from("bulk_requests").select("id,crop,quantity_kg,buyer_name,msp_per_kg,status,bulk_quotes(id,offered_price_per_kg,proposed_by,status,note,created_at)").eq("farmer_id", session.userId).order("created_at", { ascending: false }).then(({ data, error }) => {
       if (error) notify(error.message); else setQuotes(data || []);
     });
   }, [session?.userId, liveTick]);
@@ -2894,8 +2914,8 @@ function FarmerOperations({ notify, session, liveTick }) {
     }
     const { data, error } = await supabase
       .from("bulk_quotes")
-      .insert({ request_id: request.id, offered_price_per_kg: offeredPrice, proposed_by: "farmer", status: "proposed" })
-      .select("id,offered_price_per_kg,proposed_by,status")
+      .insert({ request_id: request.id, offered_price_per_kg: offeredPrice, proposed_by: "farmer", status: "proposed", note: counterNotes[request.id]?.trim() || null })
+      .select("id,offered_price_per_kg,proposed_by,status,note,created_at")
       .single();
     if (error) return notify(error.message);
     setQuotes((current) => current.map((item) => item.id === request.id ? {
@@ -2903,6 +2923,7 @@ function FarmerOperations({ notify, session, liveTick }) {
       bulk_quotes: [...(item.bulk_quotes || []), data],
     } : item));
     setCounterOffers((current) => ({ ...current, [request.id]: "" }));
+    setCounterNotes((current) => ({ ...current, [request.id]: "" }));
     notify("Your counter-offer has been sent to the wholesale buyer. You remain in control of the final sale.");
   };
   const matches = useMemo(
@@ -3182,7 +3203,7 @@ function FarmerOperations({ notify, session, liveTick }) {
           {quotes.length ? quotes.map((request) => {
             const offer = (request.bulk_quotes || []).filter((item) => item.proposed_by === "buyer" && item.status === "proposed").at(-1);
             const counter = (request.bulk_quotes || []).filter((item) => item.proposed_by === "farmer" && item.status === "proposed").at(-1);
-            return <div className="contract-row quote-request" key={request.id}><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · MSP floor ₹{Number(request.msp_per_kg || 0).toFixed(2)}/kg · {request.status}</small>{offer && <strong>Buyer offer: ₹{Number(offer.offered_price_per_kg).toFixed(2)}/kg</strong>}{counter && <strong>Your counter: ₹{Number(counter.offered_price_per_kg).toFixed(2)}/kg</strong>}</div>{offer ? <div className="quote-actions"><label>Counter ₹/kg<input type="number" min={request.msp_per_kg || 0} step="0.01" value={counterOffers[request.id] || ""} onChange={(event) => setCounterOffers({ ...counterOffers, [request.id]: event.target.value })} placeholder={`Min ₹${request.msp_per_kg || 0}`} /></label><button onClick={() => sendCounterOffer(request)}>Send counter</button><button className="primary" onClick={() => respondToQuote(request, offer, "accept")}>Accept sale</button> <button className="secondary" onClick={() => respondToQuote(request, offer, "reject")}>Decline</button></div> : <span>Waiting for buyer offer</span>}</div>;
+            return <div className="contract-row quote-request" key={request.id}><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · {Number(request.msp_per_kg || 0) > 0 ? `Official MSP ₹${Number(request.msp_per_kg).toFixed(2)}/kg` : "No official MSP notified"} · {request.status}</small><div className="negotiation-thread">{[...(request.bulk_quotes || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map((entry) => <div className={"tracking " + (entry.proposed_by === "farmer" ? "farmer-offer" : "buyer-offer")} key={entry.id}><b>{entry.proposed_by === "farmer" ? "Your counter-offer" : "Buyer offer"} · ₹{Number(entry.offered_price_per_kg).toFixed(2)}/kg</b><span>{entry.note || "No message attached."}</span><small>{entry.created_at ? new Date(entry.created_at).toLocaleString("en-IN") : "Just now"}</small><strong>{entry.status}</strong></div>)}</div></div>{offer ? <div className="quote-actions"><label>Counter ₹/kg<input type="number" min={request.msp_per_kg || 0.01} step="0.01" value={counterOffers[request.id] || ""} onChange={(event) => setCounterOffers({ ...counterOffers, [request.id]: event.target.value })} placeholder={`Min ₹${request.msp_per_kg || 0}`} /></label><label>Message to buyer<textarea maxLength="500" value={counterNotes[request.id] || ""} onChange={(event) => setCounterNotes({ ...counterNotes, [request.id]: event.target.value })} placeholder="Explain your quality, delivery, or price terms…" /></label><button onClick={() => sendCounterOffer(request)}>Send counter</button><button className="primary" onClick={() => respondToQuote(request, offer, "accept")}>Accept sale</button> <button className="secondary" onClick={() => respondToQuote(request, offer, "reject")}>Decline</button></div> : <span>Waiting for buyer offer</span>}</div>;
           }) : <p className="empty-state">No wholesale quote requests have been assigned to you yet.</p>}
         </div>
       )}
