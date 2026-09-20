@@ -31,9 +31,14 @@ import {
 import "./styles.css";
 import "./auth.css";
 import "./workflows.css";
+import "./checkout.css";
 import { isSupabaseConfigured, supabase } from "./supabase";
 import { firebaseAuth, isFirebaseConfigured } from "./firebase";
-import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
+import {
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  useDeviceLanguage,
+} from "firebase/auth";
 
 const initialLots = [];
 const INDIA_CROPS = [
@@ -453,6 +458,19 @@ const hindiUI = {
   "/kg": "/किग्रा",
   km: "किमी",
   intake: "प्राप्ति",
+  "Mark received": "प्राप्ति दर्ज करें",
+  Received: "प्राप्त हुआ",
+  "Mark ready": "तैयार करें",
+  Ready: "तैयार",
+  "Total payable at pickup": "पिकअप पर कुल देय",
+  "Consumer checkout": "उपभोक्ता चेकआउट",
+  "Your items are reserved. Select a verified FarmLink warehouse, then confirm your pickup order.":
+    "आपकी वस्तुएँ आरक्षित हैं। सत्यापित फार्मलिंक गोदाम चुनें और पिकअप ऑर्डर की पुष्टि करें।",
+  "Firebase OTP sent to your registered mobile number.": "आपके पंजीकृत मोबाइल नंबर पर Firebase OTP भेजा गया है।",
+  "Start recording": "रिकॉर्डिंग शुरू करें",
+  "Stop & transcribe": "रोकें और लिप्यंतरित करें",
+  Engine: "इंजन",
+  Language: "भाषा",
   "Jaipur North": "जयपुर उत्तर",
   "Sanganer Hub": "सांगानेर हब",
 };
@@ -678,6 +696,7 @@ function App() {
   useEffect(() => {
     const root = document.body;
     if (!root) return;
+    document.documentElement.lang = lang === "hi" ? "hi" : "en";
     let pending = false;
     const translate = () => {
       if (!pending) {
@@ -710,11 +729,60 @@ function App() {
       );
       return;
     }
-    setCart((c) => [...c, lot]);
+    const alreadyReserved = cart.reduce((sum, item) => sum + item.quantityKg, 0);
+    const quantityKg = Math.min(10, 50 - alreadyReserved, Number(lot.qty));
+    if (quantityKg <= 0) {
+      notify("A consumer order can contain up to 50 kg. Adjust your cart to add more.");
+      return;
+    }
+    setCart((current) => {
+      const existing = current.find((item) => item.id === lot.id);
+      return existing
+        ? current.map((item) =>
+            item.id === lot.id
+              ? { ...item, quantityKg: item.quantityKg + quantityKg }
+              : item,
+          )
+        : [...current, { ...lot, quantityKg }];
+    });
     setLots((ls) =>
-      ls.map((x) => (x.id === lot.id ? { ...x, qty: x.qty - 10 } : x)),
+      ls.map((x) =>
+        x.id === lot.id ? { ...x, qty: x.qty - quantityKg } : x,
+      ),
     );
-    notify("10 kg reserved. Your order is ready for checkout.");
+    notify(`${quantityKg} kg reserved. Adjust quantity in checkout anytime.`);
+  };
+  const updateCartQuantity = (lotId, requestedQuantity) => {
+    const item = cart.find((entry) => entry.id === lotId);
+    if (!item) return;
+    const nextQuantity = Math.max(0, Math.floor(Number(requestedQuantity) || 0));
+    const otherQuantity = cart
+      .filter((entry) => entry.id !== lotId)
+      .reduce((sum, entry) => sum + entry.quantityKg, 0);
+    if (nextQuantity > 0 && otherQuantity + nextQuantity > 50) {
+      notify("The maximum order quantity is 50 kg.");
+      return;
+    }
+    const difference = nextQuantity - item.quantityKg;
+    const available = lots.find((lot) => lot.id === lotId)?.qty || 0;
+    if (difference > available) {
+      notify("That quantity is no longer available in this lot.");
+      return;
+    }
+    setCart((current) =>
+      nextQuantity === 0
+        ? current.filter((entry) => entry.id !== lotId)
+        : current.map((entry) =>
+            entry.id === lotId
+              ? { ...entry, quantityKg: nextQuantity }
+              : entry,
+          ),
+    );
+    setLots((current) =>
+      current.map((lot) =>
+        lot.id === lotId ? { ...lot, qty: lot.qty - difference } : lot,
+      ),
+    );
   };
   useEffect(() => {
     const expired = orders.filter(
@@ -750,7 +818,7 @@ function App() {
         id,
         pickupWarehouse,
         items: cart.length,
-        quantity: cart.length * 10,
+        quantity: cart.reduce((sum, lot) => sum + lot.quantityKg, 0),
         status: "Pending verification",
         cancellationDeadline,
         lineItems: cart,
@@ -772,7 +840,10 @@ function App() {
             consumer_id: session.userId,
             pickup_warehouse_id: warehouse.id,
             total_kg: order.quantity,
-            total_amount: cart.reduce((sum, lot) => sum + lot.price * 10, 0),
+            total_amount: cart.reduce(
+              (sum, lot) => sum + lot.price * lot.quantityKg,
+              0,
+            ),
             status: "pending_verification",
             cancellation_expires_at: new Date(
               cancellationDeadline,
@@ -790,7 +861,7 @@ function App() {
           .map((lot) => ({
             order_id: created.id,
             lot_id: lot.dbId,
-            quantity_kg: 10,
+            quantity_kg: lot.quantityKg,
             unit_price: lot.price,
           }));
         if (items.length) {
@@ -845,10 +916,10 @@ function App() {
     if (await setOrderStatus(id, "Cancelled")) {
       setLots((current) =>
         current.map((lot) => {
-          const reserved = (order.lineItems || []).filter(
-            (item) => item.id === lot.id,
-          ).length;
-          return reserved ? { ...lot, qty: lot.qty + reserved * 10 } : lot;
+          const reserved = (order.lineItems || [])
+            .filter((item) => item.id === lot.id)
+            .reduce((sum, item) => sum + item.quantityKg, 0);
+          return reserved ? { ...lot, qty: lot.qty + reserved } : lot;
         }),
       );
       notify("Order cancelled. Reserved stock was returned.");
@@ -893,7 +964,7 @@ function App() {
     setView("home");
     notify("You have logged out.");
   };
-  const total = cart.length * 10;
+  const total = cart.reduce((sum, lot) => sum + lot.quantityKg, 0);
   return (
     <>
       <header>
@@ -926,11 +997,7 @@ function App() {
               onChange={(event) => setLang(event.target.value)}
             >
               <option value="en">English</option>
-              {CONSTITUTIONAL_LANGUAGES.map(([code, label]) => (
-                <option value={code} key={code}>
-                  {label}
-                </option>
-              ))}
+              <option value="hi">हिन्दी</option>
             </select>
           </label>
           {session ? (
@@ -1025,7 +1092,9 @@ function App() {
             lots={lots}
             setLots={setLots}
             produceRequests={produceRequests}
+            setProduceRequests={setProduceRequests}
             orders={orders}
+            setOrderStatus={setOrderStatus}
             notify={notify}
           />
         )}{" "}
@@ -1077,9 +1146,10 @@ function App() {
       )}{" "}
       {modal === "ai" && <AI close={() => setModal(null)} />}{" "}
       {modal === "checkout" && (
-        <Checkout
-          cart={cart}
-          close={() => setModal(null)}
+          <Checkout
+            cart={cart}
+            updateCartQuantity={updateCartQuantity}
+            close={() => setModal(null)}
           placeOrder={placeOrder}
           placingOrder={placingOrder}
         />
@@ -1966,7 +2036,9 @@ function WarehouseView({
   lots,
   setLots,
   produceRequests,
+  setProduceRequests,
   orders,
+  setOrderStatus,
   notify,
 }) {
   const [form, setForm] = useState({
@@ -2021,6 +2093,23 @@ function WarehouseView({
     setLots([...lots, newLot]);
     notify(`Lot ${id} recorded with an immutable intake event.`);
   };
+  const receiveRequest = async (request) => {
+    if (isSupabaseConfigured) {
+      const { error } = await supabase
+        .from("produce_requests")
+        .update({ status: "received" })
+        .eq("id", request.id);
+      if (error) return notify(error.message);
+    }
+    setProduceRequests((current) =>
+      current.map((item) =>
+        item.id === request.id
+          ? { ...item, status: "Received at warehouse" }
+          : item,
+      ),
+    );
+    notify(`${request.crop} intake marked received.`);
+  };
   return (
     <section className="page warehouse-page">
       <div className="page-top">
@@ -2045,9 +2134,9 @@ function WarehouseView({
               value={form.crop}
               onChange={(e) => setForm({ ...form, crop: e.target.value })}
             >
-              <option>Tomato</option>
-              <option>Onion</option>
-              <option>Potato</option>
+              {INDIA_CROPS.map((item) => (
+                <option key={item.name}>{item.name}</option>
+              ))}
             </select>
           </label>
           <label>
@@ -2120,6 +2209,17 @@ function WarehouseView({
               </small>
             </>
           )}
+          action={(request) => (
+            <button
+              className="queue-action"
+              disabled={String(request.status).toLowerCase().includes("received")}
+              onClick={() => receiveRequest(request)}
+            >
+              {String(request.status).toLowerCase().includes("received")
+                ? "Received"
+                : "Mark received"}
+            </button>
+          )}
         />
         <QueuePanel
           title="Consumer pickup orders"
@@ -2135,12 +2235,27 @@ function WarehouseView({
               </small>
             </>
           )}
+          action={(order) => (
+            <button
+              className="queue-action"
+              disabled={String(order.status).toLowerCase() === "ready for pickup"}
+              onClick={async () => {
+                if (await setOrderStatus(order.id, "Ready for pickup")) {
+                  notify(`${order.id} is ready for consumer pickup.`);
+                }
+              }}
+            >
+              {String(order.status).toLowerCase() === "ready for pickup"
+                ? "Ready"
+                : "Mark ready"}
+            </button>
+          )}
         />
       </div>
     </section>
   );
 }
-function QueuePanel({ title, items, empty, render }) {
+function QueuePanel({ title, items, empty, render, action }) {
   return (
     <div className="queue-panel">
       <h3>{title}</h3>
@@ -2148,7 +2263,7 @@ function QueuePanel({ title, items, empty, render }) {
         items.map((item) => (
           <div className="admin-row" key={item.id}>
             <span className="dot"></span>
-            <div>{render(item)}</div>
+            <div>{render(item)}{action?.(item)}</div>
           </div>
         ))
       ) : (
@@ -2803,7 +2918,7 @@ function AuthView({ setSession, setView, notify }) {
             );
           }
           const auth = firebaseAuth();
-          auth.useDeviceLanguage();
+          useDeviceLanguage(auth);
           if (!firebaseVerifier.current) {
             firebaseVerifier.current = new RecaptchaVerifier(
               auth,
@@ -2838,7 +2953,15 @@ function AuthView({ setSession, setView, notify }) {
           "firebase-phone-session",
           { body: { idToken } },
         );
-        if (otpError) throw otpError;
+        if (otpError) {
+          let detail;
+          try {
+            detail = await otpError.context?.json();
+          } catch {
+            // Use the provider error below when no structured response exists.
+          }
+          throw new Error(detail?.error || otpError.message);
+        }
         if (otp?.error) throw new Error(otp.error);
         const { data: verified, error } = await supabase.auth.verifyOtp({
           token_hash: otp.tokenHash,
@@ -2859,13 +2982,19 @@ function AuthView({ setSession, setView, notify }) {
           },
         });
         if (error) throw error;
-        if (!signup.session) {
-          notify(
-            "Check your email to confirm your consumer account. You will return to FarmLink after confirming.",
-          );
-          return;
+        let signedInUser = signup.session?.user;
+        if (!signedInUser) {
+          const { data: login, error: loginError } =
+            await supabase.auth.signInWithPassword({
+              email: String(data.get("email")),
+              password,
+            });
+          if (loginError || !login.user) {
+            throw loginError || new Error("Account was created but sign-in did not complete.");
+          }
+          signedInUser = login.user;
         }
-        await finishLogin(signup.user, "consumer");
+        await finishLogin(signedInUser, "consumer");
         return;
       }
       if (mode === "register" && role === "farmer") {
@@ -3076,15 +3205,6 @@ function AuthView({ setSession, setView, notify }) {
             <ArrowUpRight size={17} />
           </button>
         </form>
-        {role === "consumer" && mode === "login" && (
-          <button
-            className="text-btn"
-            disabled={busy}
-            onClick={resendConfirmation}
-          >
-            Resend email confirmation
-          </button>
-        )}
         {role === "admin" && (
           <p className="admin-note">
             <ShieldCheck />
@@ -3379,9 +3499,10 @@ function Metric({ icon, label, value, note }) {
     </div>
   );
 }
-function Checkout({ cart, close, placeOrder, placingOrder }) {
+function Checkout({ cart, updateCartQuantity, close, placeOrder, placingOrder }) {
   const [warehouse, setWarehouse] = useState("Jaipur North");
-  const total = cart.reduce((sum, l) => sum + l.price * 10, 0);
+  const total = cart.reduce((sum, l) => sum + l.price * l.quantityKg, 0);
+  const totalKg = cart.reduce((sum, l) => sum + l.quantityKg, 0);
   return (
     <div className="modal-back">
       <div className="modal checkout-modal">
@@ -3395,8 +3516,8 @@ function Checkout({ cart, close, placeOrder, placingOrder }) {
           confirm your pickup order.
         </p>
         <div className="checkout-lines">
-          {cart.map((lot, index) => (
-            <div className="checkout-line" key={`${lot.id}-${index}`}>
+          {cart.map((lot) => (
+            <div className="checkout-line" key={lot.id}>
               <span>
                 {lot.crop === "Tomato"
                   ? "🍅"
@@ -3408,9 +3529,41 @@ function Checkout({ cart, close, placeOrder, placingOrder }) {
                 <b>
                   {lot.crop}, Grade {lot.grade}
                 </b>
-                <small>10 kg from lot {lot.id}</small>
+                <small>Lot {lot.id} · ₹{lot.price}/kg</small>
               </div>
-              <strong>₹{lot.price * 10}</strong>
+              <div className="checkout-quantity" aria-label={`${lot.crop} quantity`}>
+                <button
+                  type="button"
+                  aria-label={`Decrease ${lot.crop} quantity`}
+                  onClick={() => updateCartQuantity(lot.id, lot.quantityKg - 1)}
+                >
+                  −
+                </button>
+                <input
+                  aria-label={`${lot.crop} kilograms`}
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={lot.quantityKg}
+                  onChange={(event) => updateCartQuantity(lot.id, event.target.value)}
+                />
+                <button
+                  type="button"
+                  aria-label={`Increase ${lot.crop} quantity`}
+                  onClick={() => updateCartQuantity(lot.id, lot.quantityKg + 1)}
+                >
+                  +
+                </button>
+              </div>
+              <strong>₹{lot.price * lot.quantityKg}</strong>
+              <button
+                type="button"
+                className="checkout-remove"
+                aria-label={`Remove ${lot.crop} from checkout`}
+                onClick={() => updateCartQuantity(lot.id, 0)}
+              >
+                <X size={16} />
+              </button>
             </div>
           ))}
         </div>
@@ -3428,8 +3581,8 @@ function Checkout({ cart, close, placeOrder, placingOrder }) {
           </small>
         </label>
         <div className="checkout-total">
-          <span>Total payable at pickup</span>
-          <b>₹{total}</b>
+          <span>Total payable at pickup · {totalKg} / 50 kg</span>
+          <b>₹{total.toFixed(2)}</b>
         </div>
         <button
           className="primary checkout-confirm"
@@ -3517,7 +3670,15 @@ function Voice({ close, notify }) {
         "transcribe-audio",
         { body: form },
       );
-      if (error) throw error;
+      if (error) {
+        let detail;
+        try {
+          detail = await error.context?.json();
+        } catch {
+          // Fall back to the provider error when no JSON error is available.
+        }
+        throw new Error(detail?.error || error.message);
+      }
       if (!data?.text)
         throw new Error(data?.error || "No transcript returned.");
       setTranscript(data.text);

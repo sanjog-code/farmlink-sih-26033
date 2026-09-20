@@ -1,0 +1,55 @@
+.checkout-lines {
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.checkout-line > div:not(.checkout-quantity) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+}
+
+.checkout-quantity {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 3px;
+  flex: none !important;
+}
+
+.checkout-quantity button,
+.checkout-remove {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: #eaf3e8;
+  color: #1c5c38;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.checkout-quantity input {
+  width: 40px;
+  border: 1px solid #d6e4d4;
+  border-radius: 7px;
+  background: #fff;
+  padding: 4px;
+  text-align: center;
+  font-weight: 800;
+}
+
+.checkout-remove {
+  flex: none;
+  background: #fff0ef;
+  color: #b23a32;
+}
+
+@media (max-width: 800px) {
+  .checkout-line { align-items: flex-start; flex-wrap: wrap; }
+  .checkout-line > div:not(.checkout-quantity) { min-width: 135px; }
+}
