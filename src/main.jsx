@@ -1516,14 +1516,14 @@ function Market({
           Organic certified
         </label>
       </div>
-      <div className="filters">
+      <div className="filters crop-category-bar" aria-label="Produce categories">
         {["All", ...cropCategories].map((x) => (
           <button
             key={x}
             className={filter === x ? "selected" : ""}
             onClick={() => setFilter(x)}
           >
-            {x === "All" ? "All produce" : <>{cropEmoji(x)} {x} <small>({lots.filter((lot) => lot.crop === x).length})</small></>}
+            {x === "All" ? <><span className="category-all">✦</span> All produce <small>{lots.length}</small></> : <><span className="category-icon">{cropEmoji(x)}</span><span>{x}</span><small>{lots.filter((lot) => lot.crop === x).length}</small></>}
           </button>
         ))}
       </div>
@@ -2693,6 +2693,7 @@ function FarmerOperations({ notify, session, liveTick }) {
     [farmerListings, setFarmerListings] = useState([]),
     [farmerOrders, setFarmerOrders] = useState([]),
     [farmerJobs, setFarmerJobs] = useState([]),
+    [listingFloor, setListingFloor] = useState(null),
     [listing, setListing] = useState({
       crop: "Tomato",
       description: "Fresh produce from our verified farm cluster.",
@@ -2705,6 +2706,20 @@ function FarmerOperations({ notify, session, liveTick }) {
       if (error) notify(error.message); else setQuotes(data || []);
     });
   }, [session?.userId, liveTick]);
+  useEffect(() => {
+    if (!isSupabaseConfigured || !listing.crop) return;
+    let active = true;
+    Promise.all([
+      supabase.from("msp_rates").select("msp_per_kg,source_url").eq("crop", listing.crop).maybeSingle(),
+      supabase.from("crop_price_floors").select("floor_price_per_kg,floor_type,source_url").eq("crop", listing.crop).maybeSingle(),
+    ]).then(([mspResult, referenceResult]) => {
+      if (!active) return;
+      if (mspResult.data) setListingFloor({ price: Number(mspResult.data.msp_per_kg), label: "Official MSP", source: mspResult.data.source_url });
+      else if (referenceResult.data) setListingFloor({ price: Number(referenceResult.data.floor_price_per_kg), label: referenceResult.data.floor_type === "official_msp" ? "Official MSP" : "Verified reference floor", source: referenceResult.data.source_url });
+      else setListingFloor(null);
+    });
+    return () => { active = false; };
+  }, [listing.crop]);
   useEffect(() => {
     if (!isSupabaseConfigured || !session?.userId) return;
     Promise.all([
@@ -2771,6 +2786,8 @@ function FarmerOperations({ notify, session, liveTick }) {
       notify("Sign in as a farmer to publish a listing.");
       return;
     }
+    if (!listingFloor) return notify(`No verified price floor exists for ${listing.crop}. Ask an admin to configure it before listing.`);
+    if (Number(listing.price) < listingFloor.price) return notify(`Your listing price cannot be below the ${listingFloor.label.toLowerCase()} of ₹${listingFloor.price.toFixed(2)}/kg.`);
     setSaving(true);
     try {
       const cropMeta = INDIA_CROPS.find((item) => item.name === listing.crop);
@@ -2881,12 +2898,14 @@ function FarmerOperations({ notify, session, liveTick }) {
             <input
               required
               type="number"
-              min="1"
+              min={listingFloor?.price || 1}
+              step="0.01"
               value={listing.price}
               onChange={(e) =>
                 setListing({ ...listing, price: e.target.value })
               }
             />
+            <small className={listingFloor ? "floor-note" : "floor-note missing"}>{listingFloor ? <>{listingFloor.label}: <b>₹{listingFloor.price.toFixed(2)}/kg</b>{listingFloor.source ? <a href={listingFloor.source} target="_blank" rel="noreferrer"> View source</a> : ""}</> : "No verified floor configured yet — this crop cannot be submitted."}</small>
           </label>
           <label>
             Description
@@ -3642,12 +3661,20 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
   const [assignments, setAssignments] = useState({});
   const [clusterSelections, setClusterSelections] = useState({});
   const [listingWarehouses, setListingWarehouses] = useState({});
+  const [floorForm, setFloorForm] = useState({ crop: "Tomato", price: "", source: "" });
+  const [priceFloors, setPriceFloors] = useState([]);
   const [route, setRoute] = useState({ origin: warehouses[0]?.name || "", destination: warehouses[1]?.name || "" });
   const refresh = () => setLiveTick((tick) => tick + 1);
   useEffect(() => {
     if (!isSupabaseConfigured || tab !== "listings") return;
     supabase.from("farmer_listings").select("id,crop,category,description,quantity_kg,price_per_kg,image_url,created_at,profiles(full_name)").eq("status", "pending").order("created_at", { ascending: false }).then(({ data, error }) => {
       if (error) notify(error.message); else setListings(data || []);
+    });
+  }, [tab, liveTick]);
+  useEffect(() => {
+    if (!isSupabaseConfigured || tab !== "price floors") return;
+    supabase.from("crop_price_floors").select("crop,floor_price_per_kg,floor_type,source_url,updated_at").order("crop").then(({ data, error }) => {
+      if (error) notify(error.message); else setPriceFloors(data || []);
     });
   }, [tab, liveTick]);
   useEffect(() => {
@@ -3739,11 +3766,20 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
     if (error) return notify(error.message);
     notify("Inter-warehouse transfer route created."); refresh();
   };
+  const savePriceFloor = async (event) => {
+    event.preventDefault();
+    const price = Number(floorForm.price);
+    if (!floorForm.crop || !Number.isFinite(price) || price <= 0) return notify("Choose a crop and enter a valid verified price floor.");
+    const { error } = await supabase.from("crop_price_floors").upsert({ crop: floorForm.crop, floor_price_per_kg: price, floor_type: "admin_verified_reference", source_url: floorForm.source || null, updated_at: new Date().toISOString() }, { onConflict: "crop" });
+    if (error) return notify(error.message);
+    notify(`Verified floor saved for ${floorForm.crop}. Farmers and buyers are now protected by it.`);
+    setFloorForm({ ...floorForm, price: "", source: "" }); refresh();
+  };
   const pending = produceRequests.filter((item) => !["collection_scheduled", "received"].includes(item.status)).length + orders.filter((item) => !["verified", "ready for pickup"].includes(String(item.status).toLowerCase())).length + logisticsJobs.filter((item) => item.status !== "scheduled").length;
   return <section className="page admin-page">
     <div className="page-top"><div><p className="eyebrow green">LIVE OPERATIONS COMMAND CENTER</p><h1>FarmLink Admin</h1><p>Verify listings, coordinate collection and warehouse work, connect wholesale buyers, and map the route for every handoff.</p></div><button className="secondary" onClick={logout}><LogOut size={17}/>Sign out</button></div>
     <div className="metric-grid"><Metric icon={<Users/>} label="Farmer requests" value={String(produceRequests.length)} note={`${pending} item(s) require attention`}/><Metric icon={<ShoppingCart/>} label="Consumer orders" value={String(orders.length)} note="Live pickup fulfilment"/><Metric icon={<Truck/>} label="Logistics jobs" value={String(logisticsJobs.length)} note="Route and schedule tracking"/><Metric icon={<PackageCheck/>} label="Live inventory" value={`${lots.reduce((sum, lot) => sum + lot.qty, 0)} kg`} note="Verified warehouse stock"/></div>
-    <section className="admin-control"><div className="tabs">{[["action","Action centre"],["listings","Listing approvals"],["wholesale","Wholesale desk"],["warehouses","Warehouse inspector"],["routes","Route map"]].map(([key,label]) => <button key={key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>
+    <section className="admin-control"><div className="tabs">{[["action","Action centre"],["listings","Listing approvals"],["wholesale","Wholesale desk"],["warehouses","Warehouse inspector"],["routes","Route map"],["price floors","Price floors"]].map(([key,label]) => <button key={key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>
     {tab === "action" && <div className="admin-grid">
       <QueuePanel title="Newest farmer & cluster requests" empty="No open farmer requests." items={produceRequests.slice(0, 8)} render={(item) => <><b>{item.crop} · {item.grossWeight} kg</b><small>{item.farmer} · {item.cluster} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["collection_scheduled","received"].includes(item.status)} onClick={() => scheduleClusterRequest(item)}>{["collection_scheduled","received"].includes(item.status) ? "Scheduled" : "Verify & schedule"}</button>}/>
       <QueuePanel title="Newest consumer orders" empty="No pending consumer orders." items={orders.slice(0, 8)} render={(item) => <><b>{item.id} · {item.quantity} kg</b><small>{item.pickupWarehouse} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["verified","ready for pickup"].includes(String(item.status).toLowerCase())} onClick={async () => { if (await setOrderStatus(item.id, "Verified")) notify("Consumer order verified across admin, consumer and warehouse queues."); }}>{["verified","ready for pickup"].includes(String(item.status).toLowerCase()) ? "Verified" : "Verify order"}</button>}/>
@@ -3753,6 +3789,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
     {tab === "wholesale" && <div className="admin-work-panel"><h3>Connect wholesale requests to crop-matched farmers</h3><p>Only farmers with live, verified stock of the requested crop can receive a quote. If no one farmer can fulfil it, create a capacity-checked farmer cluster.</p>{bulkRequests.length ? bulkRequests.filter((request) => !["confirmed","declined"].includes(request.status)).map((request) => { const eligible = eligibleFarmers(request); const selected = clusterSelections[request.id] || []; const clusterCapacity = eligible.filter((farmer) => selected.includes(farmer.id)).reduce((sum, farmer) => sum + Number(farmer.stock[request.crop] || 0), 0); return <div className="quote-assignment" key={request.id}><div className="assignment-row"><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · MSP floor ₹{Number(request.msp_per_kg || 0).toFixed(2)}/kg · {request.status}</small><small>{eligible.length} crop-matched farmer(s) · {eligible.reduce((sum, farmer) => sum + Number(farmer.stock[request.crop] || 0), 0)} kg live capacity</small></div><select value={assignments[request.id] || request.farmer_id || ""} onChange={(event) => setAssignments({ ...assignments, [request.id]: event.target.value })}><option value="">Choose an eligible farmer</option>{eligible.filter((farmer) => Number(farmer.stock[request.crop] || 0) >= Number(request.quantity_kg)).map((farmer) => <option key={farmer.id} value={farmer.id}>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""} · {farmer.stock[request.crop]} kg</option>)}</select><button className="primary" disabled={!eligible.some((farmer) => Number(farmer.stock[request.crop] || 0) >= Number(request.quantity_kg))} onClick={() => assignFarmer(request)}>Assign single farmer</button></div><div className="cluster-picker"><b>Or create a farmer cluster</b><small>Select contributors with {request.crop}; capacity is allocated automatically up to the buyer requirement.</small>{eligible.map((farmer) => <label key={farmer.id}><input type="checkbox" checked={selected.includes(farmer.id)} onChange={() => toggleClusterFarmer(request.id, farmer.id)}/><span>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""}</span><strong>{farmer.stock[request.crop]} kg available</strong></label>)}{eligible.length ? <div><span>Selected capacity: <b>{clusterCapacity} / {request.quantity_kg} kg</b></span><button className="secondary" disabled={selected.length < 2 || clusterCapacity < Number(request.quantity_kg)} onClick={() => assignCluster(request)}>Create cluster & assign quote</button></div> : <p className="empty-state">No farmer currently has published live stock of {request.crop}.</p>}</div></div>; }) : <p className="empty-state">No wholesale requests are awaiting review.</p>}</div>}
     {tab === "warehouses" && <div className="admin-work-panel"><h3>Warehouse inspection menu</h3><p>Open a warehouse to handle intake, consumer pickups, and its associated live queue.</p>{warehouses.map((warehouse) => <div className="contract-row" key={warehouse.id || warehouse.name}><div><b>{warehouse.name}</b><small>{warehouse.address}</small></div><span>{orders.filter((order) => order.pickupWarehouse === warehouse.name).length} pickup order(s)</span><button className="primary" onClick={() => setView("warehouse")}>Inspect</button></div>)}</div>}
     {tab === "routes" && <div className="admin-work-panel"><h3>Farm-to-warehouse route mapping</h3><p>Map collection → intake warehouse → inter-warehouse transfer → pickup fulfilment.</p><LiveRoutePlanner notify={notify} initialOrigin={warehouses[0]?.address || ""} initialDestination={warehouses[1]?.address || warehouses[0]?.address || ""}/><form className="route-form" onSubmit={addRoute}><select value={route.origin} onChange={(event) => setRoute({ ...route, origin: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><span>→</span><select value={route.destination} onChange={(event) => setRoute({ ...route, destination: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><button className="primary" type="submit">Save transfer route</button></form><button className="secondary" onClick={() => setView("warehouse")}>Open warehouse operations</button></div>}
+    {tab === "price floors" && <div className="admin-work-panel"><h3>MSP and verified crop price floors</h3><p>Official MSP entries take priority automatically. For crops without a government MSP, add a source-backed verified reference floor before farmers can list or buyers can quote.</p><form className="floor-form" onSubmit={savePriceFloor}><label>Crop<select value={floorForm.crop} onChange={(event) => setFloorForm({ ...floorForm, crop: event.target.value })}>{INDIA_CROPS.map((crop) => <option key={crop.name} value={crop.name}>{cropEmoji(crop.name, crop.category)} {crop.name}</option>)}</select></label><label>Verified floor ₹/kg<input required type="number" min="0.01" step="0.01" value={floorForm.price} onChange={(event) => setFloorForm({ ...floorForm, price: event.target.value })}/></label><label>Official/reference source URL<input type="url" value={floorForm.source} onChange={(event) => setFloorForm({ ...floorForm, source: event.target.value })} placeholder="https://…"/></label><button className="primary" type="submit">Save protected floor</button></form><div className="floor-list">{priceFloors.length ? priceFloors.map((floor) => <div key={floor.crop}><b>{floor.crop}</b><span>₹{Number(floor.floor_price_per_kg).toFixed(2)}/kg · verified reference</span>{floor.source_url && <a href={floor.source_url} target="_blank" rel="noreferrer">Source <ArrowUpRight size={13}/></a>}</div>) : <p className="empty-state">No reference floors have been added yet. Official MSP crops continue to use their existing official rate.</p>}</div></div>}
     </section>
   </section>;
 }
