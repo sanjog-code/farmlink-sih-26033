@@ -22,3 +22,10 @@ create policy "consumers cancel pending orders" on public.consumer_orders
   for update
   using (consumer_id = auth.uid() and status = 'pending_verification' and cancellation_expires_at > now())
   with check (consumer_id = auth.uid() and status = 'cancelled');
+
+
+drop policy if exists "consumers confirm expired orders" on public.consumer_orders;
+create policy "consumers confirm expired orders" on public.consumer_orders
+  for update
+  using (consumer_id = auth.uid() and status = 'pending_verification' and cancellation_expires_at <= now())
+  with check (consumer_id = auth.uid() and status = 'confirmed');
