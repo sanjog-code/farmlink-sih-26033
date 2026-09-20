@@ -1901,25 +1901,54 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
     [quote, setQuote] = useState(false),
     [cropQuery, setCropQuery] = useState(""),
     [quantity, setQuantity] = useState(250),
-    [offer, setOffer] = useState("");
+    [offer, setOffer] = useState(""),
+    [myQuotes, setMyQuotes] = useState([]),
+    [contract, setContract] = useState({ crop: "Tomato", quantity: 250, frequency: "Weekly", delivery: "Monday · 10 AM – 1 PM", price: "" }),
+    [contracts, setContracts] = useState([]);
   const visibleLots = lots.filter((lot) =>
     lot.crop.toLowerCase().includes(cropQuery.trim().toLowerCase()),
   );
+  useEffect(() => {
+    if (!session?.userId || !isSupabaseConfigured) return;
+    supabase.from("bulk_requests").select("id,crop,quantity_kg,status,created_at,bulk_quotes(offered_price_per_kg,proposed_by,status)").eq("buyer_id", session.userId).order("created_at", { ascending: false }).then(({ data, error }) => {
+      if (!error) setMyQuotes(data || []);
+    });
+  }, [session?.userId, liveTick]);
+  const openQuote = (lot) => {
+    setQuote(lot); setQuantity(Math.max(250, Math.min(Number(lot.qty) || 250, 1000))); setOffer(String(lot.price)); setTab("quotes");
+  };
   const sendQuote = async () => {
     if (!quote) return;
     const kg = Number(quantity), price = Number(offer || quote.price);
     if (kg < 250) return notify("Bulk requests must be at least 250 kg.");
     if (!session?.userId || !isSupabaseConfigured) return notify("Sign in with a wholesale buyer account to send a live quote.");
     try {
-      const { error } = await supabase.from("bulk_requests").insert({
+      const { data: request, error } = await supabase.from("bulk_requests").insert({
         buyer_id: session.userId, buyer_name: session.name || session.label || "Bulk buyer",
         crop: quote.crop, quantity_kg: kg, status: "pending",
         ...(quote.listingId ? { listing_id: quote.listingId } : {}),
-      });
+      }).select("id").single();
       if (error) throw error;
-      notify(`Quote request for ${kg} kg sent for admin verification. Your offer of ₹${price}/kg will be negotiated after farmer assignment.`);
-      setQuote(false); setLiveTick((tick) => tick + 1);
+      const { error: offerError } = await supabase.from("bulk_quotes").insert({ request_id: request.id, offered_price_per_kg: price, proposed_by: "buyer" });
+      if (offerError) throw offerError;
+      notify(`Quote request for ${kg} kg and your ₹${price}/kg offer were sent for admin verification.`);
+      setQuote(false); setTab("quotes"); setLiveTick((tick) => tick + 1);
     } catch (error) { notify(error.message || "Unable to create the bulk request."); }
+  };
+  const createContract = async (event) => {
+    event.preventDefault();
+    const kg = Number(contract.quantity), price = Number(contract.price);
+    if (kg < 250) return notify("Recurring contract quantities must be at least 250 kg.");
+    if (!price || price <= 0) return notify("Enter a proposed price per kg for the contract.");
+    if (!session?.userId || !isSupabaseConfigured) return notify("Sign in before creating a contract request.");
+    try {
+      const { data: request, error } = await supabase.from("bulk_requests").insert({ buyer_id: session.userId, buyer_name: `${session.name || session.label || "Bulk buyer"} · ${contract.frequency} contract`, crop: contract.crop, quantity_kg: kg, status: "pending" }).select("id").single();
+      if (error) throw error;
+      const { error: quoteError } = await supabase.from("bulk_quotes").insert({ request_id: request.id, offered_price_per_kg: price, proposed_by: "buyer" });
+      if (quoteError) throw quoteError;
+      setContracts((current) => [{ id: request.id, ...contract, status: "Awaiting admin verification & farmer approval" }, ...current]);
+      notify("Recurring contract request created. Admin will assign it to a farmer for approval."); setLiveTick((tick) => tick + 1);
+    } catch (error) { notify(error.message || "Unable to create the contract request."); }
   };
   return (
     <section className="page">
@@ -1971,9 +2000,9 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
           <div className="cards">
             {visibleLots.map((l) => (
               <div className="product-wrap" key={l.id}>
-                <LotCard lot={l} onClick={() => setQuote(l)} />
+                <LotCard lot={l} onClick={() => openQuote(l)} />
                 <div className="product-actions">
-                  <button onClick={() => setQuote(l)}>
+                  <button onClick={() => openQuote(l)}>
                     Request sample / quote
                   </button>
                   <button
@@ -2021,9 +2050,7 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
               </button>
             </div>
           ) : (
-            <p className="empty-state">
-              Choose a produce listing to start an RFQ.
-            </p>
+            <div><p className="empty-state">Choose a produce listing from Discover to start an RFQ.</p>{myQuotes.map((item) => <div className="tracking" key={item.id}><b>{item.crop} · {item.quantity_kg} kg</b><span>Your offer: {item.bulk_quotes?.find((entry) => entry.proposed_by === "buyer") ? `₹${item.bulk_quotes.find((entry) => entry.proposed_by === "buyer").offered_price_per_kg}/kg` : "pending"}</span><strong>{item.status}</strong></div>)}</div>
           )}
         </div>
       )}
@@ -2034,20 +2061,15 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
             Create recurring purchase agreements with clear quantity, grade,
             delivery window, pricing method and cancellation terms.
           </p>
-          <div className="contract-row">
-            <b>Weekly tomato supply</b>
-            <span>200 kg / week</span>
-            <span>Draft awaiting farmer approval</span>
-            <button onClick={() => notify("Contract draft opened.")}>
-              Open draft
-            </button>
-          </div>
-          <button
-            className="primary"
-            onClick={() => notify("New contract order draft created.")}
-          >
-            Create contract order
-          </button>
+          <form className="form-grid" onSubmit={createContract}>
+            <label>Crop<select value={contract.crop} onChange={(e) => setContract({ ...contract, crop: e.target.value })}>{INDIA_CROPS.map((crop) => <option key={crop.name}>{crop.name}</option>)}</select></label>
+            <label>Quantity per delivery (minimum 250 kg)<input required type="number" min="250" value={contract.quantity} onChange={(e) => setContract({ ...contract, quantity: e.target.value })}/></label>
+            <label>Frequency<select value={contract.frequency} onChange={(e) => setContract({ ...contract, frequency: e.target.value })}><option>Weekly</option><option>Fortnightly</option><option>Monthly</option></select></label>
+            <label>Delivery window<input required value={contract.delivery} onChange={(e) => setContract({ ...contract, delivery: e.target.value })}/></label>
+            <label>Proposed price per kg<input required type="number" min="1" value={contract.price} onChange={(e) => setContract({ ...contract, price: e.target.value })}/></label>
+            <button className="primary" type="submit">Create contract request</button>
+          </form>
+          {contracts.map((item) => <div className="contract-row" key={item.id}><b>{item.frequency} {item.crop} supply</b><span>{item.quantity} kg per delivery · ₹{item.price}/kg</span><span>{item.status}</span></div>)}
         </div>
       )}
       {tab === "analytics" && (
