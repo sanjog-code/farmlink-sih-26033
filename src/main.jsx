@@ -1,128 +1,3576 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {createRoot} from 'react-dom/client';
-import {Sprout, MapPin, PackageCheck, ShoppingCart, Mic, BrainCircuit, Warehouse, Truck, ShieldCheck, ArrowUpRight, ScanLine, Check, Languages, X, ChevronRight, Leaf, Clock3, UserRound, LockKeyhole, Mail, Phone, MapPinned, Users, BarChart3, LogOut, ClipboardList} from 'lucide-react';
-import './styles.css';
-import './auth.css';
-import './workflows.css';
-import { isSupabaseConfigured, supabase } from './supabase';
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  Sprout,
+  MapPin,
+  PackageCheck,
+  ShoppingCart,
+  Mic,
+  BrainCircuit,
+  Warehouse,
+  Truck,
+  ShieldCheck,
+  ArrowUpRight,
+  ScanLine,
+  Check,
+  Languages,
+  X,
+  ChevronRight,
+  Leaf,
+  Clock3,
+  UserRound,
+  LockKeyhole,
+  Mail,
+  Phone,
+  MapPinned,
+  Users,
+  BarChart3,
+  LogOut,
+  ClipboardList,
+} from "lucide-react";
+import "./styles.css";
+import "./auth.css";
+import "./workflows.css";
+import { isSupabaseConfigured, supabase } from "./supabase";
 
-const initialLots=[
- {id:'FL-24091',crop:'Tomato',hi:'टमाटर',grade:'A',qty:820,price:27,old:1,warehouse:'Jaipur North',farmer:'Ramesh Kumar',dist:'12 km',trend:8},
- {id:'FL-24092',crop:'Onion',hi:'प्याज',grade:'A',qty:1150,price:31,old:2,warehouse:'Jaipur North',farmer:'Meena Devi',dist:'12 km',trend:3},
- {id:'FL-24093',crop:'Potato',hi:'आलू',grade:'B',qty:540,price:22,old:3,warehouse:'Sanganer Hub',farmer:'Sita Ram',dist:'18 km',trend:-2},
-];
+const initialLots = [];
 const INDIA_CROPS = [
-['Cereals & millets','Rice'],['Cereals & millets','Wheat'],['Cereals & millets','Maize'],['Cereals & millets','Barley'],['Cereals & millets','Sorghum (Jowar)'],['Cereals & millets','Pearl millet (Bajra)'],['Cereals & millets','Finger millet (Ragi)'],['Cereals & millets','Foxtail millet (Kangni)'],['Cereals & millets','Little millet (Kutki)'],['Cereals & millets','Kodo millet'],['Cereals & millets','Proso millet (Cheena)'],['Cereals & millets','Barnyard millet (Sanwa)'],['Cereals & millets','Browntop millet'],['Cereals & millets','Buckwheat'],['Cereals & millets','Amaranth (Rajgira)'],
-['Pulses','Chickpea (Gram)'],['Pulses','Pigeon pea (Arhar/Tur)'],['Pulses','Green gram (Moong)'],['Pulses','Black gram (Urad)'],['Pulses','Lentil (Masur)'],['Pulses','Field pea'],['Pulses','Cowpea'],['Pulses','Moth bean'],['Pulses','Horse gram'],['Pulses','Lathyrus (Khesari)'],['Pulses','Rice bean'],['Pulses','French bean'],['Pulses','Cluster bean (Guar)'],['Pulses','Rajma'],['Pulses','Soybean'],
-['Oilseeds','Groundnut'],['Oilseeds','Rapeseed & mustard'],['Oilseeds','Sesame (Til)'],['Oilseeds','Sunflower'],['Oilseeds','Safflower'],['Oilseeds','Niger seed'],['Oilseeds','Linseed (Alsi)'],['Oilseeds','Castor'],['Oilseeds','Cottonseed'],['Oilseeds','Taramira'],['Oilseeds','Camelina'],['Oilseeds','Oil palm'],['Oilseeds','Coconut'],
-['Commercial & fibre','Cotton'],['Commercial & fibre','Jute'],['Commercial & fibre','Mesta'],['Commercial & fibre','Kenaf'],['Commercial & fibre','Sunn hemp'],['Commercial & fibre','Flax'],['Commercial & fibre','Ramie'],['Commercial & fibre','Sugarcane'],['Commercial & fibre','Sugar beet'],['Commercial & fibre','Tobacco'],['Commercial & fibre','Tea'],['Commercial & fibre','Coffee'],['Commercial & fibre','Rubber'],['Commercial & fibre','Cocoa'],
-['Vegetables','Potato'],['Vegetables','Sweet potato'],['Vegetables','Tomato'],['Vegetables','Onion'],['Vegetables','Garlic'],['Vegetables','Brinjal (Eggplant)'],['Vegetables','Okra (Bhindi)'],['Vegetables','Capsicum'],['Vegetables','Chilli'],['Vegetables','Cauliflower'],['Vegetables','Cabbage'],['Vegetables','Broccoli'],['Vegetables','Carrot'],['Vegetables','Radish'],['Vegetables','Beetroot'],['Vegetables','Turnip'],['Vegetables','Peas'],['Vegetables','French bean'],['Vegetables','Broad bean'],['Vegetables','Cowpea vegetable'],['Vegetables','Bottle gourd'],['Vegetables','Bitter gourd'],['Vegetables','Ridge gourd'],['Vegetables','Sponge gourd'],['Vegetables','Snake gourd'],['Vegetables','Ash gourd'],['Vegetables','Pumpkin'],['Vegetables','Cucumber'],['Vegetables','Muskmelon'],['Vegetables','Watermelon'],['Vegetables','Pointed gourd'],['Vegetables','Ivy gourd'],['Vegetables','Drumstick (Moringa)'],['Vegetables','Spinach'],['Vegetables','Amaranthus greens'],['Vegetables','Fenugreek greens'],['Vegetables','Coriander greens'],['Vegetables','Lettuce'],['Vegetables','Celery'],['Vegetables','Mushroom'],['Vegetables','Tapioca (Cassava)'],['Vegetables','Elephant foot yam'],['Vegetables','Colocasia (Arbi)'],['Vegetables','Yam'],
-['Fruits','Mango'],['Fruits','Banana'],['Fruits','Guava'],['Fruits','Papaya'],['Fruits','Pomegranate'],['Fruits','Grapes'],['Fruits','Apple'],['Fruits','Pear'],['Fruits','Peach'],['Fruits','Plum'],['Fruits','Apricot'],['Fruits','Litchi'],['Fruits','Citrus'],['Fruits','Orange'],['Fruits','Mandarin'],['Fruits','Lemon'],['Fruits','Lime'],['Fruits','Sapota (Chikoo)'],['Fruits','Jackfruit'],['Fruits','Pineapple'],['Fruits','Coconut'],['Fruits','Cashew'],['Fruits','Amla'],['Fruits','Ber'],['Fruits','Jamun'],['Fruits','Custard apple'],['Fruits','Fig'],['Fruits','Date palm'],['Fruits','Dragon fruit'],['Fruits','Kiwi'],['Fruits','Strawberry'],['Fruits','Passion fruit'],['Fruits','Avocado'],['Fruits','Karonda'],['Fruits','Phalsa'],
-['Spices & condiments','Black pepper'],['Spices & condiments','Cardamom'],['Spices & condiments','Ginger'],['Spices & condiments','Turmeric'],['Spices & condiments','Coriander seed'],['Spices & condiments','Cumin'],['Spices & condiments','Fennel'],['Spices & condiments','Fenugreek'],['Spices & condiments','Ajwain'],['Spices & condiments','Dill'],['Spices & condiments','Caraway'],['Spices & condiments','Celery seed'],['Spices & condiments','Saffron'],['Spices & condiments','Vanilla'],['Spices & condiments','Tamarind'],['Spices & condiments','Kokum'],['Spices & condiments','Nutmeg'],['Spices & condiments','Clove'],['Spices & condiments','Cinnamon'],['Spices & condiments','Bay leaf'],['Spices & condiments','Curry leaf'],['Spices & condiments','Mint'],['Spices & condiments','Basil (Tulsi)'],
-['Plantation & medicinal','Arecanut'],['Plantation & medicinal','Betel leaf'],['Plantation & medicinal','Aloe vera'],['Plantation & medicinal','Ashwagandha'],['Plantation & medicinal','Isabgol'],['Plantation & medicinal','Senna'],['Plantation & medicinal','Safed musli'],['Plantation & medicinal','Kalmegh'],['Plantation & medicinal','Lemongrass'],['Plantation & medicinal','Citronella'],['Plantation & medicinal','Palmarosa'],['Plantation & medicinal','Vetiver (Khus)'],['Plantation & medicinal','Patchouli'],['Plantation & medicinal','Rosemary'],
-['Flowers & fodder','Rose'],['Flowers & fodder','Marigold'],['Flowers & fodder','Jasmine'],['Flowers & fodder','Chrysanthemum'],['Flowers & fodder','Tuberose'],['Flowers & fodder','Gladiolus'],['Flowers & fodder','Gerbera'],['Flowers & fodder','Carnation'],['Flowers & fodder','Berseem'],['Flowers & fodder','Lucerne'],['Flowers & fodder','Napier grass'],['Flowers & fodder','Fodder maize'],['Flowers & fodder','Fodder sorghum'],['Flowers & fodder','Oats fodder'],['Flowers & fodder','Guinea grass']
-].map(([category,name])=>({category,name}));
-const normalizeIndianPhone=value=>{const digits=String(value||'').replace(/\D/g,'');if(digits.length===10)return '+91'+digits;if(digits.length===12&&digits.startsWith('91'))return '+'+digits;if(String(value||'').startsWith('+')&&digits.length>=10&&digits.length<=15)return '+'+digits;return ''};
-const translations={en:{tag:'From farm to table, fairly.',hero:'Better value for every harvest.',sub:'Live local produce, transparent grading, and fair market access - built around farmer choice.',shop:'Shop fresh produce',farmer:'Farmer portal',stock:'Live stock',how:'How FarmLink works',why:'Why FarmLink',voice:'Voice access',ai:'AI insight'},hi:{tag:'खेत से घर तक, उचित मूल्य पर।',hero:'हर फसल का बेहतर मूल्य।',sub:'लाइव स्थानीय उपज, पारदर्शी ग्रेडिंग और किसान की पसंद के साथ निष्पक्ष बाजार।',shop:'ताजी उपज खरीदें',farmer:'किसान पोर्टल',stock:'लाइव स्टॉक',how:'FarmLink कैसे काम करता है',why:'FarmLink क्यों',voice:'वॉइस एक्सेस',ai:'AI सुझाव'}};
-const hindiUI={'Marketplace':'बाज़ार','Wholesale':'थोक बाज़ार','Warehouse':'गोदाम','Farmer':'किसान','Sign in':'लॉग इन','Logout':'लॉग आउट','Retail marketplace':'खुदरा बाज़ार','Continue shopping':'खरीदारी जारी रखें','Open wholesale marketplace':'थोक बाज़ार खोलें','Checkout':'चेकआउट','Save':'सहेजें','Saved to wishlist':'पसंदीदा में सहेजा गया','Save to wishlist':'पसंदीदा में सहेजें','Quality report':'गुणवत्ता रिपोर्ट','AI smart ranking':'एआई स्मार्ट रैंकिंग','Lowest price':'सबसे कम कीमत','Nearest first':'सबसे नज़दीक पहले','Organic certified':'जैविक प्रमाणित','All':'सभी','Tomato':'टमाटर','Onion':'प्याज़','Potato':'आलू','Consumer account':'उपभोक्ता खाता','Orders, favourites & preferences':'ऑर्डर, पसंदीदा और प्राथमिकताएँ','Order tracking':'ऑर्डर ट्रैकिंग','wishlist':'पसंदीदा','orders':'ऑर्डर','profile':'प्रोफ़ाइल','reviews':'समीक्षाएँ','Profile & delivery preferences':'प्रोफ़ाइल और डिलीवरी प्राथमिकताएँ','Primary address':'मुख्य पता','Mobile number':'मोबाइल नंबर','Preferred pickup window':'पसंदीदा पिकअप समय','Save preferences':'प्राथमिकताएँ सहेजें','Reviews & ratings':'समीक्षाएँ और रेटिंग','Submit verified review':'सत्यापित समीक्षा भेजें','VERIFIED WHOLESALE MARKETPLACE':'सत्यापित थोक बाज़ार','Buy better, in bulk.':'थोक में बेहतर खरीदें।','discover':'खोजें','quotes':'कोटेशन','contracts':'अनुबंध','analytics':'विश्लेषण','invoices':'चालान','Negotiation & quote workspace':'बातचीत और कोटेशन कार्यक्षेत्र','Send negotiated quote':'बातचीत वाला कोटेशन भेजें','Contract orders':'अनुबंध ऑर्डर','Create contract order':'अनुबंध ऑर्डर बनाएँ','GST-compliant invoice centre':'GST-अनुपालन चालान केंद्र','Generate PDF':'पीडीएफ बनाएँ','Farmer portal':'किसान पोर्टल','Your produce. Your decision.':'आपकी उपज। आपका निर्णय।','PICKUP & GRADING':'पिकअप और ग्रेडिंग','Add produce request':'उपज अनुरोध जोड़ें','Request type':'अनुरोध प्रकार','Produce intake':'उपज प्राप्ति','Cluster collection request':'क्लस्टर संग्रह अनुरोध','Produce':'उपज','Gross weight at pickup (kg)':'पिकअप पर सकल वजन (किग्रा)','Collection cluster':'संग्रह क्लस्टर','Send request to warehouse':'गोदाम को अनुरोध भेजें','Your produce & requests':'आपकी उपज और अनुरोध','Need working capital?':'कार्यशील पूंजी चाहिए?','Explore options':'विकल्प देखें','How grading works':'ग्रेडिंग कैसे काम करती है','listings':'लिस्टिंग','logistics':'लॉजिस्टिक्स','payments':'भुगतान','performance':'प्रदर्शन','verification':'सत्यापन','Produce listing management & AI grading':'उपज लिस्टिंग प्रबंधन और एआई ग्रेडिंग','Listing title':'लिस्टिंग शीर्षक','Listing image':'लिस्टिंग तस्वीर','Description':'विवरण','Run AI grading & submit listing':'एआई ग्रेडिंग चलाएँ और लिस्टिंग भेजें','Incoming order management':'आने वाले ऑर्डर प्रबंधन','Accept order':'ऑर्डर स्वीकारें','Logistics schedule':'लॉजिस्टिक्स समय-सारणी','Available earnings':'उपलब्ध आय','Pending settlement':'लंबित भुगतान','Transactions':'लेनदेन','Sales trend':'बिक्री रुझान','Repeat customers':'दोबारा आने वाले ग्राहक','Average rating':'औसत रेटिंग','Farmer profile verification':'किसान प्रोफ़ाइल सत्यापन','Continue verification':'सत्यापन जारी रखें','ADMIN-ONLY WAREHOUSE CONSOLE':'केवल एडमिन गोदाम कंसोल','Warehouse intake & fulfillment':'गोदाम प्राप्ति और पूर्ति','Admin access only':'केवल एडमिन पहुँच','Confirm produce intake':'उपज प्राप्ति की पुष्टि करें','Confirmed net weight (kg)':'पुष्ट शुद्ध वजन (किग्रा)','Human-verified grade':'मानव-सत्यापित ग्रेड','Confirm grade & create lot':'ग्रेड की पुष्टि करें और लॉट बनाएँ','Live inventory ledger':'लाइव इन्वेंटरी लेजर','Farmer produce & cluster requests':'किसान उपज और क्लस्टर अनुरोध','Consumer pickup orders':'उपभोक्ता पिकअप ऑर्डर','PLATFORM COMMAND CENTER':'प्लेटफ़ॉर्म कमांड सेंटर','FarmLink Admin':'फार्मलिंक एडमिन','Registered farmers':'पंजीकृत किसान','Live inventory':'लाइव इन्वेंटरी','Stock value':'स्टॉक मूल्य','GOVERNANCE & MODERATION':'शासन और मॉडरेशन','User management':'उपयोगकर्ता प्रबंधन','Listing moderation':'लिस्टिंग मॉडरेशन','Dispute resolution':'विवाद समाधान','System configuration':'सिस्टम कॉन्फ़िगरेशन','Review pending applications':'लंबित आवेदन देखें','Approve':'स्वीकृत करें','Reject selected listing':'चयनित लिस्टिंग अस्वीकारें','Login':'लॉग इन','Register':'पंजीकरण','WELCOME BACK':'वापसी पर स्वागत है','CREATE YOUR ACCOUNT':'अपना खाता बनाएँ','Sign in to FarmLink':'फार्मलिंक में लॉग इन करें','Register as a user':'उपयोगकर्ता के रूप में पंजीकरण करें','Consumer':'उपभोक्ता','Admin':'एडमिन','Full name':'पूरा नाम','Full address':'पूरा पता','Email address':'ईमेल पता','Farmer ID':'किसान आईडी','Admin username':'एडमिन उपयोगकर्ता नाम','Password':'पासवर्ड','Create account':'खाता बनाएँ','Resend email confirmation':'ईमेल पुष्टि फिर भेजें','DIRECT FROM VERIFIED STORAGE':'सत्यापित भंडारण से सीधे','FRESH PRODUCE MARKETPLACE':'ताज़ा उपज बाज़ार','VERIFIED Grade':'सत्यापित ग्रेड','Choose your pickup warehouse':'अपना पिकअप गोदाम चुनें','Confirm pickup order':'पिकअप ऑर्डर की पुष्टि करें','Pickup warehouse':'पिकअप गोदाम','Ready for pickup':'पिकअप के लिए तैयार','Back to marketplace':'बाज़ार पर वापस','LOCAL MARKET, LIVE STOCK.':'स्थानीय बाज़ार, लाइव स्टॉक।','Voice access':'वॉइस एक्सेस','Try voice demo':'वॉइस डेमो आज़माएँ','Start speaking':'बोलना शुरू करें','AI insight':'एआई सुझाव','Farmer-first aggregation • Transparent grade • Better choices':'किसान-प्रथम एकत्रीकरण • पारदर्शी ग्रेड • बेहतर विकल्प','Live local produce, transparent grading, and fair market access - built around farmer choice.':'लाइव स्थानीय उपज, पारदर्शी ग्रेडिंग और किसान की पसंद पर बना निष्पक्ष बाज़ार।','Smart-ranked by quality, proximity and price competitiveness. Every live lot has a traceable quality record.':'गुणवत्ता, निकटता और मूल्य प्रतिस्पर्धा के आधार पर एआई रैंकिंग। हर लाइव लॉट का पता लगाने योग्य गुणवत्ता रिकॉर्ड है।','Search produce, farmer or location':'उपज, किसान या स्थान खोजें','No lots match these filters. Try clearing the organic or grade filter.':'इन फ़िल्टरों से कोई लॉट नहीं मिला। जैविक या ग्रेड फ़िल्टर हटाकर देखें।','Request GST-ready quotes, negotiate with verified farmers, and arrange recurring contracts.':'GST-तैयार कोटेशन माँगें, सत्यापित किसानों से बातचीत करें और नियमित अनुबंध बनाएँ।','Track pickup status, maintain delivery preferences, and share verified purchase feedback.':'पिकअप स्थिति ट्रैक करें, डिलीवरी प्राथमिकताएँ रखें और सत्यापित खरीद प्रतिक्रिया साझा करें।','Discover verified suppliers, request quality samples, negotiate transparent quotes, and manage recurring contracts.':'सत्यापित आपूर्तिकर्ता खोजें, गुणवत्ता नमूने माँगें, पारदर्शी कोटेशन पर बातचीत करें और नियमित अनुबंध संभालें।','Monitor farmer collection requests, consumer pickup orders, warehouse stock and market operations.':'किसान संग्रह अनुरोध, उपभोक्ता पिकअप ऑर्डर, गोदाम स्टॉक और बाज़ार संचालन की निगरानी करें।','Demo platform for SIH 2026 PS 26033. AI recommendations are illustrative, not guarantees.':'SIH 2026 PS 26033 के लिए डेमो प्लेटफ़ॉर्म। एआई सुझाव केवल उदाहरण हैं, गारंटी नहीं।','Traceable lots':'ट्रैक करने योग्य लॉट','Human-verified grades':'मानव-सत्यापित ग्रेड','MARKET SIGNAL':'बाज़ार संकेत','High demand nearby':'पास में अधिक मांग','available today':'आज उपलब्ध','LIVE FROM NEARBY WAREHOUSES':'नज़दीकी गोदामों से लाइव','View marketplace':'बाज़ार देखें','Grade ':'ग्रेड ','kg available':'किग्रा उपलब्ध','day old':'दिन पुराना','ONE CONNECTED FLOW':'एक जुड़ा हुआ प्रवाह','Less uncertainty.':'कम अनिश्चितता।','More choice.':'अधिक विकल्प।','FarmLink joins physical aggregation with market intelligence so produce moves with clarity, not pressure.':'फार्मलिंक भौतिक एकत्रीकरण को बाज़ार की जानकारी से जोड़ता है ताकि उपज दबाव से नहीं, स्पष्टता से आगे बढ़े।','Cluster pickup':'क्लस्टर पिकअप','Village & FPO collection':'गाँव और FPO संग्रह','Weigh, grade & store':'वजन, ग्रेड और भंडारण','AI guidance':'एआई मार्गदर्शन','Price, demand & stock-age':'मूल्य, मांग और स्टॉक आयु','Market access':'बाज़ार पहुँच','Consumer & bulk buyers':'उपभोक्ता और थोक खरीदार','Ask in your own language.':'अपनी भाषा में पूछें।','Call, speak, and get guided help with stock, prices or pickups.':'कॉल करें, बोलें और स्टॉक, मूल्य या पिकअप में मार्गदर्शित सहायता पाएँ।','Reserve 10 kg':'10 किग्रा आरक्षित करें','Human-verified grade':'मानव-सत्यापित ग्रेड','kg':'किग्रा','/kg':'/किग्रा','km':'किमी','intake':'प्राप्ति','Jaipur North':'जयपुर उत्तर','Sanganer Hub':'सांगानेर हब'};
-function localizeUI(root,language){const pairs=language==='hi'?Object.entries(hindiUI):Object.entries(hindiUI).map(([en,hi])=>[hi,en]);const replace=value=>pairs.sort((a,b)=>b[0].length-a[0].length).reduce((text,[from,to])=>text.split(from).join(to),value);const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);nodes.forEach(node=>{const next=replace(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next});root.querySelectorAll('[placeholder],[aria-label]').forEach(element=>['placeholder','aria-label'].forEach(attribute=>{const value=element.getAttribute(attribute);if(value){const next=replace(value);if(next!==value)element.setAttribute(attribute,next)}}))}
-function App(){
- const [lang,setLang]=useState('en'),[view,setView]=useState('home'),[lots,setLots]=useState(initialLots),[cart,setCart]=useState([]),[wishlist,setWishlist]=useState([]),[selectedLot,setSelectedLot]=useState(null),[modal,setModal]=useState(null),[toast,setToast]=useState(''),[session,setSession]=useState(null),[produceRequests,setProduceRequests]=useState([]),[orders,setOrders]=useState([]),[now,setNow]=useState(Date.now()); const t=translations[lang];
- useEffect(()=>{if(!isSupabaseConfigured)return;supabase.auth.getSession().then(async({data:{session:authSession}})=>{if(!authSession)return;const {data:profile}=await supabase.from('profiles').select('role,full_name,farmer_id').eq('id',authSession.user.id).single();if(profile)setSession({role:profile.role,label:profile.full_name,name:profile.full_name,farmerId:profile.farmer_id,userId:authSession.user.id})})},[]);
- useEffect(()=>{if(!isSupabaseConfigured||!session?.userId)return;supabase.from('produce_lots').select('id,lot_code,crop,grade,quantity_kg,price_per_kg,warehouses(name)').then(({data})=>{if(data)setLots(data.map((lot,index)=>({id:lot.lot_code,dbId:lot.id,crop:lot.crop,hi:lot.crop,grade:lot.grade,qty:Number(lot.quantity_kg),price:Number(lot.price_per_kg),old:1,warehouse:lot.warehouses?.name||'Warehouse',farmer:'',dist:'Nearby',trend:index===0?8:3})))})},[session?.userId]);
- useEffect(()=>{if(!isSupabaseConfigured||!session?.userId)return;supabase.from('farmer_listings').select('id,crop,category,description,quantity_kg,price_per_kg,image_url').eq('status','published').then(({data})=>{if(data)setLots(current=>[...current.filter(lot=>!lot.listing),...data.map((listing,index)=>({id:'LIST-'+listing.id.slice(-6).toUpperCase(),listing:true,listingId:listing.id,crop:listing.crop,hi:listing.crop,grade:'Farmer listed',qty:Number(listing.quantity_kg),price:Number(listing.price_per_kg),old:0,warehouse:'Direct farmer listing',farmer:'Verified farmer',dist:'Direct',trend:0,imageUrl:listing.image_url,description:listing.description,category:listing.category}))])})},[session?.userId]);
- useEffect(()=>{if(!isSupabaseConfigured||!session?.userId)return;const requestQuery=session.role==='admin'?supabase.from('produce_requests').select('id,crop,gross_weight_kg,collection_cluster,request_type,status,profiles(full_name)'):supabase.from('produce_requests').select('id,crop,gross_weight_kg,collection_cluster,request_type,status').eq('farmer_id',session.userId);requestQuery.then(({data})=>{if(data)setProduceRequests(data.map(r=>({id:r.id,crop:r.crop,grossWeight:Number(r.gross_weight_kg),cluster:r.collection_cluster,type:r.request_type==='cluster_collection'?'Cluster collection request':'Produce intake',status:r.status,farmer:r.profiles?.full_name||session.name||'Farmer'})))})},[session?.userId,session?.role]);
- useEffect(()=>{if(!isSupabaseConfigured||!session?.userId||!['admin','consumer'].includes(session.role))return;const query=session.role==='admin'?supabase.from('consumer_orders').select('id,order_code,total_kg,status,cancellation_expires_at,warehouses(name)'):supabase.from('consumer_orders').select('id,order_code,total_kg,status,cancellation_expires_at,warehouses(name)').eq('consumer_id',session.userId);query.then(({data})=>{if(data)setOrders(data.map(order=>({id:order.order_code,dbId:order.id,quantity:Number(order.total_kg),items:0,status:(order.status||'pending_verification').split('_').map(word=>word.charAt(0).toUpperCase()+word.slice(1)).join(' '),cancellationDeadline:order.cancellation_expires_at?new Date(order.cancellation_expires_at).getTime():null,pickupWarehouse:order.warehouses?.name||'Warehouse'})))})},[session?.role,session?.userId]);
- useEffect(()=>{const root=document.body;if(!root)return;let pending=false;const translate=()=>{if(!pending){pending=true;localizeUI(root,lang);pending=false}};translate();const observer=new MutationObserver(translate);observer.observe(root,{childList:true,subtree:true,characterData:true});return()=>observer.disconnect()},[lang,view]);
- useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer)},[]);
- const notify=m=>{setToast(m);setTimeout(()=>setToast(''),3000)};
- const reserve=lot=>{if(lot.listing){notify('This farmer photo listing is visible now; warehouse intake will enable checkout after stock verification.');return}setCart(c=>[...c,lot]);setLots(ls=>ls.map(x=>x.id===lot.id?{...x,qty:x.qty-10}:x));notify('10 kg reserved. Your order is ready for checkout.');};
- useEffect(()=>{const expired=orders.filter(order=>order.status==='Pending verification'&&order.cancellationDeadline&&now>=order.cancellationDeadline);if(!expired.length)return;setOrders(current=>current.map(order=>expired.some(item=>item.id===order.id)?{...order,status:'Confirmed'}:order));expired.forEach(order=>{if(isSupabaseConfigured&&order.dbId)supabase.from('consumer_orders').update({status:'confirmed'}).eq('id',order.dbId)})},[now,orders]);
- const placeOrder=async(pickupWarehouse)=>{const id=`ORD-${String(Date.now()).slice(-6)}`,cancellationDeadline=Date.now()+10*60*1000;const order={id,pickupWarehouse,items:cart.length,quantity:cart.length*10,status:'Pending verification',cancellationDeadline,lineItems:cart};if(isSupabaseConfigured&&session?.userId){const {data:warehouse,error:warehouseError}=await supabase.from('warehouses').select('id').eq('name',pickupWarehouse).single();if(warehouseError){notify('Pickup warehouse could not be found.');return}const {data:created,error}=await supabase.from('consumer_orders').insert({order_code:id,consumer_id:session.userId,pickup_warehouse_id:warehouse.id,total_kg:order.quantity,total_amount:cart.reduce((sum,lot)=>sum+lot.price*10,0),status:'pending_verification',cancellation_expires_at:new Date(cancellationDeadline).toISOString()}).select('id').single();if(error){notify(error.message);return}order.dbId=created.id;const items=cart.filter(lot=>lot.dbId).map(lot=>({order_id:created.id,lot_id:lot.dbId,quantity_kg:10,unit_price:lot.price}));if(items.length){const {error:itemError}=await supabase.from('order_items').insert(items);if(itemError){notify(itemError.message);return}}}setOrders(existing=>[order,...existing]);setCart([]);setModal(null);notify(`Order ${id} is pending verification. You can cancel it for 10 minutes.`);};
- const setOrderStatus=async(id,status)=>{const order=orders.find(item=>item.id===id);if(!order)return false;if(isSupabaseConfigured&&order.dbId){const {error}=await supabase.from('consumer_orders').update({status:status.toLowerCase().replaceAll(' ','_')}).eq('id',order.dbId);if(error){notify(error.message);return false}}setOrders(current=>current.map(item=>item.id===id?{...item,status}:item));return true;};
- const cancelOrder=async id=>{const order=orders.find(item=>item.id===id);if(!order||order.status!=='Pending verification'||now>=order.cancellationDeadline){notify('This cancellation window has closed.');return}if(await setOrderStatus(id,'Cancelled')){setLots(current=>current.map(lot=>{const reserved=(order.lineItems||[]).filter(item=>item.id===lot.id).length;return reserved?{...lot,qty:lot.qty+reserved*10}:lot}));notify('Order cancelled. Reserved stock was returned.')}};
- const confirmOrder=id=>setOrderStatus(id,'Confirmed');
- const access=(role,destination)=>{if(session?.role==='consumer'&&['farmer','warehouse','admin'].includes(destination)){setView('market');notify('Consumer accounts cannot access farmer or warehouse systems.');return}if(session?.role===role||session?.role==='admin')setView(destination);else {setView('auth');notify(`Please sign in as ${role}.`)}};
- const logout=async()=>{if(isSupabaseConfigured)await supabase.auth.signOut();setSession(null);setCart([]);setModal(null);setView('home');notify('You have logged out.');};
- const total=cart.length*10;
- return <><header><button className="brand" onClick={()=>setView('home')}><span><Sprout size={24}/></span>Farm<span>Link</span></button><nav><button onClick={()=>access('consumer','market')}>Marketplace</button><button onClick={()=>access('consumer','bulk')}>Wholesale</button>{session?.role!=='consumer'&&<button onClick={()=>access('admin','warehouse')}>Warehouse</button>}{session?.role!=='consumer'&&<button onClick={()=>access('farmer','farmer')}>Farmer</button>}</nav><div className="head-actions"><button className="language" onClick={()=>setLang(lang==='en'?'hi':'en')}><Languages size={16}/>{lang==='en'?'हिंदी':'English'}</button>{session?<button className="profile-btn" onClick={()=>session.role==='admin'?setView('admin'):setView(session.role==='farmer'?'farmer':'consumer')}><UserRound size={17}/>{session.label}</button>:<button className="login-btn" onClick={()=>setView('auth')}><UserRound size={17}/>Sign in</button>}<span className="logout-wrap">{session&&<button className="login-btn" onClick={logout}><LogOut size={17}/>Logout</button>}</span><button className="cart" onClick={()=>access('consumer','consumer')}><ShoppingCart size={18}/>{cart.length||''}</button></div></header>
- <main>{view==='home'&&<Home t={t} lots={lots} setView={setView} access={access} reserve={reserve} setModal={setModal}/>} {view==='market'&&<Market lots={lots} reserve={reserve} cart={cart} total={total} onCheckout={()=>setModal('checkout')} notify={notify} wishlist={wishlist} setWishlist={setWishlist} setSelectedLot={setSelectedLot} setView={setView}/>} {view==='detail'&&<ProductDetail lot={selectedLot} reserve={reserve} wishlist={wishlist} setWishlist={setWishlist} setView={setView} notify={notify}/>} {view==='consumer'&&<ConsumerHub cart={cart} wishlist={wishlist} lots={lots} orders={orders} now={now} cancelOrder={cancelOrder} setView={setView} notify={notify}/>} {view==='bulk'&&<BulkMarket lots={lots} setView={setView} notify={notify}/>} {view==='warehouse'&&session?.role==='admin'&&<WarehouseView session={session} lots={lots} setLots={setLots} produceRequests={produceRequests} orders={orders} notify={notify}/>} {view==='farmer'&&session?.role==='farmer'&&<FarmerView session={session} lots={lots} setModal={setModal} produceRequests={produceRequests} setProduceRequests={setProduceRequests} notify={notify}/>} {view==='auth'&&<AuthView setSession={setSession} setView={setView} notify={notify}/>} {view==='admin'&&<><AdminView lots={lots} orders={orders} produceRequests={produceRequests} setView={setView} logout={logout} notify={notify}/><AdminOrderConfirmation orders={orders} confirmOrder={confirmOrder}/></>}</main>
- <footer><div className="brand light"><span><Sprout size={22}/></span>Farm<span>Link</span></div><p>Farmer-first aggregation • Transparent grade • Better choices</p><small>Demo platform for SIH 2026 PS 26033. AI recommendations are illustrative, not guarantees.</small></footer>
- {modal==='voice'&&<Voice close={()=>setModal(null)} notify={notify}/>} {modal==='ai'&&<AI close={()=>setModal(null)}/>} {modal==='checkout'&&<Checkout cart={cart} close={()=>setModal(null)} placeOrder={placeOrder}/>} {toast&&<div className="toast"><Check size={17}/>{toast}</div>}</>}
+  ["Cereals & millets", "Rice"],
+  ["Cereals & millets", "Wheat"],
+  ["Cereals & millets", "Maize"],
+  ["Cereals & millets", "Barley"],
+  ["Cereals & millets", "Sorghum (Jowar)"],
+  ["Cereals & millets", "Pearl millet (Bajra)"],
+  ["Cereals & millets", "Finger millet (Ragi)"],
+  ["Cereals & millets", "Foxtail millet (Kangni)"],
+  ["Cereals & millets", "Little millet (Kutki)"],
+  ["Cereals & millets", "Kodo millet"],
+  ["Cereals & millets", "Proso millet (Cheena)"],
+  ["Cereals & millets", "Barnyard millet (Sanwa)"],
+  ["Cereals & millets", "Browntop millet"],
+  ["Cereals & millets", "Buckwheat"],
+  ["Cereals & millets", "Amaranth (Rajgira)"],
+  ["Pulses", "Chickpea (Gram)"],
+  ["Pulses", "Pigeon pea (Arhar/Tur)"],
+  ["Pulses", "Green gram (Moong)"],
+  ["Pulses", "Black gram (Urad)"],
+  ["Pulses", "Lentil (Masur)"],
+  ["Pulses", "Field pea"],
+  ["Pulses", "Cowpea"],
+  ["Pulses", "Moth bean"],
+  ["Pulses", "Horse gram"],
+  ["Pulses", "Lathyrus (Khesari)"],
+  ["Pulses", "Rice bean"],
+  ["Pulses", "French bean"],
+  ["Pulses", "Cluster bean (Guar)"],
+  ["Pulses", "Rajma"],
+  ["Pulses", "Soybean"],
+  ["Oilseeds", "Groundnut"],
+  ["Oilseeds", "Rapeseed & mustard"],
+  ["Oilseeds", "Sesame (Til)"],
+  ["Oilseeds", "Sunflower"],
+  ["Oilseeds", "Safflower"],
+  ["Oilseeds", "Niger seed"],
+  ["Oilseeds", "Linseed (Alsi)"],
+  ["Oilseeds", "Castor"],
+  ["Oilseeds", "Cottonseed"],
+  ["Oilseeds", "Taramira"],
+  ["Oilseeds", "Camelina"],
+  ["Oilseeds", "Oil palm"],
+  ["Oilseeds", "Coconut"],
+  ["Commercial & fibre", "Cotton"],
+  ["Commercial & fibre", "Jute"],
+  ["Commercial & fibre", "Mesta"],
+  ["Commercial & fibre", "Kenaf"],
+  ["Commercial & fibre", "Sunn hemp"],
+  ["Commercial & fibre", "Flax"],
+  ["Commercial & fibre", "Ramie"],
+  ["Commercial & fibre", "Sugarcane"],
+  ["Commercial & fibre", "Sugar beet"],
+  ["Commercial & fibre", "Tobacco"],
+  ["Commercial & fibre", "Tea"],
+  ["Commercial & fibre", "Coffee"],
+  ["Commercial & fibre", "Rubber"],
+  ["Commercial & fibre", "Cocoa"],
+  ["Vegetables", "Potato"],
+  ["Vegetables", "Sweet potato"],
+  ["Vegetables", "Tomato"],
+  ["Vegetables", "Onion"],
+  ["Vegetables", "Garlic"],
+  ["Vegetables", "Brinjal (Eggplant)"],
+  ["Vegetables", "Okra (Bhindi)"],
+  ["Vegetables", "Capsicum"],
+  ["Vegetables", "Chilli"],
+  ["Vegetables", "Cauliflower"],
+  ["Vegetables", "Cabbage"],
+  ["Vegetables", "Broccoli"],
+  ["Vegetables", "Carrot"],
+  ["Vegetables", "Radish"],
+  ["Vegetables", "Beetroot"],
+  ["Vegetables", "Turnip"],
+  ["Vegetables", "Peas"],
+  ["Vegetables", "French bean"],
+  ["Vegetables", "Broad bean"],
+  ["Vegetables", "Cowpea vegetable"],
+  ["Vegetables", "Bottle gourd"],
+  ["Vegetables", "Bitter gourd"],
+  ["Vegetables", "Ridge gourd"],
+  ["Vegetables", "Sponge gourd"],
+  ["Vegetables", "Snake gourd"],
+  ["Vegetables", "Ash gourd"],
+  ["Vegetables", "Pumpkin"],
+  ["Vegetables", "Cucumber"],
+  ["Vegetables", "Muskmelon"],
+  ["Vegetables", "Watermelon"],
+  ["Vegetables", "Pointed gourd"],
+  ["Vegetables", "Ivy gourd"],
+  ["Vegetables", "Drumstick (Moringa)"],
+  ["Vegetables", "Spinach"],
+  ["Vegetables", "Amaranthus greens"],
+  ["Vegetables", "Fenugreek greens"],
+  ["Vegetables", "Coriander greens"],
+  ["Vegetables", "Lettuce"],
+  ["Vegetables", "Celery"],
+  ["Vegetables", "Mushroom"],
+  ["Vegetables", "Tapioca (Cassava)"],
+  ["Vegetables", "Elephant foot yam"],
+  ["Vegetables", "Colocasia (Arbi)"],
+  ["Vegetables", "Yam"],
+  ["Fruits", "Mango"],
+  ["Fruits", "Banana"],
+  ["Fruits", "Guava"],
+  ["Fruits", "Papaya"],
+  ["Fruits", "Pomegranate"],
+  ["Fruits", "Grapes"],
+  ["Fruits", "Apple"],
+  ["Fruits", "Pear"],
+  ["Fruits", "Peach"],
+  ["Fruits", "Plum"],
+  ["Fruits", "Apricot"],
+  ["Fruits", "Litchi"],
+  ["Fruits", "Citrus"],
+  ["Fruits", "Orange"],
+  ["Fruits", "Mandarin"],
+  ["Fruits", "Lemon"],
+  ["Fruits", "Lime"],
+  ["Fruits", "Sapota (Chikoo)"],
+  ["Fruits", "Jackfruit"],
+  ["Fruits", "Pineapple"],
+  ["Fruits", "Coconut"],
+  ["Fruits", "Cashew"],
+  ["Fruits", "Amla"],
+  ["Fruits", "Ber"],
+  ["Fruits", "Jamun"],
+  ["Fruits", "Custard apple"],
+  ["Fruits", "Fig"],
+  ["Fruits", "Date palm"],
+  ["Fruits", "Dragon fruit"],
+  ["Fruits", "Kiwi"],
+  ["Fruits", "Strawberry"],
+  ["Fruits", "Passion fruit"],
+  ["Fruits", "Avocado"],
+  ["Fruits", "Karonda"],
+  ["Fruits", "Phalsa"],
+  ["Spices & condiments", "Black pepper"],
+  ["Spices & condiments", "Cardamom"],
+  ["Spices & condiments", "Ginger"],
+  ["Spices & condiments", "Turmeric"],
+  ["Spices & condiments", "Coriander seed"],
+  ["Spices & condiments", "Cumin"],
+  ["Spices & condiments", "Fennel"],
+  ["Spices & condiments", "Fenugreek"],
+  ["Spices & condiments", "Ajwain"],
+  ["Spices & condiments", "Dill"],
+  ["Spices & condiments", "Caraway"],
+  ["Spices & condiments", "Celery seed"],
+  ["Spices & condiments", "Saffron"],
+  ["Spices & condiments", "Vanilla"],
+  ["Spices & condiments", "Tamarind"],
+  ["Spices & condiments", "Kokum"],
+  ["Spices & condiments", "Nutmeg"],
+  ["Spices & condiments", "Clove"],
+  ["Spices & condiments", "Cinnamon"],
+  ["Spices & condiments", "Bay leaf"],
+  ["Spices & condiments", "Curry leaf"],
+  ["Spices & condiments", "Mint"],
+  ["Spices & condiments", "Basil (Tulsi)"],
+  ["Plantation & medicinal", "Arecanut"],
+  ["Plantation & medicinal", "Betel leaf"],
+  ["Plantation & medicinal", "Aloe vera"],
+  ["Plantation & medicinal", "Ashwagandha"],
+  ["Plantation & medicinal", "Isabgol"],
+  ["Plantation & medicinal", "Senna"],
+  ["Plantation & medicinal", "Safed musli"],
+  ["Plantation & medicinal", "Kalmegh"],
+  ["Plantation & medicinal", "Lemongrass"],
+  ["Plantation & medicinal", "Citronella"],
+  ["Plantation & medicinal", "Palmarosa"],
+  ["Plantation & medicinal", "Vetiver (Khus)"],
+  ["Plantation & medicinal", "Patchouli"],
+  ["Plantation & medicinal", "Rosemary"],
+  ["Flowers & fodder", "Rose"],
+  ["Flowers & fodder", "Marigold"],
+  ["Flowers & fodder", "Jasmine"],
+  ["Flowers & fodder", "Chrysanthemum"],
+  ["Flowers & fodder", "Tuberose"],
+  ["Flowers & fodder", "Gladiolus"],
+  ["Flowers & fodder", "Gerbera"],
+  ["Flowers & fodder", "Carnation"],
+  ["Flowers & fodder", "Berseem"],
+  ["Flowers & fodder", "Lucerne"],
+  ["Flowers & fodder", "Napier grass"],
+  ["Flowers & fodder", "Fodder maize"],
+  ["Flowers & fodder", "Fodder sorghum"],
+  ["Flowers & fodder", "Oats fodder"],
+  ["Flowers & fodder", "Guinea grass"],
+].map(([category, name]) => ({ category, name }));
+const normalizeIndianPhone = (value) => {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.length === 10) return "+91" + digits;
+  if (digits.length === 12 && digits.startsWith("91")) return "+" + digits;
+  if (
+    String(value || "").startsWith("+") &&
+    digits.length >= 10 &&
+    digits.length <= 15
+  )
+    return "+" + digits;
+  return "";
+};
+const translations = {
+  en: {
+    tag: "From farm to table, fairly.",
+    hero: "Better value for every harvest.",
+    sub: "Live local produce, transparent grading, and fair market access - built around farmer choice.",
+    shop: "Shop fresh produce",
+    farmer: "Farmer portal",
+    stock: "Live stock",
+    how: "How FarmLink works",
+    why: "Why FarmLink",
+    voice: "Voice access",
+    ai: "AI insight",
+  },
+  hi: {
+    tag: "खेत से घर तक, उचित मूल्य पर।",
+    hero: "हर फसल का बेहतर मूल्य।",
+    sub: "लाइव स्थानीय उपज, पारदर्शी ग्रेडिंग और किसान की पसंद के साथ निष्पक्ष बाजार।",
+    shop: "ताजी उपज खरीदें",
+    farmer: "किसान पोर्टल",
+    stock: "लाइव स्टॉक",
+    how: "FarmLink कैसे काम करता है",
+    why: "FarmLink क्यों",
+    voice: "वॉइस एक्सेस",
+    ai: "AI सुझाव",
+  },
+};
+const hindiUI = {
+  Marketplace: "बाज़ार",
+  Wholesale: "थोक बाज़ार",
+  Warehouse: "गोदाम",
+  Farmer: "किसान",
+  "Sign in": "लॉग इन",
+  Logout: "लॉग आउट",
+  "Retail marketplace": "खुदरा बाज़ार",
+  "Continue shopping": "खरीदारी जारी रखें",
+  "Open wholesale marketplace": "थोक बाज़ार खोलें",
+  Checkout: "चेकआउट",
+  Save: "सहेजें",
+  "Saved to wishlist": "पसंदीदा में सहेजा गया",
+  "Save to wishlist": "पसंदीदा में सहेजें",
+  "Quality report": "गुणवत्ता रिपोर्ट",
+  "AI smart ranking": "एआई स्मार्ट रैंकिंग",
+  "Lowest price": "सबसे कम कीमत",
+  "Nearest first": "सबसे नज़दीक पहले",
+  "Organic certified": "जैविक प्रमाणित",
+  All: "सभी",
+  Tomato: "टमाटर",
+  Onion: "प्याज़",
+  Potato: "आलू",
+  "Consumer account": "उपभोक्ता खाता",
+  "Orders, favourites & preferences": "ऑर्डर, पसंदीदा और प्राथमिकताएँ",
+  "Order tracking": "ऑर्डर ट्रैकिंग",
+  wishlist: "पसंदीदा",
+  orders: "ऑर्डर",
+  profile: "प्रोफ़ाइल",
+  reviews: "समीक्षाएँ",
+  "Profile & delivery preferences": "प्रोफ़ाइल और डिलीवरी प्राथमिकताएँ",
+  "Primary address": "मुख्य पता",
+  "Mobile number": "मोबाइल नंबर",
+  "Preferred pickup window": "पसंदीदा पिकअप समय",
+  "Save preferences": "प्राथमिकताएँ सहेजें",
+  "Reviews & ratings": "समीक्षाएँ और रेटिंग",
+  "Submit verified review": "सत्यापित समीक्षा भेजें",
+  "VERIFIED WHOLESALE MARKETPLACE": "सत्यापित थोक बाज़ार",
+  "Buy better, in bulk.": "थोक में बेहतर खरीदें।",
+  discover: "खोजें",
+  quotes: "कोटेशन",
+  contracts: "अनुबंध",
+  analytics: "विश्लेषण",
+  invoices: "चालान",
+  "Negotiation & quote workspace": "बातचीत और कोटेशन कार्यक्षेत्र",
+  "Send negotiated quote": "बातचीत वाला कोटेशन भेजें",
+  "Contract orders": "अनुबंध ऑर्डर",
+  "Create contract order": "अनुबंध ऑर्डर बनाएँ",
+  "GST-compliant invoice centre": "GST-अनुपालन चालान केंद्र",
+  "Generate PDF": "पीडीएफ बनाएँ",
+  "Farmer portal": "किसान पोर्टल",
+  "Your produce. Your decision.": "आपकी उपज। आपका निर्णय।",
+  "PICKUP & GRADING": "पिकअप और ग्रेडिंग",
+  "Add produce request": "उपज अनुरोध जोड़ें",
+  "Request type": "अनुरोध प्रकार",
+  "Produce intake": "उपज प्राप्ति",
+  "Cluster collection request": "क्लस्टर संग्रह अनुरोध",
+  Produce: "उपज",
+  "Gross weight at pickup (kg)": "पिकअप पर सकल वजन (किग्रा)",
+  "Collection cluster": "संग्रह क्लस्टर",
+  "Send request to warehouse": "गोदाम को अनुरोध भेजें",
+  "Your produce & requests": "आपकी उपज और अनुरोध",
+  "Need working capital?": "कार्यशील पूंजी चाहिए?",
+  "Explore options": "विकल्प देखें",
+  "How grading works": "ग्रेडिंग कैसे काम करती है",
+  listings: "लिस्टिंग",
+  logistics: "लॉजिस्टिक्स",
+  payments: "भुगतान",
+  performance: "प्रदर्शन",
+  verification: "सत्यापन",
+  "Produce listing management & AI grading":
+    "उपज लिस्टिंग प्रबंधन और एआई ग्रेडिंग",
+  "Listing title": "लिस्टिंग शीर्षक",
+  "Listing image": "लिस्टिंग तस्वीर",
+  Description: "विवरण",
+  "Run AI grading & submit listing": "एआई ग्रेडिंग चलाएँ और लिस्टिंग भेजें",
+  "Incoming order management": "आने वाले ऑर्डर प्रबंधन",
+  "Accept order": "ऑर्डर स्वीकारें",
+  "Logistics schedule": "लॉजिस्टिक्स समय-सारणी",
+  "Available earnings": "उपलब्ध आय",
+  "Pending settlement": "लंबित भुगतान",
+  Transactions: "लेनदेन",
+  "Sales trend": "बिक्री रुझान",
+  "Repeat customers": "दोबारा आने वाले ग्राहक",
+  "Average rating": "औसत रेटिंग",
+  "Farmer profile verification": "किसान प्रोफ़ाइल सत्यापन",
+  "Continue verification": "सत्यापन जारी रखें",
+  "ADMIN-ONLY WAREHOUSE CONSOLE": "केवल एडमिन गोदाम कंसोल",
+  "Warehouse intake & fulfillment": "गोदाम प्राप्ति और पूर्ति",
+  "Admin access only": "केवल एडमिन पहुँच",
+  "Confirm produce intake": "उपज प्राप्ति की पुष्टि करें",
+  "Confirmed net weight (kg)": "पुष्ट शुद्ध वजन (किग्रा)",
+  "Human-verified grade": "मानव-सत्यापित ग्रेड",
+  "Confirm grade & create lot": "ग्रेड की पुष्टि करें और लॉट बनाएँ",
+  "Live inventory ledger": "लाइव इन्वेंटरी लेजर",
+  "Farmer produce & cluster requests": "किसान उपज और क्लस्टर अनुरोध",
+  "Consumer pickup orders": "उपभोक्ता पिकअप ऑर्डर",
+  "PLATFORM COMMAND CENTER": "प्लेटफ़ॉर्म कमांड सेंटर",
+  "FarmLink Admin": "फार्मलिंक एडमिन",
+  "Registered farmers": "पंजीकृत किसान",
+  "Live inventory": "लाइव इन्वेंटरी",
+  "Stock value": "स्टॉक मूल्य",
+  "GOVERNANCE & MODERATION": "शासन और मॉडरेशन",
+  "User management": "उपयोगकर्ता प्रबंधन",
+  "Listing moderation": "लिस्टिंग मॉडरेशन",
+  "Dispute resolution": "विवाद समाधान",
+  "System configuration": "सिस्टम कॉन्फ़िगरेशन",
+  "Review pending applications": "लंबित आवेदन देखें",
+  Approve: "स्वीकृत करें",
+  "Reject selected listing": "चयनित लिस्टिंग अस्वीकारें",
+  Login: "लॉग इन",
+  Register: "पंजीकरण",
+  "WELCOME BACK": "वापसी पर स्वागत है",
+  "CREATE YOUR ACCOUNT": "अपना खाता बनाएँ",
+  "Sign in to FarmLink": "फार्मलिंक में लॉग इन करें",
+  "Register as a user": "उपयोगकर्ता के रूप में पंजीकरण करें",
+  Consumer: "उपभोक्ता",
+  Admin: "एडमिन",
+  "Full name": "पूरा नाम",
+  "Full address": "पूरा पता",
+  "Email address": "ईमेल पता",
+  "Farmer ID": "किसान आईडी",
+  "Admin username": "एडमिन उपयोगकर्ता नाम",
+  Password: "पासवर्ड",
+  "Create account": "खाता बनाएँ",
+  "Resend email confirmation": "ईमेल पुष्टि फिर भेजें",
+  "DIRECT FROM VERIFIED STORAGE": "सत्यापित भंडारण से सीधे",
+  "FRESH PRODUCE MARKETPLACE": "ताज़ा उपज बाज़ार",
+  "VERIFIED Grade": "सत्यापित ग्रेड",
+  "Choose your pickup warehouse": "अपना पिकअप गोदाम चुनें",
+  "Confirm pickup order": "पिकअप ऑर्डर की पुष्टि करें",
+  "Pickup warehouse": "पिकअप गोदाम",
+  "Ready for pickup": "पिकअप के लिए तैयार",
+  "Back to marketplace": "बाज़ार पर वापस",
+  "LOCAL MARKET, LIVE STOCK.": "स्थानीय बाज़ार, लाइव स्टॉक।",
+  "Voice access": "वॉइस एक्सेस",
+  "Try voice demo": "वॉइस डेमो आज़माएँ",
+  "Start speaking": "बोलना शुरू करें",
+  "AI insight": "एआई सुझाव",
+  "Farmer-first aggregation • Transparent grade • Better choices":
+    "किसान-प्रथम एकत्रीकरण • पारदर्शी ग्रेड • बेहतर विकल्प",
+  "Live local produce, transparent grading, and fair market access - built around farmer choice.":
+    "लाइव स्थानीय उपज, पारदर्शी ग्रेडिंग और किसान की पसंद पर बना निष्पक्ष बाज़ार।",
+  "Smart-ranked by quality, proximity and price competitiveness. Every live lot has a traceable quality record.":
+    "गुणवत्ता, निकटता और मूल्य प्रतिस्पर्धा के आधार पर एआई रैंकिंग। हर लाइव लॉट का पता लगाने योग्य गुणवत्ता रिकॉर्ड है।",
+  "Search produce, farmer or location": "उपज, किसान या स्थान खोजें",
+  "No lots match these filters. Try clearing the organic or grade filter.":
+    "इन फ़िल्टरों से कोई लॉट नहीं मिला। जैविक या ग्रेड फ़िल्टर हटाकर देखें।",
+  "Request GST-ready quotes, negotiate with verified farmers, and arrange recurring contracts.":
+    "GST-तैयार कोटेशन माँगें, सत्यापित किसानों से बातचीत करें और नियमित अनुबंध बनाएँ।",
+  "Track pickup status, maintain delivery preferences, and share verified purchase feedback.":
+    "पिकअप स्थिति ट्रैक करें, डिलीवरी प्राथमिकताएँ रखें और सत्यापित खरीद प्रतिक्रिया साझा करें।",
+  "Discover verified suppliers, request quality samples, negotiate transparent quotes, and manage recurring contracts.":
+    "सत्यापित आपूर्तिकर्ता खोजें, गुणवत्ता नमूने माँगें, पारदर्शी कोटेशन पर बातचीत करें और नियमित अनुबंध संभालें।",
+  "Monitor farmer collection requests, consumer pickup orders, warehouse stock and market operations.":
+    "किसान संग्रह अनुरोध, उपभोक्ता पिकअप ऑर्डर, गोदाम स्टॉक और बाज़ार संचालन की निगरानी करें।",
+  "Demo platform for SIH 2026 PS 26033. AI recommendations are illustrative, not guarantees.":
+    "SIH 2026 PS 26033 के लिए डेमो प्लेटफ़ॉर्म। एआई सुझाव केवल उदाहरण हैं, गारंटी नहीं।",
+  "Traceable lots": "ट्रैक करने योग्य लॉट",
+  "Human-verified grades": "मानव-सत्यापित ग्रेड",
+  "MARKET SIGNAL": "बाज़ार संकेत",
+  "High demand nearby": "पास में अधिक मांग",
+  "available today": "आज उपलब्ध",
+  "LIVE FROM NEARBY WAREHOUSES": "नज़दीकी गोदामों से लाइव",
+  "View marketplace": "बाज़ार देखें",
+  "Grade ": "ग्रेड ",
+  "kg available": "किग्रा उपलब्ध",
+  "day old": "दिन पुराना",
+  "ONE CONNECTED FLOW": "एक जुड़ा हुआ प्रवाह",
+  "Less uncertainty.": "कम अनिश्चितता।",
+  "More choice.": "अधिक विकल्प।",
+  "FarmLink joins physical aggregation with market intelligence so produce moves with clarity, not pressure.":
+    "फार्मलिंक भौतिक एकत्रीकरण को बाज़ार की जानकारी से जोड़ता है ताकि उपज दबाव से नहीं, स्पष्टता से आगे बढ़े।",
+  "Cluster pickup": "क्लस्टर पिकअप",
+  "Village & FPO collection": "गाँव और FPO संग्रह",
+  "Weigh, grade & store": "वजन, ग्रेड और भंडारण",
+  "AI guidance": "एआई मार्गदर्शन",
+  "Price, demand & stock-age": "मूल्य, मांग और स्टॉक आयु",
+  "Market access": "बाज़ार पहुँच",
+  "Consumer & bulk buyers": "उपभोक्ता और थोक खरीदार",
+  "Ask in your own language.": "अपनी भाषा में पूछें।",
+  "Call, speak, and get guided help with stock, prices or pickups.":
+    "कॉल करें, बोलें और स्टॉक, मूल्य या पिकअप में मार्गदर्शित सहायता पाएँ।",
+  "Reserve 10 kg": "10 किग्रा आरक्षित करें",
+  "Human-verified grade": "मानव-सत्यापित ग्रेड",
+  kg: "किग्रा",
+  "/kg": "/किग्रा",
+  km: "किमी",
+  intake: "प्राप्ति",
+  "Jaipur North": "जयपुर उत्तर",
+  "Sanganer Hub": "सांगानेर हब",
+};
+function localizeUI(root, language) {
+  const pairs =
+    language === "hi"
+      ? Object.entries(hindiUI)
+      : Object.entries(hindiUI).map(([en, hi]) => [hi, en]);
+  const replace = (value) =>
+    pairs
+      .sort((a, b) => b[0].length - a[0].length)
+      .reduce((text, [from, to]) => text.split(from).join(to), value);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach((node) => {
+    const next = replace(node.nodeValue);
+    if (next !== node.nodeValue) node.nodeValue = next;
+  });
+  root.querySelectorAll("[placeholder],[aria-label]").forEach((element) =>
+    ["placeholder", "aria-label"].forEach((attribute) => {
+      const value = element.getAttribute(attribute);
+      if (value) {
+        const next = replace(value);
+        if (next !== value) element.setAttribute(attribute, next);
+      }
+    }),
+  );
+}
+const CONSTITUTIONAL_LANGUAGES = [
+  ["as", "অসমীয়া"],
+  ["bn", "বাংলা"],
+  ["brx", "बड़ो"],
+  ["doi", "डोगरी"],
+  ["gu", "ગુજરાતી"],
+  ["hi", "हिन्दी"],
+  ["kn", "ಕನ್ನಡ"],
+  ["ks", "کٲشُر"],
+  ["kok", "कोंकणी"],
+  ["mai", "मैथिली"],
+  ["ml", "മലയാളം"],
+  ["mni", "মেইতেই লোন্"],
+  ["mr", "मराठी"],
+  ["ne", "नेपाली"],
+  ["or", "ଓଡ଼ିଆ"],
+  ["pa", "ਪੰਜਾਬੀ"],
+  ["sa", "संस्कृतम्"],
+  ["sat", "ᱥᱟᱱᱛᱟᱲᱤ"],
+  ["sd", "سنڌي"],
+  ["ta", "தமிழ்"],
+  ["te", "తెలుగు"],
+  ["ur", "اردو"],
+];
 
-function Home({t,lots,setView,access,reserve,setModal}){return <><section className="hero"><div className="hero-copy"><p className="eyebrow"><Leaf size={15}/>{t.tag}</p><h1>{t.hero}</h1><p>{t.sub}</p><div className="cta"><button className="primary" onClick={()=>access('consumer','market')}>{t.shop}<ArrowUpRight size={18}/></button><button className="secondary" onClick={()=>access('farmer','farmer')}>{t.farmer}<ChevronRight size={18}/></button></div><div className="trust"><span><ShieldCheck/>Traceable lots</span><span><ScanLine/>Human-verified grades</span></div></div><div className="hero-card"><div className="sun"></div><div className="field"><span></span><span></span><span></span></div><div className="floating price"><small>MARKET SIGNAL</small><b>Tomato +8%</b><em>High demand nearby</em></div><div className="floating stock"><PackageCheck/><div><b>2,510 kg</b><small>available today</small></div></div><div className="produce tomato">●</div><div className="produce onion">●</div></div></section>
- <section className="section"><div className="section-head"><div><p className="eyebrow green">LIVE FROM NEARBY WAREHOUSES</p><h2>{t.stock}</h2></div><button className="text-btn" onClick={()=>access('consumer','market')}>View marketplace <ArrowUpRight size={16}/></button></div><div className="cards">{lots.map(l=><LotCard key={l.id} lot={l} onClick={()=>reserve(l)}/>)}</div></section>
- <section className="impact"><div><p className="eyebrow">ONE CONNECTED FLOW</p><h2>Less uncertainty.<br/>More choice.</h2><p>FarmLink joins physical aggregation with market intelligence so produce moves with clarity, not pressure.</p><button className="outline" onClick={()=>setModal('ai')}><BrainCircuit size={18}/>{t.ai}</button></div><div className="flow"><Flow n="1" icon={<Truck/>} title="Cluster pickup" text="Village & FPO collection"/><Flow n="2" icon={<Warehouse/>} title="Warehouse intake" text="Weigh, grade & store"/><Flow n="3" icon={<BrainCircuit/>} title="AI guidance" text="Price, demand & stock-age"/><Flow n="4" icon={<ShoppingCart/>} title="Market access" text="Consumer & bulk buyers"/></div></section>
- <section className="voice-banner"><div className="mic"><Mic size={34}/></div><div><p className="eyebrow">{t.voice.toUpperCase()}</p><h2>Ask in your own language.</h2><p>Call, speak, and get guided help with stock, prices or pickups.</p></div><button className="primary pale" onClick={()=>setModal('voice')}>Try voice demo <Mic size={18}/></button></section></>}
-function LotCard({lot,onClick}){return <article className="lot"><div className={'lot-img '+lot.crop.toLowerCase()}>{lot.imageUrl?<img src={lot.imageUrl} alt={lot.crop+' grown by '+lot.farmer}/>:<span>{lot.crop==='Tomato'?'🍅':lot.crop==='Onion'?'🧅':'🥔'}</span>}<b>{lot.listing?'Farmer photo':'Grade '+lot.grade}</b></div><div className="lot-body"><div className="lot-title"><div><h3>{lot.crop}</h3><p><MapPin size={14}/>{lot.warehouse} · {lot.dist}</p></div><span className={lot.trend>=0?'up':'down'}>{lot.trend>=0?'↑':''}{lot.trend}%</span></div><div className="lot-meta"><span>{lot.qty} kg available</span><span><Clock3 size={14}/>{lot.old} day old</span></div><div className="buy"><b>₹{lot.price}<small>/kg</small></b><button onClick={onClick}>Reserve 10 kg</button></div></div></article>}
-function Flow({n,icon,title,text}){return <div className="flow-item"><span>{n}</span><i>{icon}</i><div><b>{title}</b><small>{text}</small></div></div>}
-function Market({lots,reserve,cart,total,onCheckout,notify,wishlist,setWishlist,setSelectedLot,setView}){
- const [filter,setFilter]=useState('All'),[grade,setGrade]=useState('Any'),[organic,setOrganic]=useState(false),[sort,setSort]=useState('smart'),[query,setQuery]=useState('');
- const visible=useMemo(()=>lots.filter(l=>(filter==='All'||l.crop===filter)&&(grade==='Any'||l.grade===grade)&&(!query||l.crop.toLowerCase().includes(query.toLowerCase()))).sort((a,b)=>sort==='price'?a.price-b.price:sort==='distance'?parseInt(a.dist)-parseInt(b.dist):(b.trend*3+a.qty/100-a.price/10)-(a.trend*3+b.qty/100-b.price/10)),[lots,filter,grade,sort,query]);
- const favorite=lot=>{setWishlist(items=>items.some(x=>x.id===lot.id)?items.filter(x=>x.id!==lot.id):[...items,lot]);notify(wishlist.some(x=>x.id===lot.id)?'Removed from wishlist.':'Saved to wishlist.');};
- return <section className="page"><div className="page-top"><div><p className="eyebrow green">FRESH PRODUCE MARKETPLACE</p><h1>Local market, live stock.</h1><p>Smart-ranked by quality, proximity and price competitiveness. Every live lot has a traceable quality record.</p></div><div className="checkout"><b>{cart.length} items · {total} kg</b><button className="primary" disabled={!cart.length} onClick={onCheckout}>Checkout</button></div></div><div className="market-tools"><input aria-label="Search produce" placeholder="Search produce, farmer or location" value={query} onChange={e=>setQuery(e.target.value)}/><select value={grade} onChange={e=>setGrade(e.target.value)}><option>Any</option><option>A</option><option>B</option><option>C</option></select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="smart">AI smart ranking</option><option value="price">Lowest price</option><option value="distance">Nearest first</option></select><label className="check-filter"><input type="checkbox" checked={organic} onChange={e=>setOrganic(e.target.checked)}/> Organic certified</label></div><div className="filters">{['All','Tomato','Onion','Potato'].map(x=><button key={x} className={filter===x?'selected':''} onClick={()=>setFilter(x)}>{x}</button>)}</div><p className="search-note"><BrainCircuit size={16}/> AI ranking considers verified grade, distance, price and stock freshness. {organic&&' No organic-certified demo lots are currently available.'}</p><div className="cards">{visible.filter(()=>!organic).map(l=><div className="product-wrap" key={l.id}><LotCard lot={l} onClick={()=>reserve(l)}/><div className="product-actions"><button onClick={()=>{setSelectedLot(l);setView('detail')}}>Quality report</button><button className={wishlist.some(x=>x.id===l.id)?'favorite active':'favorite'} onClick={()=>favorite(l)}>♡ Save</button></div></div>)}</div>{!visible.filter(()=>!organic).length&&<p className="empty-state">No lots match these filters. Try clearing the organic or grade filter.</p>}<div className="bulk"><div><PackageCheck/><div><h3>Buying in bulk?</h3><p>Request GST-ready quotes, negotiate with verified farmers, and arrange recurring contracts.</p></div></div><button className="primary" onClick={()=>setView('bulk')}>Open wholesale marketplace</button></div></section>
+function App() {
+  const [lang, setLang] = useState("en"),
+    [view, setView] = useState("home"),
+    [lots, setLots] = useState(initialLots),
+    [cart, setCart] = useState([]),
+    [wishlist, setWishlist] = useState([]),
+    [selectedLot, setSelectedLot] = useState(null),
+    [modal, setModal] = useState(null),
+    [toast, setToast] = useState(""),
+    [session, setSession] = useState(null),
+    [produceRequests, setProduceRequests] = useState([]),
+    [orders, setOrders] = useState([]),
+    [now, setNow] = useState(Date.now()),
+    [placingOrder, setPlacingOrder] = useState(false),
+    placingOrderRef = useRef(false);
+  const t = translations[lang] || translations.en;
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    supabase.auth
+      .getSession()
+      .then(async ({ data: { session: authSession } }) => {
+        if (!authSession) return;
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role,full_name,farmer_id")
+          .eq("id", authSession.user.id)
+          .single();
+        if (profile)
+          setSession({
+            role: profile.role,
+            label: profile.full_name,
+            name: profile.full_name,
+            farmerId: profile.farmer_id,
+            userId: authSession.user.id,
+          });
+      });
+  }, []);
+  useEffect(() => {
+    if (!isSupabaseConfigured || !session?.userId) return;
+    supabase
+      .from("produce_lots")
+      .select(
+        "id,lot_code,crop,grade,quantity_kg,price_per_kg,warehouses(name)",
+      )
+      .then(({ data }) => {
+        if (data)
+          setLots(
+            data.map((lot, index) => ({
+              id: lot.lot_code,
+              dbId: lot.id,
+              crop: lot.crop,
+              hi: lot.crop,
+              grade: lot.grade,
+              qty: Number(lot.quantity_kg),
+              price: Number(lot.price_per_kg),
+              old: 1,
+              warehouse: lot.warehouses?.name || "Warehouse",
+              farmer: "",
+              dist: "Nearby",
+              trend: index === 0 ? 8 : 3,
+            })),
+          );
+      });
+  }, [session?.userId]);
+  useEffect(() => {
+    if (!isSupabaseConfigured || !session?.userId) return;
+    supabase
+      .from("farmer_listings")
+      .select("id,crop,category,description,quantity_kg,price_per_kg,image_url")
+      .eq("status", "published")
+      .then(({ data }) => {
+        if (data)
+          setLots((current) => [
+            ...current.filter((lot) => !lot.listing),
+            ...data.map((listing, index) => ({
+              id: "LIST-" + listing.id.slice(-6).toUpperCase(),
+              listing: true,
+              listingId: listing.id,
+              crop: listing.crop,
+              hi: listing.crop,
+              grade: "Farmer listed",
+              qty: Number(listing.quantity_kg),
+              price: Number(listing.price_per_kg),
+              old: 0,
+              warehouse: "Direct farmer listing",
+              farmer: "Verified farmer",
+              dist: "Direct",
+              trend: 0,
+              imageUrl: listing.image_url,
+              description: listing.description,
+              category: listing.category,
+            })),
+          ]);
+      });
+  }, [session?.userId]);
+  useEffect(() => {
+    if (!isSupabaseConfigured || !session?.userId) return;
+    const requestQuery =
+      session.role === "admin"
+        ? supabase
+            .from("produce_requests")
+            .select(
+              "id,crop,gross_weight_kg,collection_cluster,request_type,status,profiles(full_name)",
+            )
+        : supabase
+            .from("produce_requests")
+            .select(
+              "id,crop,gross_weight_kg,collection_cluster,request_type,status",
+            )
+            .eq("farmer_id", session.userId);
+    requestQuery.then(({ data }) => {
+      if (data)
+        setProduceRequests(
+          data.map((r) => ({
+            id: r.id,
+            crop: r.crop,
+            grossWeight: Number(r.gross_weight_kg),
+            cluster: r.collection_cluster,
+            type:
+              r.request_type === "cluster_collection"
+                ? "Cluster collection request"
+                : "Produce intake",
+            status: r.status,
+            farmer: r.profiles?.full_name || session.name || "Farmer",
+          })),
+        );
+    });
+  }, [session?.userId, session?.role]);
+  useEffect(() => {
+    if (
+      !isSupabaseConfigured ||
+      !session?.userId ||
+      !["admin", "consumer"].includes(session.role)
+    )
+      return;
+    const query =
+      session.role === "admin"
+        ? supabase
+            .from("consumer_orders")
+            .select(
+              "id,order_code,total_kg,status,cancellation_expires_at,warehouses(name)",
+            )
+        : supabase
+            .from("consumer_orders")
+            .select(
+              "id,order_code,total_kg,status,cancellation_expires_at,warehouses(name)",
+            )
+            .eq("consumer_id", session.userId);
+    query.then(({ data }) => {
+      if (data)
+        setOrders(
+          data.map((order) => ({
+            id: order.order_code,
+            dbId: order.id,
+            quantity: Number(order.total_kg),
+            items: 0,
+            status: (order.status || "pending_verification")
+              .split("_")
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" "),
+            cancellationDeadline: order.cancellation_expires_at
+              ? new Date(order.cancellation_expires_at).getTime()
+              : null,
+            pickupWarehouse: order.warehouses?.name || "Warehouse",
+          })),
+        );
+    });
+  }, [session?.role, session?.userId]);
+  useEffect(() => {
+    const root = document.body;
+    if (!root) return;
+    let pending = false;
+    const translate = () => {
+      if (!pending) {
+        pending = true;
+        localizeUI(root, lang);
+        pending = false;
+      }
+    };
+    translate();
+    const observer = new MutationObserver(translate);
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+    return () => observer.disconnect();
+  }, [lang, view]);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const notify = (m) => {
+    setToast(m);
+    setTimeout(() => setToast(""), 3000);
+  };
+  const reserve = (lot) => {
+    if (lot.listing) {
+      notify(
+        "This farmer photo listing is visible now; warehouse intake will enable checkout after stock verification.",
+      );
+      return;
+    }
+    setCart((c) => [...c, lot]);
+    setLots((ls) =>
+      ls.map((x) => (x.id === lot.id ? { ...x, qty: x.qty - 10 } : x)),
+    );
+    notify("10 kg reserved. Your order is ready for checkout.");
+  };
+  useEffect(() => {
+    const expired = orders.filter(
+      (order) =>
+        order.status === "Pending verification" &&
+        order.cancellationDeadline &&
+        now >= order.cancellationDeadline,
+    );
+    if (!expired.length) return;
+    setOrders((current) =>
+      current.map((order) =>
+        expired.some((item) => item.id === order.id)
+          ? { ...order, status: "Confirmed" }
+          : order,
+      ),
+    );
+    expired.forEach((order) => {
+      if (isSupabaseConfigured && order.dbId)
+        supabase
+          .from("consumer_orders")
+          .update({ status: "confirmed" })
+          .eq("id", order.dbId);
+    });
+  }, [now, orders]);
+  const placeOrder = async (pickupWarehouse) => {
+    if (placingOrderRef.current || placingOrder || !cart.length) return;
+    placingOrderRef.current = true;
+    setPlacingOrder(true);
+    try {
+      const id = `ORD-${String(Date.now()).slice(-6)}`,
+        cancellationDeadline = Date.now() + 10 * 60 * 1000;
+      const order = {
+        id,
+        pickupWarehouse,
+        items: cart.length,
+        quantity: cart.length * 10,
+        status: "Pending verification",
+        cancellationDeadline,
+        lineItems: cart,
+      };
+      if (isSupabaseConfigured && session?.userId) {
+        const { data: warehouse, error: warehouseError } = await supabase
+          .from("warehouses")
+          .select("id")
+          .eq("name", pickupWarehouse)
+          .single();
+        if (warehouseError) {
+          notify("Pickup warehouse could not be found.");
+          return;
+        }
+        const { data: created, error } = await supabase
+          .from("consumer_orders")
+          .insert({
+            order_code: id,
+            consumer_id: session.userId,
+            pickup_warehouse_id: warehouse.id,
+            total_kg: order.quantity,
+            total_amount: cart.reduce((sum, lot) => sum + lot.price * 10, 0),
+            status: "pending_verification",
+            cancellation_expires_at: new Date(
+              cancellationDeadline,
+            ).toISOString(),
+          })
+          .select("id")
+          .single();
+        if (error) {
+          notify(error.message);
+          return;
+        }
+        order.dbId = created.id;
+        const items = cart
+          .filter((lot) => lot.dbId)
+          .map((lot) => ({
+            order_id: created.id,
+            lot_id: lot.dbId,
+            quantity_kg: 10,
+            unit_price: lot.price,
+          }));
+        if (items.length) {
+          const { error: itemError } = await supabase
+            .from("order_items")
+            .insert(items);
+          if (itemError) {
+            notify(itemError.message);
+            return;
+          }
+        }
+      }
+      setOrders((existing) => [order, ...existing]);
+      setCart([]);
+      setModal(null);
+      notify(
+        `Order ${id} is pending verification. You can cancel it for 10 minutes.`,
+      );
+    } finally {
+      placingOrderRef.current = false;
+      setPlacingOrder(false);
+    }
+  };
+  const setOrderStatus = async (id, status) => {
+    const order = orders.find((item) => item.id === id);
+    if (!order) return false;
+    if (isSupabaseConfigured && order.dbId) {
+      const { error } = await supabase
+        .from("consumer_orders")
+        .update({ status: status.toLowerCase().replaceAll(" ", "_") })
+        .eq("id", order.dbId);
+      if (error) {
+        notify(error.message);
+        return false;
+      }
+    }
+    setOrders((current) =>
+      current.map((item) => (item.id === id ? { ...item, status } : item)),
+    );
+    return true;
+  };
+  const cancelOrder = async (id) => {
+    const order = orders.find((item) => item.id === id);
+    if (
+      !order ||
+      order.status !== "Pending verification" ||
+      now >= order.cancellationDeadline
+    ) {
+      notify("This cancellation window has closed.");
+      return;
+    }
+    if (await setOrderStatus(id, "Cancelled")) {
+      setLots((current) =>
+        current.map((lot) => {
+          const reserved = (order.lineItems || []).filter(
+            (item) => item.id === lot.id,
+          ).length;
+          return reserved ? { ...lot, qty: lot.qty + reserved * 10 } : lot;
+        }),
+      );
+      notify("Order cancelled. Reserved stock was returned.");
+    }
+  };
+  const confirmOrder = (id) => setOrderStatus(id, "Confirmed");
+  const orderAgain = (id) => {
+    const order = orders.find((item) => item.id === id);
+    if (!order?.lineItems?.length) {
+      notify(
+        "This order's items are no longer available. Please choose current marketplace items.",
+      );
+      return;
+    }
+    setCart(order.lineItems);
+    setView("market");
+    notify(
+      "Confirmed order added to your cart. Review it and place a new order.",
+    );
+  };
+  const access = (role, destination) => {
+    if (
+      session?.role === "consumer" &&
+      ["farmer", "warehouse", "admin"].includes(destination)
+    ) {
+      setView("market");
+      notify("Consumer accounts cannot access farmer or warehouse systems.");
+      return;
+    }
+    if (session?.role === role || session?.role === "admin")
+      setView(destination);
+    else {
+      setView("auth");
+      notify(`Please sign in as ${role}.`);
+    }
+  };
+  const logout = async () => {
+    if (isSupabaseConfigured) await supabase.auth.signOut();
+    setSession(null);
+    setCart([]);
+    setModal(null);
+    setView("home");
+    notify("You have logged out.");
+  };
+  const total = cart.length * 10;
+  return (
+    <>
+      <header>
+        <button className="brand" onClick={() => setView("home")}>
+          <span>
+            <Sprout size={24} />
+          </span>
+          Farm<span>Link</span>
+        </button>
+        <nav>
+          <button onClick={() => access("consumer", "market")}>
+            Marketplace
+          </button>
+          <button onClick={() => access("consumer", "bulk")}>Wholesale</button>
+          {session?.role !== "consumer" && (
+            <button onClick={() => access("admin", "warehouse")}>
+              Warehouse
+            </button>
+          )}
+          {session?.role !== "consumer" && (
+            <button onClick={() => access("farmer", "farmer")}>Farmer</button>
+          )}
+        </nav>
+        <div className="head-actions">
+          <label className="language">
+            <Languages size={16} />
+            <select
+              aria-label="Interface language"
+              value={lang}
+              onChange={(event) => setLang(event.target.value)}
+            >
+              <option value="en">English</option>
+              {CONSTITUTIONAL_LANGUAGES.map(([code, label]) => (
+                <option value={code} key={code}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {session ? (
+            <button
+              className="profile-btn"
+              onClick={() =>
+                session.role === "admin"
+                  ? setView("admin")
+                  : setView(session.role === "farmer" ? "farmer" : "consumer")
+              }
+            >
+              <UserRound size={17} />
+              {session.label}
+            </button>
+          ) : (
+            <button className="login-btn" onClick={() => setView("auth")}>
+              <UserRound size={17} />
+              Sign in
+            </button>
+          )}
+          <span className="logout-wrap">
+            {session && (
+              <button className="login-btn" onClick={logout}>
+                <LogOut size={17} />
+                Logout
+              </button>
+            )}
+          </span>
+          <button
+            className="cart"
+            onClick={() => access("consumer", "consumer")}
+          >
+            <ShoppingCart size={18} />
+            {cart.length || ""}
+          </button>
+        </div>
+      </header>
+      <main>
+        {view === "home" && (
+          <Home
+            t={t}
+            lots={lots}
+            setView={setView}
+            access={access}
+            reserve={reserve}
+            setModal={setModal}
+          />
+        )}{" "}
+        {view === "market" && (
+          <Market
+            lots={lots}
+            reserve={reserve}
+            cart={cart}
+            total={total}
+            onCheckout={() => setModal("checkout")}
+            notify={notify}
+            wishlist={wishlist}
+            setWishlist={setWishlist}
+            setSelectedLot={setSelectedLot}
+            setView={setView}
+          />
+        )}{" "}
+        {view === "detail" && (
+          <ProductDetail
+            lot={selectedLot}
+            reserve={reserve}
+            wishlist={wishlist}
+            setWishlist={setWishlist}
+            setView={setView}
+            notify={notify}
+          />
+        )}{" "}
+        {view === "consumer" && (
+          <ConsumerHub
+            cart={cart}
+            wishlist={wishlist}
+            lots={lots}
+            orders={orders}
+            now={now}
+            cancelOrder={cancelOrder}
+            orderAgain={orderAgain}
+            setView={setView}
+            notify={notify}
+          />
+        )}{" "}
+        {view === "bulk" && (
+          <BulkMarket lots={lots} setView={setView} notify={notify} />
+        )}{" "}
+        {view === "warehouse" && session?.role === "admin" && (
+          <WarehouseView
+            session={session}
+            lots={lots}
+            setLots={setLots}
+            produceRequests={produceRequests}
+            orders={orders}
+            notify={notify}
+          />
+        )}{" "}
+        {view === "farmer" && session?.role === "farmer" && (
+          <FarmerView
+            session={session}
+            lots={lots}
+            setModal={setModal}
+            produceRequests={produceRequests}
+            setProduceRequests={setProduceRequests}
+            notify={notify}
+          />
+        )}{" "}
+        {view === "auth" && (
+          <AuthView setSession={setSession} setView={setView} notify={notify} />
+        )}{" "}
+        {view === "admin" && (
+          <>
+            <AdminView
+              lots={lots}
+              orders={orders}
+              produceRequests={produceRequests}
+              setView={setView}
+              logout={logout}
+              notify={notify}
+            />
+            <AdminOrderConfirmation
+              orders={orders}
+              confirmOrder={confirmOrder}
+            />
+          </>
+        )}
+      </main>
+      <footer>
+        <div className="brand light">
+          <span>
+            <Sprout size={22} />
+          </span>
+          Farm<span>Link</span>
+        </div>
+        <p>Farmer-first aggregation • Transparent grade • Better choices</p>
+        <small>
+          Demo platform for SIH 2026 PS 26033. AI recommendations are
+          illustrative, not guarantees.
+        </small>
+      </footer>
+      {modal === "voice" && (
+        <Voice close={() => setModal(null)} notify={notify} />
+      )}{" "}
+      {modal === "ai" && <AI close={() => setModal(null)} />}{" "}
+      {modal === "checkout" && (
+        <Checkout
+          cart={cart}
+          close={() => setModal(null)}
+          placeOrder={placeOrder}
+          placingOrder={placingOrder}
+        />
+      )}{" "}
+      {toast && (
+        <div className="toast">
+          <Check size={17} />
+          {toast}
+        </div>
+      )}
+    </>
+  );
 }
-function ProductDetail({lot,reserve,wishlist,setWishlist,setView,notify}){if(!lot)return <section className="page"><button className="secondary" onClick={()=>setView('market')}>Back to marketplace</button></section>;const saved=wishlist.some(x=>x.id===lot.id);return <section className="page product-detail"><button className="text-btn" onClick={()=>setView('market')}>← Back to marketplace</button><div className="detail-grid"><div className={'detail-visual '+lot.crop.toLowerCase()}>{lot.imageUrl?<img src={lot.imageUrl} alt={lot.crop+' listing'}/>:lot.crop==='Tomato'?'🍅':lot.crop==='Onion'?'🧅':'🥔'}<span>{lot.listing?'Farmer photo listing':'Verified Grade '+lot.grade}</span></div><div><p className="eyebrow green">TRACEABLE LOT {lot.id}</p><h1>{lot.crop} · Grade {lot.grade}</h1><p>Harvested locally and human-verified at {lot.warehouse}. Available for scheduled pickup.</p><h2>₹{lot.price}<small>/kg</small></h2><div className="quality-report"><div><b>91%</b><small>AI grade confidence</small></div><div><b>{lot.dist}</b><small>From warehouse</small></div><div><b>{lot.old} day</b><small>Stock age</small></div></div><div className="detail-actions"><button className="primary" onClick={()=>reserve(lot)}>Add 10 kg to cart</button><button className="secondary" onClick={()=>{setWishlist(items=>saved?items.filter(x=>x.id!==lot.id):[...items,lot]);notify(saved?'Removed from wishlist.':'Saved to wishlist.')}}>{saved?'Saved to wishlist':'Save to wishlist'}</button></div></div></div><div className="detail-sections"><article><h3>Quality report</h3><p>Visual defects: low · Size uniformity: high · Maturity: optimal. This AI-assisted report is reviewed by the intake operator before listing.</p></article><article><h3>Farmer profile</h3><p>{lot.farmer||'Verified FarmLink producer'} · Nearby farmer cluster · Produce handled through transparent warehouse grading.</p></article><article><h3>Nutritional information</h3><p>Fresh {lot.crop.toLowerCase()} is a source of fibre and essential micronutrients. Store cool and consume promptly.</p></article></div></section>}
-function ConsumerHub({cart,wishlist,lots,orders,now,cancelOrder,setView,notify}){
- const [tab,setTab]=useState('orders'),[review,setReview]=useState('');
- const countdown=deadline=>{const seconds=Math.max(0,Math.ceil((deadline-now)/1000));return `${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`};
- return <section className="page"><div className="page-top"><div><p className="eyebrow green">CONSUMER ACCOUNT</p><h1>Orders, favourites & preferences</h1><p>Track pickup status, maintain delivery preferences, and share verified purchase feedback.</p></div><button className="secondary" onClick={()=>setView('market')}>Continue shopping</button></div><div className="tabs">{['orders','wishlist','profile','reviews'].map(x=><button className={tab===x?'selected':''} onClick={()=>setTab(x)} key={x}>{x}</button>)}</div>{tab==='orders'&&<div className="account-panel"><h3>Order tracking</h3>{orders.length?orders.map(order=>{const canCancel=order.status==='Pending verification'&&order.cancellationDeadline&&now<order.cancellationDeadline;return <div className="tracking" key={order.id}><b>{order.id}</b><span>{order.status}</span><span>Pickup at {order.pickupWarehouse}</span>{canCancel?<><strong>Cancel within {countdown(order.cancellationDeadline)}</strong><small>Your order is pending verification. You can cancel it during this 10-minute window.</small><button onClick={()=>cancelOrder(order.id)}>Cancel order</button></>:<strong>{order.status==='Confirmed'?'Order confirmed':order.status}</strong>}</div>}):<p className="empty-state">No orders yet. Your pickup orders will appear here.</p>}<div className="tracking demo"><b>ORD-DEMO-100</b><span>Confirmed</span><span>Ready at Jaipur North</span><strong>Pickup ready</strong></div></div>}{tab==='wishlist'&&<div className="cards">{wishlist.length?wishlist.map(l=><LotCard key={l.id} lot={l} onClick={()=>notify('Open the product page to add this lot to cart.')}/>):<p className="empty-state">Your wishlist is empty. Save products from the marketplace to find them here.</p>}</div>}{tab==='profile'&&<div className="account-panel form-grid"><h3>Profile & delivery preferences</h3><label>Primary address<input defaultValue="Jaipur, Rajasthan"/></label><label>Mobile number<input defaultValue="+91 98XXXXXX12"/></label><label>Preferred pickup window<select><option>10 AM – 1 PM</option><option>2 PM – 6 PM</option></select></label><button className="primary" onClick={()=>notify('Profile preferences saved locally. Connect this form to the Supabase profile update in the next backend iteration.')}>Save preferences</button></div>}{tab==='reviews'&&<div className="account-panel"><h3>Reviews & ratings</h3><p>Only verified purchasers can submit a review. Your feedback is shown after moderation.</p><textarea placeholder="Share feedback about your recent produce order" value={review} onChange={e=>setReview(e.target.value)}/><button className="primary" onClick={()=>{setReview('');notify('Review submitted for moderation.')}}>Submit verified review</button></div>}</section>
+
+function Home({ t, lots, setView, access, reserve, setModal }) {
+  return (
+    <>
+      <section className="hero">
+        <div className="hero-copy">
+          <p className="eyebrow">
+            <Leaf size={15} />
+            {t.tag}
+          </p>
+          <h1>{t.hero}</h1>
+          <p>{t.sub}</p>
+          <div className="cta">
+            <button
+              className="primary"
+              onClick={() => access("consumer", "market")}
+            >
+              {t.shop}
+              <ArrowUpRight size={18} />
+            </button>
+            <button
+              className="secondary"
+              onClick={() => access("farmer", "farmer")}
+            >
+              {t.farmer}
+              <ChevronRight size={18} />
+            </button>
+          </div>
+          <div className="trust">
+            <span>
+              <ShieldCheck />
+              Traceable lots
+            </span>
+            <span>
+              <ScanLine />
+              Human-verified grades
+            </span>
+          </div>
+        </div>
+        <div className="hero-card">
+          <div className="sun"></div>
+          <div className="field">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div className="floating price">
+            <small>MARKET SIGNAL</small>
+            <b>Tomato +8%</b>
+            <em>High demand nearby</em>
+          </div>
+          <div className="floating stock">
+            <PackageCheck />
+            <div>
+              <b>2,510 kg</b>
+              <small>available today</small>
+            </div>
+          </div>
+          <div className="produce tomato">●</div>
+          <div className="produce onion">●</div>
+        </div>
+      </section>
+      <section className="section">
+        <div className="section-head">
+          <div>
+            <p className="eyebrow green">LIVE FROM NEARBY WAREHOUSES</p>
+            <h2>{t.stock}</h2>
+          </div>
+          <button
+            className="text-btn"
+            onClick={() => access("consumer", "market")}
+          >
+            View marketplace <ArrowUpRight size={16} />
+          </button>
+        </div>
+        <div className="cards">
+          {lots.map((l) => (
+            <LotCard key={l.id} lot={l} onClick={() => reserve(l)} />
+          ))}
+        </div>
+      </section>
+      <section className="impact">
+        <div>
+          <p className="eyebrow">ONE CONNECTED FLOW</p>
+          <h2>
+            Less uncertainty.
+            <br />
+            More choice.
+          </h2>
+          <p>
+            FarmLink joins physical aggregation with market intelligence so
+            produce moves with clarity, not pressure.
+          </p>
+          <button className="outline" onClick={() => setModal("ai")}>
+            <BrainCircuit size={18} />
+            {t.ai}
+          </button>
+        </div>
+        <div className="flow">
+          <Flow
+            n="1"
+            icon={<Truck />}
+            title="Cluster pickup"
+            text="Village & FPO collection"
+          />
+          <Flow
+            n="2"
+            icon={<Warehouse />}
+            title="Warehouse intake"
+            text="Weigh, grade & store"
+          />
+          <Flow
+            n="3"
+            icon={<BrainCircuit />}
+            title="AI guidance"
+            text="Price, demand & stock-age"
+          />
+          <Flow
+            n="4"
+            icon={<ShoppingCart />}
+            title="Market access"
+            text="Consumer & bulk buyers"
+          />
+        </div>
+      </section>
+      <section className="voice-banner">
+        <div className="mic">
+          <Mic size={34} />
+        </div>
+        <div>
+          <p className="eyebrow">{t.voice.toUpperCase()}</p>
+          <h2>Ask in your own language.</h2>
+          <p>Call, speak, and get guided help with stock, prices or pickups.</p>
+        </div>
+        <button className="primary pale" onClick={() => setModal("voice")}>
+          Try voice demo <Mic size={18} />
+        </button>
+      </section>
+    </>
+  );
 }
-function AdminOrderConfirmation({orders,confirmOrder}){const pending=orders.filter(order=>order.status==='Pending verification');return <section className="page"><div className="account-panel"><p className="eyebrow green">ORDER VERIFICATION</p><h2>Consumer orders pending verification</h2>{pending.length?pending.map(order=><div className="tracking" key={order.id}><b>{order.id}</b><span>{order.quantity} kg · {order.pickupWarehouse}</span><strong>Pending verification</strong><button className="primary" onClick={()=>confirmOrder(order.id)}>Confirm order</button></div>):<p className="empty-state">No orders are awaiting manual verification.</p>}</div></section>}
-function BulkMarket({lots,setView,notify}){const [tab,setTab]=useState('discover'),[quote,setQuote]=useState(false);return <section className="page"><div className="page-top"><div><p className="eyebrow green">VERIFIED WHOLESALE MARKETPLACE</p><h1>Buy better, in bulk.</h1><p>Discover verified suppliers, request quality samples, negotiate transparent quotes, and manage recurring contracts.</p></div><button className="secondary" onClick={()=>setView('market')}>Retail marketplace</button></div><div className="tabs">{['discover','quotes','contracts','analytics','invoices'].map(x=><button className={tab===x?'selected':''} onClick={()=>setTab(x)} key={x}>{x}</button>)}</div>{tab==='discover'&&<><div className="market-tools"><input placeholder="Region, produce type, certification"/><select><option>All regions</option><option>Jaipur region</option></select><select><option>All certifications</option><option>Organic</option><option>Grade A verified</option></select></div><div className="cards">{lots.map(l=><div className="product-wrap" key={l.id}><LotCard lot={l} onClick={()=>setQuote(l)}/><div className="product-actions"><button onClick={()=>setQuote(l)}>Request sample / quote</button><button onClick={()=>notify('AI grading report opened for buyer review.')}>AI quality report</button></div></div>)}</div></>}{tab==='quotes'&&<div className="account-panel"><h3>Negotiation & quote workspace</h3>{quote?<div className="quote-card"><b>{quote.crop}, Grade {quote.grade} · {quote.qty} kg available</b><p>Suggested opening quote: ₹{quote.price-2}/kg for 100 kg+. Farmer receives every offer and remains free to accept, counter, or decline.</p><label>Your proposed price<input type="number" defaultValue={quote.price-2}/></label><button className="primary" onClick={()=>notify('Quote request sent to the verified farmer.')}>Send negotiated quote</button></div>:<p className="empty-state">Choose a produce listing to start an RFQ.</p>}</div>}{tab==='contracts'&&<div className="account-panel"><h3>Contract orders</h3><p>Create recurring purchase agreements with clear quantity, grade, delivery window, pricing method and cancellation terms.</p><div className="contract-row"><b>Weekly tomato supply</b><span>200 kg / week</span><span>Draft awaiting farmer approval</span><button onClick={()=>notify('Contract draft opened.')}>Open draft</button></div><button className="primary" onClick={()=>notify('New contract order draft created.')}>Create contract order</button></div>}{tab==='analytics'&&<div className="metric-grid"><Metric icon={<BarChart3/>} label="30-day spend" value="₹48,600" note="8% lower than previous period"/><Metric icon={<Users/>} label="Active suppliers" value="6" note="4 high-performing suppliers"/><Metric icon={<PackageCheck/>} label="Orders fulfilled" value="28" note="96% on-time performance"/><Metric icon={<BrainCircuit/>} label="Cost saving insight" value="₹4,120" note="From negotiated seasonal lots"/></div>}{tab==='invoices'&&<div className="account-panel"><h3>GST-compliant invoice centre</h3><p>Generated invoices include supplier and buyer GSTIN, line items, tax breakdown, warehouse handoff and order references.</p><div className="contract-row"><b>INV-FL-2026-0148</b><span>₹18,750</span><span>GST ready</span><button onClick={()=>notify('GST invoice generated for download.')}>Generate PDF</button></div></div>}</section>}
-function WarehouseView({session,lots,setLots,produceRequests,orders,notify}){
- const [form,setForm]=useState({crop:'Tomato',weight:'350',grade:'A'});
- const submit=async e=>{e.preventDefault();let id=`FL-${24094+lots.length}`;const newLot={id,crop:form.crop,hi:form.crop,grade:form.grade,qty:+form.weight,price:form.crop==='Tomato'?27:25,old:0,warehouse:'Jaipur North',farmer:'Demo Farmer',dist:'0 km',trend:4};if(isSupabaseConfigured&&session?.userId){const {data:warehouse,error:warehouseError}=await supabase.from('warehouses').select('id').eq('name','Jaipur North').single();if(warehouseError){notify('Warehouse could not be found.');return}const {data,error}=await supabase.from('produce_lots').insert({lot_code:id,crop:form.crop,grade:form.grade,quantity_kg:newLot.qty,price_per_kg:newLot.price,warehouse_id:warehouse.id}).select('id').single();if(error){notify(error.message);return}newLot.dbId=data.id}setLots([...lots,newLot]);notify(`Lot ${id} recorded with an immutable intake event.`)};
- return <section className="page warehouse-page"><div className="page-top"><div><p className="eyebrow green">ADMIN-ONLY WAREHOUSE CONSOLE</p><h1>Warehouse intake & fulfillment</h1><p>Confirm collection weight, complete grading, manage stock and prepare consumer pickup orders.</p></div><div className="secure"><ShieldCheck/> Admin access only</div></div><div className="warehouse-grid"><form className="intake" onSubmit={submit}><h3>Confirm produce intake</h3><label>Crop<select value={form.crop} onChange={e=>setForm({...form,crop:e.target.value})}><option>Tomato</option><option>Onion</option><option>Potato</option></select></label><label>Confirmed net weight (kg)<input type="number" min="1" value={form.weight} onChange={e=>setForm({...form,weight:e.target.value})}/></label><label>Human-verified grade<select value={form.grade} onChange={e=>setForm({...form,grade:e.target.value})}><option>A</option><option>B</option><option>C</option></select></label><div className="grade-ai"><BrainCircuit/><div><b>Camera-assisted result: Grade A</b><small>Confidence 91% · visual defects: low</small></div><span>Review</span></div><button className="primary" type="submit"><ScanLine size={18}/>Confirm grade & create lot</button></form><div className="ledger"><h3>Live inventory ledger</h3>{lots.map(l=><div key={l.id} className="ledger-row"><span className="dot"></span><div><b>{l.id} · {l.crop}</b><small>Received today · Grade {l.grade} · {l.warehouse}</small></div><strong>{l.qty} kg</strong></div>)}<p className="notice">Every intake, correction, reservation and dispatch is an auditable inventory event.</p></div></div><div className="ops-grid"><QueuePanel title="Farmer produce & cluster requests" empty="No new farmer requests." items={produceRequests} render={r=><><b>{r.crop} · {r.grossWeight} kg gross</b><small>{r.type} · {r.farmer} · {r.cluster} · Grade requested</small></>}/><QueuePanel title="Consumer pickup orders" empty="No pickup orders yet." items={orders} render={o=><><b>{o.id} · {o.quantity} kg</b><small>{o.pickupWarehouse} · {o.items} lot(s) · {o.status}</small></>}/></div></section>
+function LotCard({ lot, onClick }) {
+  return (
+    <article className="lot">
+      <div className={"lot-img " + lot.crop.toLowerCase()}>
+        {lot.imageUrl ? (
+          <img src={lot.imageUrl} alt={lot.crop + " grown by " + lot.farmer} />
+        ) : (
+          <span>
+            {lot.crop === "Tomato" ? "🍅" : lot.crop === "Onion" ? "🧅" : "🥔"}
+          </span>
+        )}
+        <b>{lot.listing ? "Farmer photo" : "Grade " + lot.grade}</b>
+      </div>
+      <div className="lot-body">
+        <div className="lot-title">
+          <div>
+            <h3>{lot.crop}</h3>
+            <p>
+              <MapPin size={14} />
+              {lot.warehouse} · {lot.dist}
+            </p>
+          </div>
+          <span className={lot.trend >= 0 ? "up" : "down"}>
+            {lot.trend >= 0 ? "↑" : ""}
+            {lot.trend}%
+          </span>
+        </div>
+        <div className="lot-meta">
+          <span>{lot.qty} kg available</span>
+          <span>
+            <Clock3 size={14} />
+            {lot.old} day old
+          </span>
+        </div>
+        <div className="buy">
+          <b>
+            ₹{lot.price}
+            <small>/kg</small>
+          </b>
+          <button onClick={onClick}>Reserve 10 kg</button>
+        </div>
+      </div>
+    </article>
+  );
 }
-function QueuePanel({title,items,empty,render}){return <div className="queue-panel"><h3>{title}</h3>{items.length?items.map(item=><div className="admin-row" key={item.id}><span className="dot"></span><div>{render(item)}</div></div>):<p className="empty-state">{empty}</p>}</div>}
-function FarmerView({session,lots,setModal,produceRequests,setProduceRequests,notify}){
- const [form,setForm]=useState({crop:'Tomato',grossWeight:'',cluster:'Jaipur North cluster',type:'Produce intake'});
- const [cropSearch,setCropSearch]=useState('');const matchingCrops=useMemo(()=>INDIA_CROPS.filter(item=>(item.name+' '+item.category).toLowerCase().includes(cropSearch.toLowerCase())).slice(0,80),[cropSearch]);
- const myLots=lots.filter(l=>l.farmer==='Ramesh Kumar'||l.farmer===session?.name);
- const submit=async e=>{e.preventDefault();const id=`REQ-${String(Date.now()).slice(-6)}`;const request={...form,id,farmer:session?.name||'Farmer',status:'Awaiting pickup and grade'};if(isSupabaseConfigured&&session?.userId){const {data,error}=await supabase.from('produce_requests').insert({farmer_id:session.userId,crop:form.crop,gross_weight_kg:Number(form.grossWeight),collection_cluster:form.cluster,request_type:form.type==='Cluster collection request'?'cluster_collection':'produce_intake'}).select('id').single();if(error){notify(error.message);return}request.id=data.id}setProduceRequests(current=>[request,...current]);setForm({...form,grossWeight:''});notify(`${form.type} ${id} sent to the warehouse admin.`)};
- return <section className="page farmer-page"><div className="farmer-welcome"><div><p className="eyebrow">NAMASTE{session?.name?`, ${session.name}`:''}</p><h1>Your produce. Your decision.</h1><p>Add produce for a grade request, or create a cluster collection request. The collector will confirm final weight and grade at pickup.</p><button className="primary" onClick={()=>setModal('ai')}><BrainCircuit size={18}/>View price guidance</button></div><div className="balance"><small>ESTIMATED STOCK VALUE</small><b>₹22,140</b><span>820 kg in storage</span></div></div><div className="farmer-grid workflow-grid"><form className="intake farmer-request" onSubmit={submit}><p className="eyebrow green">PICKUP & GRADING</p><h3>Add produce request</h3><label>Request type<select value={form.type} onChange={e=>setForm({...form,type:e.target.value})}><option>Produce intake</option><option>Cluster collection request</option></select></label><label>Search India crop<input value={cropSearch} onChange={e=>setCropSearch(e.target.value)} placeholder="Search crop or category"/></label><label>Crop selection<select value={form.crop} onChange={e=>setForm({...form,crop:e.target.value})}>{matchingCrops.length?matchingCrops.map(item=><option key={item.name} value={item.name}>{item.name} · {item.category}</option>):<option>{form.crop}</option>}</select><small>{INDIA_CROPS.length}+ Indian crop species across field, horticulture, spice, plantation, medicinal, flower and fodder groups.</small></label><label>Gross weight at pickup (kg)<input required min="1" type="number" placeholder="e.g. 250" value={form.grossWeight} onChange={e=>setForm({...form,grossWeight:e.target.value})}/></label><label>Collection cluster<select value={form.cluster} onChange={e=>setForm({...form,cluster:e.target.value})}><option>Jaipur North cluster</option><option>Sanganer cluster</option><option>Village / FPO pickup point</option></select></label><div className="grade-ai"><ScanLine/><div><b>Grade requested</b><small>Final weight and grade are confirmed by the pickup operator.</small></div></div><button className="primary" type="submit"><Truck size={18}/>Send request to warehouse</button></form><div className="my-lots"><h3>Your produce & requests</h3>{myLots.map(l=><div className="my-lot" key={l.id}><span>🍅</span><div><b>{l.id} · {l.crop}, Grade {l.grade}</b><small>{l.qty} kg · {l.warehouse}</small></div><strong>₹{l.price}/kg</strong></div>)}{produceRequests.filter(r=>r.farmer===(session?.name||'Farmer')).map(r=><div className="my-lot" key={r.id}><span>📋</span><div><b>{r.crop} · {r.grossWeight} kg gross</b><small>{r.type} · {r.cluster} · {r.status}</small></div><strong>Pending</strong></div>)}{!myLots.length&&!produceRequests.length&&<p className="empty-state">Your approved lots and pending requests will appear here.</p>}</div></div><FarmerOperations notify={notify} session={session}/><div className="farmer-grid"><div className="finance"><p className="eyebrow">STORED STOCK FINANCE</p><h3>Need working capital?</h3><p>Start a consent-based eligibility enquiry for your stored produce.</p><button onClick={()=>notify('Consent-first finance enquiry started. No credit decision has been made.')}>Explore options <ArrowUpRight size={16}/></button><small>Subject to warehouse, partner and lender eligibility. Not a loan offer.</small></div><div className="farmer-help"><h3>How grading works</h3><p>Enter your gross amount and request collection. At pickup, the operator verifies weight, captures quality details, and confirms the final grade before it becomes live stock.</p></div></div></section>
+function Flow({ n, icon, title, text }) {
+  return (
+    <div className="flow-item">
+      <span>{n}</span>
+      <i>{icon}</i>
+      <div>
+        <b>{title}</b>
+        <small>{text}</small>
+      </div>
+    </div>
+  );
 }
-function FarmerOperations({notify,session}){
- const [tab,setTab]=useState('listings'),[cropSearch,setCropSearch]=useState(''),[image,setImage]=useState(null),[preview,setPreview]=useState(''),[saving,setSaving]=useState(false),[published,setPublished]=useState(null),[listing,setListing]=useState({crop:'Tomato',description:'Fresh produce from our verified farm cluster.',quantity:'100',price:'25'});
- const matches=useMemo(()=>INDIA_CROPS.filter(item=>(item.name+' '+item.category).toLowerCase().includes(cropSearch.toLowerCase())).slice(0,80),[cropSearch]);
- const selectPhoto=file=>{setImage(file||null);setPreview(file?URL.createObjectURL(file):'')};
- const submitListing=async event=>{event.preventDefault();if(!image){notify('Attach at least one produce photo before publishing.');return}if(!session?.userId||!isSupabaseConfigured){notify('Sign in as a farmer to publish a listing.');return}setSaving(true);try{const cropMeta=INDIA_CROPS.find(item=>item.name===listing.crop);const extension=(image.name.split('.').pop()||'jpg').replace(/[^a-z0-9]/gi,'');const path=session.userId+'/'+crypto.randomUUID()+'.'+extension;const {error:uploadError}=await supabase.storage.from('produce-photos').upload(path,image,{contentType:image.type,upsert:false});if(uploadError)throw uploadError;const {data:urlData}=supabase.storage.from('produce-photos').getPublicUrl(path);const record={farmer_id:session.userId,crop:listing.crop,category:cropMeta?.category||'Other',description:listing.description,quantity_kg:Number(listing.quantity),price_per_kg:Number(listing.price),image_url:urlData.publicUrl,status:'published'};const {data,error}=await supabase.from('farmer_listings').insert(record).select().single();if(error)throw error;setPublished(data);notify('Listing published with its farmer photo. Consumers can now view it.')}catch(error){notify(error.message||'Photo listing could not be published.')}finally{setSaving(false)}};
- return <section className="farmer-operations"><div className="tabs">{['listings','orders','logistics','payments','performance','verification'].map(x=><button key={x} className={tab===x?'selected':''} onClick={()=>setTab(x)}>{x}</button>)}</div>{tab==='listings'&&<form className="account-panel form-grid photo-listing" onSubmit={submitListing}><h3>Produce listing management & photo grading</h3><label>Search crop catalogue<input value={cropSearch} onChange={e=>setCropSearch(e.target.value)} placeholder="Search any Indian crop"/></label><label>Crop selection<select value={listing.crop} onChange={e=>setListing({...listing,crop:e.target.value})}>{matches.map(item=><option key={item.name} value={item.name}>{item.name} · {item.category}</option>)}</select></label><label>Quantity available (kg)<input required type="number" min="1" value={listing.quantity} onChange={e=>setListing({...listing,quantity:e.target.value})}/></label><label>Expected price per kg<input required type="number" min="1" value={listing.price} onChange={e=>setListing({...listing,price:e.target.value})}/></label><label>Description<textarea value={listing.description} onChange={e=>setListing({...listing,description:e.target.value})}/></label><label>Produce photos<input required type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>selectPhoto(e.target.files?.[0])}/><small>JPEG, PNG or WebP. Your photo is stored securely and displayed to consumers.</small></label>{preview&&<img className="listing-preview" src={preview} alt="Selected produce preview"/>}<button className="primary" disabled={saving} type="submit">{saving?'Publishing…':'Publish listing with photo'}</button>{published&&<div className="published-note"><ShieldCheck size={18}/><span><b>{published.crop} is live.</b> Its photo is visible in the consumer marketplace.</span></div>}</form>}{tab==='orders'&&<div className="account-panel"><h3>Incoming order management</h3><div className="tracking"><b>ORD-FL-1029</b><span>25 kg tomato</span><span>Consumer pickup</span><button onClick={()=>notify('Order accepted and warehouse notified.')}>Accept order</button></div><p>Accept, pack and hand off orders to the assigned warehouse/logistics partner.</p></div>}{tab==='logistics'&&<div className="account-panel"><h3>Logistics schedule</h3><div className="tracking"><b>Pickup run JP-N-03</b><span>Tomorrow, 09:30</span><span>Jaipur North cluster</span><strong>Collector assigned</strong></div></div>}{tab==='payments'&&<div className="metric-grid"><Metric icon={<BarChart3/>} label="Available earnings" value="₹12,450" note="Released after completed pickup"/><Metric icon={<Clock3/>} label="Pending settlement" value="₹4,700" note="2 orders in quality confirmation"/><Metric icon={<ClipboardList/>} label="Transactions" value="18" note="Full payment history available"/></div>}{tab==='performance'&&<div className="metric-grid"><Metric icon={<BarChart3/>} label="Sales trend" value="+18%" note="Compared with last month"/><Metric icon={<Users/>} label="Repeat customers" value="38%" note="Healthy return rate"/><Metric icon={<ShieldCheck/>} label="Average rating" value="4.7 / 5" note="From verified buyer reviews"/></div>}{tab==='verification'&&<div className="account-panel"><h3>Farmer profile verification</h3><p>Identity, farm location, bank account and FPO details are reviewed before trust status is displayed to buyers.</p><button className="primary" onClick={()=>notify('Verification checklist opened for document upload.')}>Continue verification</button></div>}</section>
+function Market({
+  lots,
+  reserve,
+  cart,
+  total,
+  onCheckout,
+  notify,
+  wishlist,
+  setWishlist,
+  setSelectedLot,
+  setView,
+}) {
+  const [filter, setFilter] = useState("All"),
+    [grade, setGrade] = useState("Any"),
+    [organic, setOrganic] = useState(false),
+    [sort, setSort] = useState("smart"),
+    [query, setQuery] = useState("");
+  const visible = useMemo(
+    () =>
+      lots
+        .filter(
+          (l) =>
+            (filter === "All" || l.crop === filter) &&
+            (grade === "Any" || l.grade === grade) &&
+            (!query || l.crop.toLowerCase().includes(query.toLowerCase())),
+        )
+        .sort((a, b) =>
+          sort === "price"
+            ? a.price - b.price
+            : sort === "distance"
+              ? parseInt(a.dist) - parseInt(b.dist)
+              : b.trend * 3 +
+                a.qty / 100 -
+                a.price / 10 -
+                (a.trend * 3 + b.qty / 100 - b.price / 10),
+        ),
+    [lots, filter, grade, sort, query],
+  );
+  const favorite = (lot) => {
+    setWishlist((items) =>
+      items.some((x) => x.id === lot.id)
+        ? items.filter((x) => x.id !== lot.id)
+        : [...items, lot],
+    );
+    notify(
+      wishlist.some((x) => x.id === lot.id)
+        ? "Removed from wishlist."
+        : "Saved to wishlist.",
+    );
+  };
+  return (
+    <section className="page">
+      <div className="page-top">
+        <div>
+          <p className="eyebrow green">FRESH PRODUCE MARKETPLACE</p>
+          <h1>Local market, live stock.</h1>
+          <p>
+            Smart-ranked by quality, proximity and price competitiveness. Every
+            live lot has a traceable quality record.
+          </p>
+        </div>
+        <div className="checkout">
+          <b>
+            {cart.length} items · {total} kg
+          </b>
+          <button
+            className="primary"
+            disabled={!cart.length}
+            onClick={onCheckout}
+          >
+            Checkout
+          </button>
+        </div>
+      </div>
+      <div className="market-tools">
+        <input
+          aria-label="Search produce"
+          placeholder="Search produce, farmer or location"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <select value={grade} onChange={(e) => setGrade(e.target.value)}>
+          <option>Any</option>
+          <option>A</option>
+          <option>B</option>
+          <option>C</option>
+        </select>
+        <select value={sort} onChange={(e) => setSort(e.target.value)}>
+          <option value="smart">AI smart ranking</option>
+          <option value="price">Lowest price</option>
+          <option value="distance">Nearest first</option>
+        </select>
+        <label className="check-filter">
+          <input
+            type="checkbox"
+            checked={organic}
+            onChange={(e) => setOrganic(e.target.checked)}
+          />{" "}
+          Organic certified
+        </label>
+      </div>
+      <div className="filters">
+        {["All", "Tomato", "Onion", "Potato"].map((x) => (
+          <button
+            key={x}
+            className={filter === x ? "selected" : ""}
+            onClick={() => setFilter(x)}
+          >
+            {x}
+          </button>
+        ))}
+      </div>
+      <p className="search-note">
+        <BrainCircuit size={16} /> AI ranking considers verified grade,
+        distance, price and stock freshness.{" "}
+        {organic && " No organic-certified demo lots are currently available."}
+      </p>
+      <div className="cards">
+        {visible
+          .filter(() => !organic)
+          .map((l) => (
+            <div className="product-wrap" key={l.id}>
+              <LotCard lot={l} onClick={() => reserve(l)} />
+              <div className="product-actions">
+                <button
+                  onClick={() => {
+                    setSelectedLot(l);
+                    setView("detail");
+                  }}
+                >
+                  Quality report
+                </button>
+                <button
+                  className={
+                    wishlist.some((x) => x.id === l.id)
+                      ? "favorite active"
+                      : "favorite"
+                  }
+                  onClick={() => favorite(l)}
+                >
+                  ♡ Save
+                </button>
+              </div>
+            </div>
+          ))}
+      </div>
+      {!visible.filter(() => !organic).length && (
+        <p className="empty-state">
+          No lots match these filters. Try clearing the organic or grade filter.
+        </p>
+      )}
+      <div className="bulk">
+        <div>
+          <PackageCheck />
+          <div>
+            <h3>Buying in bulk?</h3>
+            <p>
+              Request GST-ready quotes, negotiate with verified farmers, and
+              arrange recurring contracts.
+            </p>
+          </div>
+        </div>
+        <button className="primary" onClick={() => setView("bulk")}>
+          Open wholesale marketplace
+        </button>
+      </div>
+    </section>
+  );
 }
-function AuthView({setSession,setView,notify}){
- const [mode,setMode]=useState('login'),[role,setRole]=useState('consumer'),[farmerId,setFarmerId]=useState(''),[resendEmail,setResendEmail]=useState(''),[otpStep,setOtpStep]=useState(false),[farmerPhone,setFarmerPhone]=useState(''),[busy,setBusy]=useState(false);
- const resendConfirmation=async()=>{if(!resendEmail){notify('Enter your consumer email address first.');return}if(!isSupabaseConfigured){notify('Email confirmation is available after Supabase is configured.');return}setBusy(true);try{const {error}=await supabase.auth.resend({type:'signup',email:resendEmail,options:{emailRedirectTo:window.location.origin+'/'}});if(error)throw error;notify('Confirmation email resent. Open the new link to return to FarmLink.')}catch(error){notify(error.message||'Unable to resend confirmation email.')}finally{setBusy(false)}};
- const finishLogin=async(user,requestedRole)=>{
-   const {data:profile,error}=await supabase.from('profiles').select('role,full_name,farmer_id').eq('id',user.id).single();
-   if(error||!profile){notify('Your FarmLink profile could not be loaded.');return}
-   if(profile.role!==requestedRole){await supabase.auth.signOut();notify('This account does not have access to that portal.');return}
-   setSession({role:profile.role,label:profile.full_name,name:profile.full_name,farmerId:profile.farmer_id,userId:user.id});
-   setView(profile.role==='consumer'?'market':profile.role==='farmer'?'farmer':'admin');notify(`Signed in as ${profile.role}.`);
- };
- const submit=async e=>{
-   e.preventDefault();const data=new FormData(e.currentTarget);const name=String(data.get('name')||'').trim();
-   if(mode==='register'&&role!=='admin'&&!name){notify('Please enter your full name.');return}
-   if(!isSupabaseConfigured){const label=role==='farmer'?(farmerId||`FLR-${String(Date.now()).slice(-6)}`):role==='admin'?'FarmLink Admin':name||'Consumer';if(mode==='register'&&role==='farmer'&&!farmerId){setFarmerId(label);notify(`Registration complete. Your Farmer ID is ${label}. Use it with your password to sign in.`);return}setSession({role,label:name||label,name,farmerId:role==='farmer'?label:undefined});setView(role==='consumer'?'market':role==='farmer'?'farmer':'admin');notify(`Signed in as ${role}.`);return}
-   setBusy(true);try{const password=String(data.get('password'));const mobile=String(data.get('mobile')||'');const address=String(data.get('address')||'');
-     if(mode==='register'&&role==='admin'){notify('Admin accounts must be created by an existing administrator.');return}
-     if(mode==='login'&&role==='farmer'){const phone=otpStep?farmerPhone:normalizeIndianPhone(mobile);if(!phone)throw new Error('Enter a valid 10-digit Indian mobile number.');if(!otpStep){const {error}=await supabase.auth.signInWithOtp({phone});if(error)throw error;setFarmerPhone(phone);setOtpStep(true);notify('OTP sent to your registered mobile number.');return}const {data:verified,error}=await supabase.auth.verifyOtp({phone,type:'sms',token:String(data.get('otp')||'').trim()});if(error||!verified.user)throw error||new Error('OTP verification failed.');await finishLogin(verified.user,'farmer');return}
-     if(mode==='register'&&role==='consumer'){const {data:signup,error}=await supabase.auth.signUp({email:String(data.get('email')),password,options:{emailRedirectTo:window.location.origin+'/',data:{full_name:name,mobile,address}}});if(error)throw error;if(!signup.session){notify('Check your email to confirm your consumer account. You will return to FarmLink after confirming.');return}await finishLogin(signup.user,'consumer');return}
-     if(mode==='register'&&role==='farmer'){const phone=normalizeIndianPhone(mobile);if(!phone)throw new Error('Enter a valid 10-digit Indian mobile number.');const {data,error}=await supabase.functions.invoke('register-farmer',{body:{fullName:name,mobile:phone,address}});if(error)throw error;setFarmerId(data.farmerId);setMode('login');setFarmerPhone(phone);setOtpStep(false);notify(`Farmer ID issued: ${data.farmerId}. Request an OTP to sign in.`);return}
-     const loginName=String(data.get('email')||'').trim().toLowerCase();const email=role==='admin'?(loginName.includes('@')?loginName:loginName+'@farmlink.admin'):loginName;const {data:login,error}=await supabase.auth.signInWithPassword({email,password});if(error)throw error;await finishLogin(login.user,role);
-   }catch(error){notify(error.message||'Unable to complete this request.')}finally{setBusy(false)}
- };
- return <section className="auth-page"><div className="auth-aside"><div className="brand light"><span><Sprout size={24}/></span>Farm<span>Link</span></div><div><p className="eyebrow">FARMER-FIRST ACCESS</p><h1>One platform.<br/>Three clear roles.</h1><p>Consumers shop trusted local stock. Farmers manage their harvest. Admins monitor the full connected flow.</p></div><div className="role-list"><span><ShoppingCart/>Consumer marketplace only</span><span><Sprout/>Farmer dashboard & Farmer ID</span><span><ShieldCheck/>Admin monitoring controls</span></div></div><div className="auth-card"><div className="auth-switch"><button type="button" className={mode==='login'?'active':''} onClick={()=>setMode('login')}>Login</button><button type="button" className={mode==='register'?'active':''} onClick={()=>{setMode('register');setFarmerId('');setOtpStep(false)}}>Register</button></div><p className="eyebrow green">{mode==='login'?'WELCOME BACK':'CREATE YOUR ACCOUNT'}</p><h2>{mode==='login'?'Sign in to FarmLink':'Register as a user'}</h2><div className="role-tabs">{[['consumer','Consumer',ShoppingCart],['farmer','Farmer',Sprout],['admin','Admin',ShieldCheck]].map(([key,label,Icon])=><button type="button" key={key} className={role===key?'role-active':''} onClick={()=>{setRole(key);setFarmerId('');setOtpStep(false)}}><Icon size={17}/>{label}</button>)}</div><form onSubmit={submit}>{mode==='register'&&role!=='admin'&&<Field icon={<UserRound/>} label="Full name" name="name" type="text"/>}{mode==='register'&&role!=='admin'&&<Field icon={<MapPinned/>} label="Full address" name="address" type="text"/>}{role==='consumer'&&<Field icon={<Mail/>} label="Email address" name="email" type="email" onChange={e=>setResendEmail(e.target.value)}/>} {role==='farmer'&&mode==='login'&&otpStep&&<Field icon={<LockKeyhole/>} label="6-digit OTP" name="otp" type="text"/>}{((mode==='register'&&role!=='admin')||(mode==='login'&&role==='farmer'))&&<Field icon={<Phone/>} label="Mobile number" name="mobile" type="tel"/>}{role==='admin'&&<Field icon={<UserRound/>} label="Admin username" name="email" type="text"/>}{role!=='farmer'&&<Field icon={<LockKeyhole/>} label="Password" name="password" type="password"/>}{farmerId&&<div className="farmer-id"><Sprout/><div><small>YOUR FARMER ID</small><b>{farmerId}</b><span>Keep this ID safe for future logins.</span></div></div>}<button className="primary auth-submit" disabled={busy} type="submit">{busy?'Please wait…':role==='farmer'&&mode==='login'?(otpStep?'Verify OTP':'Send OTP'):mode==='register'?'Create account':'Sign in'}<ArrowUpRight size={17}/></button></form>{role==='consumer'&&mode==='login'&&<button className="text-btn" disabled={busy} onClick={resendConfirmation}>Resend email confirmation</button>}{role==='admin'&&<p className="admin-note"><ShieldCheck/>Admin accounts are provisioned by FarmLink. This demo mode accepts an administrator-provisioned username.</p>}<small className="auth-note">{isSupabaseConfigured?'Supabase Auth is active.':'Demo mode: configure Supabase environment variables to enable secure account storage.'}</small></div></section>
+function ProductDetail({
+  lot,
+  reserve,
+  wishlist,
+  setWishlist,
+  setView,
+  notify,
+}) {
+  if (!lot)
+    return (
+      <section className="page">
+        <button className="secondary" onClick={() => setView("market")}>
+          Back to marketplace
+        </button>
+      </section>
+    );
+  const saved = wishlist.some((x) => x.id === lot.id);
+  return (
+    <section className="page product-detail">
+      <button className="text-btn" onClick={() => setView("market")}>
+        ← Back to marketplace
+      </button>
+      <div className="detail-grid">
+        <div className={"detail-visual " + lot.crop.toLowerCase()}>
+          {lot.imageUrl ? (
+            <img src={lot.imageUrl} alt={lot.crop + " listing"} />
+          ) : lot.crop === "Tomato" ? (
+            "🍅"
+          ) : lot.crop === "Onion" ? (
+            "🧅"
+          ) : (
+            "🥔"
+          )}
+          <span>
+            {lot.listing
+              ? "Farmer photo listing"
+              : "Verified Grade " + lot.grade}
+          </span>
+        </div>
+        <div>
+          <p className="eyebrow green">TRACEABLE LOT {lot.id}</p>
+          <h1>
+            {lot.crop} · Grade {lot.grade}
+          </h1>
+          <p>
+            Harvested locally and human-verified at {lot.warehouse}. Available
+            for scheduled pickup.
+          </p>
+          <h2>
+            ₹{lot.price}
+            <small>/kg</small>
+          </h2>
+          <div className="quality-report">
+            <div>
+              <b>91%</b>
+              <small>AI grade confidence</small>
+            </div>
+            <div>
+              <b>{lot.dist}</b>
+              <small>From warehouse</small>
+            </div>
+            <div>
+              <b>{lot.old} day</b>
+              <small>Stock age</small>
+            </div>
+          </div>
+          <div className="detail-actions">
+            <button className="primary" onClick={() => reserve(lot)}>
+              Add 10 kg to cart
+            </button>
+            <button
+              className="secondary"
+              onClick={() => {
+                setWishlist((items) =>
+                  saved
+                    ? items.filter((x) => x.id !== lot.id)
+                    : [...items, lot],
+                );
+                notify(saved ? "Removed from wishlist." : "Saved to wishlist.");
+              }}
+            >
+              {saved ? "Saved to wishlist" : "Save to wishlist"}
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="detail-sections">
+        <article>
+          <h3>Quality report</h3>
+          <p>
+            Visual defects: low · Size uniformity: high · Maturity: optimal.
+            This AI-assisted report is reviewed by the intake operator before
+            listing.
+          </p>
+        </article>
+        <article>
+          <h3>Farmer profile</h3>
+          <p>
+            {lot.farmer || "Verified FarmLink producer"} · Nearby farmer cluster
+            · Produce handled through transparent warehouse grading.
+          </p>
+        </article>
+        <article>
+          <h3>Nutritional information</h3>
+          <p>
+            Fresh {lot.crop.toLowerCase()} is a source of fibre and essential
+            micronutrients. Store cool and consume promptly.
+          </p>
+        </article>
+      </div>
+    </section>
+  );
 }
-function Field({icon,label,name,type,onChange}){return <label className="auth-field"><span>{icon}</span><input aria-label={label} name={name} placeholder={label} type={type} onChange={onChange} required/></label>}
-function AdminView({lots,orders,produceRequests,setView,logout,notify}){const value=lots.reduce((sum,l)=>sum+l.qty*l.price,0);const [tab,setTab]=useState('users');return <section className="page admin-page"><div className="page-top"><div><p className="eyebrow green">PLATFORM COMMAND CENTER</p><h1>FarmLink Admin</h1><p>Monitor farmer collection requests, consumer pickup orders, warehouse stock and market operations.</p></div><button className="secondary" onClick={logout}><LogOut size={17}/>Sign out</button></div><div className="metric-grid"><Metric icon={<Users/>} label="Registered farmers" value="152" note={produceRequests.length+' new collection request(s)'}/><Metric icon={<ShoppingCart/>} label="Consumer pickup orders" value={String(orders.length)} note="Awaiting warehouse fulfillment"/><Metric icon={<PackageCheck/>} label="Live inventory" value={lots.reduce((s,l)=>s+l.qty,0).toLocaleString()+' kg'} note="Across 2 warehouses"/><Metric icon={<BarChart3/>} label="Stock value" value={'₹'+value.toLocaleString()} note="Indicative live value"/></div><div className="admin-grid"><QueuePanel title="New farmer collection requests" empty="No new farmer produce or cluster requests." items={produceRequests} render={r=><><b>{r.crop} · {r.grossWeight} kg gross</b><small>{r.type} · {r.farmer} · {r.cluster}</small></>}/><QueuePanel title="Consumer pickup orders" empty="No consumer pickup orders yet." items={orders} render={o=><><b>{o.id} · {o.quantity} kg</b><small>Pickup at {o.pickupWarehouse} · {o.status}</small></>}/></div><div className="admin-grid"><div className="admin-panel"><h3>Warehouse & inventory events</h3>{lots.map((l,i)=><div key={l.id} className="admin-row"><span className="dot"></span><div><b>{l.id} · {l.crop}</b><small>{i===0?'Grade verified and available to buy':'Live inventory record · '+l.warehouse}</small></div><strong>{l.qty} kg</strong></div>)}<button className="wide-btn" onClick={()=>setView('warehouse')}>Open admin warehouse console</button></div><div className="admin-panel"><h3>Operations queue</h3><div className="queue"><span className="warn">3</span><div><b>Buyer verification</b><small>Bulk buyer accounts pending review</small></div></div><div className="queue"><span className="ok">2</span><div><b>Finance enquiries</b><small>Consent received; partner follow-up needed</small></div></div><div className="queue"><span className="neutral">5</span><div><b>Stock-age alerts</b><small>Review markdown / redistribution action</small></div></div><button className="primary" onClick={()=>notify('Operations report generated for review.')}>Generate report</button></div></div><section className="admin-control"><p className="eyebrow green">GOVERNANCE & MODERATION</p><div className="tabs">{['users','verification','listings','disputes','configuration'].map(x=><button key={x} className={tab===x?'selected':''} onClick={()=>setTab(x)}>{x}</button>)}</div>{tab==='users'&&<div className="account-panel"><h3>User management</h3><div className="contract-row"><b>Ramesh Kumar</b><span>Farmer · verified</span><span>Active</span><button onClick={()=>notify('User moderation profile opened.')}>Manage</button></div><div className="contract-row"><b>Metro Fresh Foods</b><span>Bulk buyer · GST pending</span><span>Review required</span><button onClick={()=>notify('Bulk buyer GST verification opened.')}>Verify GST</button></div></div>}{tab==='verification'&&<div className="account-panel"><h3>Farmer & buyer verification queue</h3><p>Review document uploads, farm/FPO details and GST credentials before enabling trust badges and wholesale purchasing.</p><button className="primary" onClick={()=>notify('Verification queue assigned to current administrator.')}>Review pending applications</button></div>}{tab==='listings'&&<div className="account-panel"><h3>Listing moderation</h3><div className="contract-row"><b>Organic onion – 500 kg</b><span>AI grade B</span><span>Awaiting moderation</span><button onClick={()=>notify('Listing approved and published.')}>Approve</button></div><button className="secondary" onClick={()=>notify('Listing rejected with farmer-visible reason request.')}>Reject selected listing</button></div>}{tab==='disputes'&&<div className="account-panel"><h3>Dispute resolution</h3><p>Record customer complaints, evidence, warehouse findings, remedies and final outcome in an auditable resolution timeline.</p><button className="primary" onClick={()=>notify('New dispute case created.')}>Create resolution case</button></div>}{tab==='configuration'&&<div className="account-panel form-grid"><h3>System configuration</h3><label>Marketplace category<input defaultValue="Vegetables"/></label><label>AI grade confidence threshold<input type="number" defaultValue="85"/></label><label>Stock freshness alert (days)<input type="number" defaultValue="3"/></label><button className="primary" onClick={()=>notify('Configuration draft saved for review.')}>Save configuration</button></div>}</section></section>}
-function Metric({icon,label,value,note}){return <div className="metric"><i>{icon}</i><small>{label}</small><b>{value}</b><span>{note}</span></div>}
-function Checkout({cart,close,placeOrder}){const [warehouse,setWarehouse]=useState('Jaipur North');const total=cart.reduce((sum,l)=>sum+l.price*10,0);return <div className="modal-back"><div className="modal checkout-modal"><button className="close" onClick={close}><X/></button><p className="eyebrow green">CONSUMER CHECKOUT</p><h2>Choose your pickup warehouse</h2><p className="checkout-copy">Your items are reserved. Select a verified FarmLink warehouse, then confirm your pickup order.</p><div className="checkout-lines">{cart.map((lot,index)=><div className="checkout-line" key={`${lot.id}-${index}`}><span>{lot.crop==='Tomato'?'🍅':lot.crop==='Onion'?'🧅':'🥔'}</span><div><b>{lot.crop}, Grade {lot.grade}</b><small>10 kg from lot {lot.id}</small></div><strong>₹{lot.price*10}</strong></div>)}</div><label className="pickup-choice">Pickup warehouse<select value={warehouse} onChange={e=>setWarehouse(e.target.value)}><option>Jaipur North</option><option>Sanganer Hub</option></select><small>Your order will appear in this warehouse's admin fulfillment queue.</small></label><div className="checkout-total"><span>Total payable at pickup</span><b>₹{total}</b></div><button className="primary checkout-confirm" onClick={()=>placeOrder(warehouse)}><PackageCheck size={18}/>Confirm pickup order</button></div></div>}
-function AI({close}){return <div className="modal-back"><div className="modal"><button className="close" onClick={close}><X/></button><p className="eyebrow green">EXPLAINABLE FARM ADVISORY</p><h2>Tomato: consider selling this week</h2><div className="recommend"><div><small>SUGGESTED RANGE</small><b>₹26 - ₹29/kg</b></div><div><small>CONFIDENCE</small><b>78%</b></div><div><small>DATA FRESHNESS</small><b>Today, 9:00 AM</b></div></div><h3>Why this guidance?</h3><ul><li>Nearby demand is up 8% this week.</li><li>Grade A availability is moderate.</li><li>Your lot is 1 day old; shelf-life risk is low.</li></ul><div className="disclaimer"><ShieldCheck/>This is a recommendation, not a guaranteed price. You remain in control of your sale decision.</div><div className="modal-actions"><button className="secondary" onClick={close}>I’ll hold</button><button className="primary" onClick={close}>List for buyers</button></div></div></div>}
-function Voice({close,notify}){
- const [provider,setProvider]=useState('bhashini'),[language,setLanguage]=useState('hi'),[recording,setRecording]=useState(false),[status,setStatus]=useState('Record a Hindi or English request to transcribe it.'),[transcript,setTranscript]=useState('');const recorderRef=useRef(null),chunksRef=useRef([]);
- const transcribe=async blob=>{if(!isSupabaseConfigured){setStatus('Connect Supabase to use secure transcription.');return}setStatus('Transcribing securely…');try{const form=new FormData();form.append('audio',new File([blob],'farmlink-recording.webm',{type:'audio/webm'}));form.append('provider',provider);form.append('language',language);const {data,error}=await supabase.functions.invoke('transcribe-audio',{body:form});if(error)throw error;if(!data?.text)throw new Error(data?.error||'No transcript returned.');setTranscript(data.text);setStatus('Transcript ready via '+(data.provider==='bhashini'?'BHASHINI':'Whisper')+'.');notify('Voice request transcribed successfully.')}catch(error){setStatus(error.message||'Transcription failed.');notify(error.message||'Transcription failed.')}};
- const start=async()=>{try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});const recorder=new MediaRecorder(stream);chunksRef.current=[];recorder.ondataavailable=event=>{if(event.data.size)chunksRef.current.push(event.data)};recorder.onstop=()=>{stream.getTracks().forEach(track=>track.stop());transcribe(new Blob(chunksRef.current,{type:'audio/webm'}))};recorder.start();recorderRef.current=recorder;setRecording(true);setTranscript('');setStatus('Recording… tap Stop & transcribe when finished.')}catch(error){setStatus('Microphone access is required to record voice input.')}};
- const stop=()=>{if(recorderRef.current?.state==='recording'){recorderRef.current.stop();setRecording(false)}};
- return <div className="modal-back"><div className="modal voice-modal"><button className="close" onClick={close}><X/></button><div className="voice-orb"><Mic size={42}/></div><p className="eyebrow green">MULTILINGUAL VOICE INPUT</p><h2>Speak in Hindi or English</h2><p>Choose an engine, record a short request, and FarmLink securely sends the audio to the selected speech-to-text provider.</p><div className="voice-options"><label>Engine<select value={provider} onChange={e=>setProvider(e.target.value)}><option value="bhashini">BHASHINI ASR</option><option value="whisper">OpenAI Whisper</option></select></label><label>Language<select value={language} onChange={e=>setLanguage(e.target.value)}><option value="hi">Hindi</option><option value="en">English</option></select></label></div><button className="primary" onClick={recording?stop:start}><Mic size={18}/>{recording?'Stop & transcribe':'Start recording'}</button><p className="voice-status">{status}</p>{transcript&&<div className="transcript"><small>TRANSCRIPT</small><b>{transcript}</b></div>}<small>Audio is sent only after you tap Stop. Credentials remain on the server; do not speak financial or identity secrets.</small></div></div>}
-createRoot(document.getElementById('root')).render(<App/>);
+function ConsumerHub({
+  cart,
+  wishlist,
+  lots,
+  orders,
+  now,
+  cancelOrder,
+  orderAgain,
+  setView,
+  notify,
+}) {
+  const [tab, setTab] = useState("orders"),
+    [review, setReview] = useState("");
+  const countdown = (deadline) => {
+    const seconds = Math.max(0, Math.ceil((deadline - now) / 1000));
+    return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  };
+  return (
+    <section className="page">
+      <div className="page-top">
+        <div>
+          <p className="eyebrow green">CONSUMER ACCOUNT</p>
+          <h1>Orders, favourites & preferences</h1>
+          <p>
+            Track pickup status, maintain delivery preferences, and share
+            verified purchase feedback.
+          </p>
+        </div>
+        <button className="secondary" onClick={() => setView("market")}>
+          Continue shopping
+        </button>
+      </div>
+      <div className="tabs">
+        {["orders", "wishlist", "profile", "reviews"].map((x) => (
+          <button
+            className={tab === x ? "selected" : ""}
+            onClick={() => setTab(x)}
+            key={x}
+          >
+            {x}
+          </button>
+        ))}
+      </div>
+      {tab === "orders" && (
+        <div className="account-panel">
+          <h3>Order tracking</h3>
+          {orders.length ? (
+            orders.map((order) => {
+              const canCancel =
+                order.status === "Pending verification" &&
+                order.cancellationDeadline &&
+                now < order.cancellationDeadline;
+              return (
+                <div className="tracking" key={order.id}>
+                  <b>{order.id}</b>
+                  <span>{order.status}</span>
+                  <span>Pickup at {order.pickupWarehouse}</span>
+                  {canCancel ? (
+                    <>
+                      <strong>
+                        Cancel within {countdown(order.cancellationDeadline)}
+                      </strong>
+                      <small>
+                        Your order is pending verification. You can cancel it
+                        during this 10-minute window.
+                      </small>
+                      <button onClick={() => cancelOrder(order.id)}>
+                        Cancel order
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <strong>
+                        {order.status === "Confirmed"
+                          ? "Order confirmed"
+                          : order.status}
+                      </strong>
+                      {order.status === "Confirmed" && (
+                        <button onClick={() => orderAgain(order.id)}>
+                          Order again
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <p className="empty-state">
+              No orders yet. Your pickup orders will appear here.
+            </p>
+          )}
+        </div>
+      )}
+      {tab === "wishlist" && (
+        <div className="cards">
+          {wishlist.length ? (
+            wishlist.map((l) => (
+              <LotCard
+                key={l.id}
+                lot={l}
+                onClick={() =>
+                  notify("Open the product page to add this lot to cart.")
+                }
+              />
+            ))
+          ) : (
+            <p className="empty-state">
+              Your wishlist is empty. Save products from the marketplace to find
+              them here.
+            </p>
+          )}
+        </div>
+      )}
+      {tab === "profile" && (
+        <div className="account-panel form-grid">
+          <h3>Profile & delivery preferences</h3>
+          <label>
+            Primary address
+            <input defaultValue="Jaipur, Rajasthan" />
+          </label>
+          <label>
+            Mobile number
+            <input defaultValue="+91 98XXXXXX12" />
+          </label>
+          <label>
+            Preferred pickup window
+            <select>
+              <option>10 AM – 1 PM</option>
+              <option>2 PM – 6 PM</option>
+            </select>
+          </label>
+          <button
+            className="primary"
+            onClick={() =>
+              notify(
+                "Profile preferences saved locally. Connect this form to the Supabase profile update in the next backend iteration.",
+              )
+            }
+          >
+            Save preferences
+          </button>
+        </div>
+      )}
+      {tab === "reviews" && (
+        <div className="account-panel">
+          <h3>Reviews & ratings</h3>
+          <p>
+            Only verified purchasers can submit a review. Your feedback is shown
+            after moderation.
+          </p>
+          <textarea
+            placeholder="Share feedback about your recent produce order"
+            value={review}
+            onChange={(e) => setReview(e.target.value)}
+          />
+          <button
+            className="primary"
+            onClick={() => {
+              setReview("");
+              notify("Review submitted for moderation.");
+            }}
+          >
+            Submit verified review
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+function AdminOrderConfirmation({ orders, confirmOrder }) {
+  const pending = orders.filter(
+    (order) => order.status === "Pending verification",
+  );
+  return (
+    <section className="page">
+      <div className="account-panel">
+        <p className="eyebrow green">ORDER VERIFICATION</p>
+        <h2>Consumer orders pending verification</h2>
+        {pending.length ? (
+          pending.map((order) => (
+            <div className="tracking" key={order.id}>
+              <b>{order.id}</b>
+              <span>
+                {order.quantity} kg · {order.pickupWarehouse}
+              </span>
+              <strong>Pending verification</strong>
+              <button
+                className="primary"
+                onClick={() => confirmOrder(order.id)}
+              >
+                Confirm order
+              </button>
+            </div>
+          ))
+        ) : (
+          <p className="empty-state">
+            No orders are awaiting manual verification.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+function BulkMarket({ lots, setView, notify }) {
+  const [tab, setTab] = useState("discover"),
+    [quote, setQuote] = useState(false),
+    [cropQuery, setCropQuery] = useState("");
+  const visibleLots = lots.filter((lot) =>
+    lot.crop.toLowerCase().includes(cropQuery.trim().toLowerCase()),
+  );
+  return (
+    <section className="page">
+      <div className="page-top">
+        <div>
+          <p className="eyebrow green">VERIFIED WHOLESALE MARKETPLACE</p>
+          <h1>Buy better, in bulk.</h1>
+          <p>
+            Discover verified suppliers, request quality samples, negotiate
+            transparent quotes, and manage recurring contracts.
+          </p>
+        </div>
+        <button className="secondary" onClick={() => setView("market")}>
+          Retail marketplace
+        </button>
+      </div>
+      <div className="tabs">
+        {["discover", "quotes", "contracts", "analytics", "invoices"].map(
+          (x) => (
+            <button
+              className={tab === x ? "selected" : ""}
+              onClick={() => setTab(x)}
+              key={x}
+            >
+              {x}
+            </button>
+          ),
+        )}
+      </div>
+      {tab === "discover" && (
+        <>
+          <div className="market-tools">
+            <input
+              aria-label="Search wholesale crops"
+              placeholder="Search crop"
+              value={cropQuery}
+              onChange={(event) => setCropQuery(event.target.value)}
+            />
+            <select>
+              <option>All regions</option>
+              <option>Jaipur region</option>
+            </select>
+            <select>
+              <option>All certifications</option>
+              <option>Organic</option>
+              <option>Grade A verified</option>
+            </select>
+          </div>
+          <div className="cards">
+            {visibleLots.map((l) => (
+              <div className="product-wrap" key={l.id}>
+                <LotCard lot={l} onClick={() => setQuote(l)} />
+                <div className="product-actions">
+                  <button onClick={() => setQuote(l)}>
+                    Request sample / quote
+                  </button>
+                  <button
+                    onClick={() =>
+                      notify("AI grading report opened for buyer review.")
+                    }
+                  >
+                    AI quality report
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {!visibleLots.length && (
+            <p className="empty-state">No wholesale crops match this search.</p>
+          )}
+        </>
+      )}
+      {tab === "quotes" && (
+        <div className="account-panel">
+          <h3>Negotiation & quote workspace</h3>
+          {quote ? (
+            <div className="quote-card">
+              <b>
+                {quote.crop}, Grade {quote.grade} · {quote.qty} kg available
+              </b>
+              <p>
+                Suggested opening quote: ₹{quote.price - 2}/kg for 100 kg+.
+                Farmer receives every offer and remains free to accept, counter,
+                or decline.
+              </p>
+              <label>
+                Your proposed price
+                <input type="number" defaultValue={quote.price - 2} />
+              </label>
+              <button
+                className="primary"
+                onClick={() =>
+                  notify("Quote request sent to the verified farmer.")
+                }
+              >
+                Send negotiated quote
+              </button>
+            </div>
+          ) : (
+            <p className="empty-state">
+              Choose a produce listing to start an RFQ.
+            </p>
+          )}
+        </div>
+      )}
+      {tab === "contracts" && (
+        <div className="account-panel">
+          <h3>Contract orders</h3>
+          <p>
+            Create recurring purchase agreements with clear quantity, grade,
+            delivery window, pricing method and cancellation terms.
+          </p>
+          <div className="contract-row">
+            <b>Weekly tomato supply</b>
+            <span>200 kg / week</span>
+            <span>Draft awaiting farmer approval</span>
+            <button onClick={() => notify("Contract draft opened.")}>
+              Open draft
+            </button>
+          </div>
+          <button
+            className="primary"
+            onClick={() => notify("New contract order draft created.")}
+          >
+            Create contract order
+          </button>
+        </div>
+      )}
+      {tab === "analytics" && (
+        <div className="metric-grid">
+          <Metric
+            icon={<BarChart3 />}
+            label="30-day spend"
+            value="₹48,600"
+            note="8% lower than previous period"
+          />
+          <Metric
+            icon={<Users />}
+            label="Active suppliers"
+            value="6"
+            note="4 high-performing suppliers"
+          />
+          <Metric
+            icon={<PackageCheck />}
+            label="Orders fulfilled"
+            value="28"
+            note="96% on-time performance"
+          />
+          <Metric
+            icon={<BrainCircuit />}
+            label="Cost saving insight"
+            value="₹4,120"
+            note="From negotiated seasonal lots"
+          />
+        </div>
+      )}
+      {tab === "invoices" && (
+        <div className="account-panel">
+          <h3>GST-compliant invoice centre</h3>
+          <p>
+            Generated invoices include supplier and buyer GSTIN, line items, tax
+            breakdown, warehouse handoff and order references.
+          </p>
+          <div className="contract-row">
+            <b>INV-FL-2026-0148</b>
+            <span>₹18,750</span>
+            <span>GST ready</span>
+            <button
+              onClick={() => notify("GST invoice generated for download.")}
+            >
+              Generate PDF
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+function WarehouseView({
+  session,
+  lots,
+  setLots,
+  produceRequests,
+  orders,
+  notify,
+}) {
+  const [form, setForm] = useState({
+    crop: "Tomato",
+    weight: "350",
+    grade: "A",
+  });
+  const submit = async (e) => {
+    e.preventDefault();
+    let id = `FL-${24094 + lots.length}`;
+    const newLot = {
+      id,
+      crop: form.crop,
+      hi: form.crop,
+      grade: form.grade,
+      qty: +form.weight,
+      price: form.crop === "Tomato" ? 27 : 25,
+      old: 0,
+      warehouse: "Jaipur North",
+      farmer: "Demo Farmer",
+      dist: "0 km",
+      trend: 4,
+    };
+    if (isSupabaseConfigured && session?.userId) {
+      const { data: warehouse, error: warehouseError } = await supabase
+        .from("warehouses")
+        .select("id")
+        .eq("name", "Jaipur North")
+        .single();
+      if (warehouseError) {
+        notify("Warehouse could not be found.");
+        return;
+      }
+      const { data, error } = await supabase
+        .from("produce_lots")
+        .insert({
+          lot_code: id,
+          crop: form.crop,
+          grade: form.grade,
+          quantity_kg: newLot.qty,
+          price_per_kg: newLot.price,
+          warehouse_id: warehouse.id,
+        })
+        .select("id")
+        .single();
+      if (error) {
+        notify(error.message);
+        return;
+      }
+      newLot.dbId = data.id;
+    }
+    setLots([...lots, newLot]);
+    notify(`Lot ${id} recorded with an immutable intake event.`);
+  };
+  return (
+    <section className="page warehouse-page">
+      <div className="page-top">
+        <div>
+          <p className="eyebrow green">ADMIN-ONLY WAREHOUSE CONSOLE</p>
+          <h1>Warehouse intake & fulfillment</h1>
+          <p>
+            Confirm collection weight, complete grading, manage stock and
+            prepare consumer pickup orders.
+          </p>
+        </div>
+        <div className="secure">
+          <ShieldCheck /> Admin access only
+        </div>
+      </div>
+      <div className="warehouse-grid">
+        <form className="intake" onSubmit={submit}>
+          <h3>Confirm produce intake</h3>
+          <label>
+            Crop
+            <select
+              value={form.crop}
+              onChange={(e) => setForm({ ...form, crop: e.target.value })}
+            >
+              <option>Tomato</option>
+              <option>Onion</option>
+              <option>Potato</option>
+            </select>
+          </label>
+          <label>
+            Confirmed net weight (kg)
+            <input
+              type="number"
+              min="1"
+              value={form.weight}
+              onChange={(e) => setForm({ ...form, weight: e.target.value })}
+            />
+          </label>
+          <label>
+            Human-verified grade
+            <select
+              value={form.grade}
+              onChange={(e) => setForm({ ...form, grade: e.target.value })}
+            >
+              <option>A</option>
+              <option>B</option>
+              <option>C</option>
+            </select>
+          </label>
+          <div className="grade-ai">
+            <BrainCircuit />
+            <div>
+              <b>Camera-assisted result: Grade A</b>
+              <small>Confidence 91% · visual defects: low</small>
+            </div>
+            <span>Review</span>
+          </div>
+          <button className="primary" type="submit">
+            <ScanLine size={18} />
+            Confirm grade & create lot
+          </button>
+        </form>
+        <div className="ledger">
+          <h3>Live inventory ledger</h3>
+          {lots.map((l) => (
+            <div key={l.id} className="ledger-row">
+              <span className="dot"></span>
+              <div>
+                <b>
+                  {l.id} · {l.crop}
+                </b>
+                <small>
+                  Received today · Grade {l.grade} · {l.warehouse}
+                </small>
+              </div>
+              <strong>{l.qty} kg</strong>
+            </div>
+          ))}
+          <p className="notice">
+            Every intake, correction, reservation and dispatch is an auditable
+            inventory event.
+          </p>
+        </div>
+      </div>
+      <div className="ops-grid">
+        <QueuePanel
+          title="Farmer produce & cluster requests"
+          empty="No new farmer requests."
+          items={produceRequests}
+          render={(r) => (
+            <>
+              <b>
+                {r.crop} · {r.grossWeight} kg gross
+              </b>
+              <small>
+                {r.type} · {r.farmer} · {r.cluster} · Grade requested
+              </small>
+            </>
+          )}
+        />
+        <QueuePanel
+          title="Consumer pickup orders"
+          empty="No pickup orders yet."
+          items={orders}
+          render={(o) => (
+            <>
+              <b>
+                {o.id} · {o.quantity} kg
+              </b>
+              <small>
+                {o.pickupWarehouse} · {o.items} lot(s) · {o.status}
+              </small>
+            </>
+          )}
+        />
+      </div>
+    </section>
+  );
+}
+function QueuePanel({ title, items, empty, render }) {
+  return (
+    <div className="queue-panel">
+      <h3>{title}</h3>
+      {items.length ? (
+        items.map((item) => (
+          <div className="admin-row" key={item.id}>
+            <span className="dot"></span>
+            <div>{render(item)}</div>
+          </div>
+        ))
+      ) : (
+        <p className="empty-state">{empty}</p>
+      )}
+    </div>
+  );
+}
+function FarmerView({
+  session,
+  lots,
+  setModal,
+  produceRequests,
+  setProduceRequests,
+  notify,
+}) {
+  const [form, setForm] = useState({
+    crop: "Tomato",
+    grossWeight: "",
+    cluster: "Jaipur North cluster",
+    type: "Produce intake",
+  });
+  const [cropSearch, setCropSearch] = useState("");
+  const matchingCrops = useMemo(
+    () =>
+      INDIA_CROPS.filter((item) =>
+        (item.name + " " + item.category)
+          .toLowerCase()
+          .includes(cropSearch.toLowerCase()),
+      ).slice(0, 80),
+    [cropSearch],
+  );
+  const myLots = lots.filter(
+    (l) => l.farmer === "Ramesh Kumar" || l.farmer === session?.name,
+  );
+  const submit = async (e) => {
+    e.preventDefault();
+    const id = `REQ-${String(Date.now()).slice(-6)}`;
+    const request = {
+      ...form,
+      id,
+      farmer: session?.name || "Farmer",
+      status: "Awaiting pickup and grade",
+    };
+    if (isSupabaseConfigured && session?.userId) {
+      const { data, error } = await supabase
+        .from("produce_requests")
+        .insert({
+          farmer_id: session.userId,
+          crop: form.crop,
+          gross_weight_kg: Number(form.grossWeight),
+          collection_cluster: form.cluster,
+          request_type:
+            form.type === "Cluster collection request"
+              ? "cluster_collection"
+              : "produce_intake",
+        })
+        .select("id")
+        .single();
+      if (error) {
+        notify(error.message);
+        return;
+      }
+      request.id = data.id;
+    }
+    setProduceRequests((current) => [request, ...current]);
+    setForm({ ...form, grossWeight: "" });
+    notify(`${form.type} ${id} sent to the warehouse admin.`);
+  };
+  return (
+    <section className="page farmer-page">
+      <div className="farmer-welcome">
+        <div>
+          <p className="eyebrow">
+            NAMASTE{session?.name ? `, ${session.name}` : ""}
+          </p>
+          <h1>Your produce. Your decision.</h1>
+          <p>
+            Add produce for a grade request, or create a cluster collection
+            request. The collector will confirm final weight and grade at
+            pickup.
+          </p>
+          <button className="primary" onClick={() => setModal("ai")}>
+            <BrainCircuit size={18} />
+            View price guidance
+          </button>
+        </div>
+        <div className="balance">
+          <small>ESTIMATED STOCK VALUE</small>
+          <b>₹22,140</b>
+          <span>820 kg in storage</span>
+        </div>
+      </div>
+      <div className="farmer-grid workflow-grid">
+        <form className="intake farmer-request" onSubmit={submit}>
+          <p className="eyebrow green">PICKUP & GRADING</p>
+          <h3>Add produce request</h3>
+          <label>
+            Request type
+            <select
+              value={form.type}
+              onChange={(e) => setForm({ ...form, type: e.target.value })}
+            >
+              <option>Produce intake</option>
+              <option>Cluster collection request</option>
+            </select>
+          </label>
+          <label>
+            Search India crop
+            <input
+              value={cropSearch}
+              onChange={(e) => setCropSearch(e.target.value)}
+              placeholder="Search crop or category"
+            />
+          </label>
+          <label>
+            Crop selection
+            <select
+              value={form.crop}
+              onChange={(e) => setForm({ ...form, crop: e.target.value })}
+            >
+              {matchingCrops.length ? (
+                matchingCrops.map((item) => (
+                  <option key={item.name} value={item.name}>
+                    {item.name} · {item.category}
+                  </option>
+                ))
+              ) : (
+                <option>{form.crop}</option>
+              )}
+            </select>
+            <small>
+              {INDIA_CROPS.length}+ Indian crop species across field,
+              horticulture, spice, plantation, medicinal, flower and fodder
+              groups.
+            </small>
+          </label>
+          <label>
+            Gross weight at pickup (kg)
+            <input
+              required
+              min="1"
+              type="number"
+              placeholder="e.g. 250"
+              value={form.grossWeight}
+              onChange={(e) =>
+                setForm({ ...form, grossWeight: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            Collection cluster
+            <select
+              value={form.cluster}
+              onChange={(e) => setForm({ ...form, cluster: e.target.value })}
+            >
+              <option>Jaipur North cluster</option>
+              <option>Sanganer cluster</option>
+              <option>Village / FPO pickup point</option>
+            </select>
+          </label>
+          <div className="grade-ai">
+            <ScanLine />
+            <div>
+              <b>Grade requested</b>
+              <small>
+                Final weight and grade are confirmed by the pickup operator.
+              </small>
+            </div>
+          </div>
+          <button className="primary" type="submit">
+            <Truck size={18} />
+            Send request to warehouse
+          </button>
+        </form>
+        <div className="my-lots">
+          <h3>Your produce & requests</h3>
+          {myLots.map((l) => (
+            <div className="my-lot" key={l.id}>
+              <span>🍅</span>
+              <div>
+                <b>
+                  {l.id} · {l.crop}, Grade {l.grade}
+                </b>
+                <small>
+                  {l.qty} kg · {l.warehouse}
+                </small>
+              </div>
+              <strong>₹{l.price}/kg</strong>
+            </div>
+          ))}
+          {produceRequests
+            .filter((r) => r.farmer === (session?.name || "Farmer"))
+            .map((r) => (
+              <div className="my-lot" key={r.id}>
+                <span>📋</span>
+                <div>
+                  <b>
+                    {r.crop} · {r.grossWeight} kg gross
+                  </b>
+                  <small>
+                    {r.type} · {r.cluster} · {r.status}
+                  </small>
+                </div>
+                <strong>Pending</strong>
+              </div>
+            ))}
+          {!myLots.length && !produceRequests.length && (
+            <p className="empty-state">
+              Your approved lots and pending requests will appear here.
+            </p>
+          )}
+        </div>
+      </div>
+      <FarmerOperations notify={notify} session={session} />
+      <div className="farmer-grid">
+        <div className="finance">
+          <p className="eyebrow">STORED STOCK FINANCE</p>
+          <h3>Need working capital?</h3>
+          <p>
+            Start a consent-based eligibility enquiry for your stored produce.
+          </p>
+          <button
+            onClick={() =>
+              notify(
+                "Consent-first finance enquiry started. No credit decision has been made.",
+              )
+            }
+          >
+            Explore options <ArrowUpRight size={16} />
+          </button>
+          <small>
+            Subject to warehouse, partner and lender eligibility. Not a loan
+            offer.
+          </small>
+        </div>
+        <div className="farmer-help">
+          <h3>How grading works</h3>
+          <p>
+            Enter your gross amount and request collection. At pickup, the
+            operator verifies weight, captures quality details, and confirms the
+            final grade before it becomes live stock.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+function FarmerOperations({ notify, session }) {
+  const [tab, setTab] = useState("listings"),
+    [cropSearch, setCropSearch] = useState(""),
+    [image, setImage] = useState(null),
+    [preview, setPreview] = useState(""),
+    [saving, setSaving] = useState(false),
+    [published, setPublished] = useState(null),
+    [listing, setListing] = useState({
+      crop: "Tomato",
+      description: "Fresh produce from our verified farm cluster.",
+      quantity: "100",
+      price: "25",
+    });
+  const matches = useMemo(
+    () =>
+      INDIA_CROPS.filter((item) =>
+        (item.name + " " + item.category)
+          .toLowerCase()
+          .includes(cropSearch.toLowerCase()),
+      ).slice(0, 80),
+    [cropSearch],
+  );
+  const selectPhoto = (file) => {
+    setImage(file || null);
+    setPreview(file ? URL.createObjectURL(file) : "");
+  };
+  const submitListing = async (event) => {
+    event.preventDefault();
+    if (!image) {
+      notify("Attach at least one produce photo before publishing.");
+      return;
+    }
+    if (!session?.userId || !isSupabaseConfigured) {
+      notify("Sign in as a farmer to publish a listing.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const cropMeta = INDIA_CROPS.find((item) => item.name === listing.crop);
+      const extension = (image.name.split(".").pop() || "jpg").replace(
+        /[^a-z0-9]/gi,
+        "",
+      );
+      const path = session.userId + "/" + crypto.randomUUID() + "." + extension;
+      const { error: uploadError } = await supabase.storage
+        .from("produce-photos")
+        .upload(path, image, { contentType: image.type, upsert: false });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage
+        .from("produce-photos")
+        .getPublicUrl(path);
+      const record = {
+        farmer_id: session.userId,
+        crop: listing.crop,
+        category: cropMeta?.category || "Other",
+        description: listing.description,
+        quantity_kg: Number(listing.quantity),
+        price_per_kg: Number(listing.price),
+        image_url: urlData.publicUrl,
+        status: "published",
+      };
+      const { data, error } = await supabase
+        .from("farmer_listings")
+        .insert(record)
+        .select()
+        .single();
+      if (error) throw error;
+      setPublished(data);
+      notify(
+        "Listing published with its farmer photo. Consumers can now view it.",
+      );
+    } catch (error) {
+      notify(error.message || "Photo listing could not be published.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <section className="farmer-operations">
+      <div className="tabs">
+        {[
+          "listings",
+          "orders",
+          "logistics",
+          "payments",
+          "performance",
+          "verification",
+        ].map((x) => (
+          <button
+            key={x}
+            className={tab === x ? "selected" : ""}
+            onClick={() => setTab(x)}
+          >
+            {x}
+          </button>
+        ))}
+      </div>
+      {tab === "listings" && (
+        <form
+          className="account-panel form-grid photo-listing"
+          onSubmit={submitListing}
+        >
+          <h3>Produce listing management & photo grading</h3>
+          <label>
+            Search crop catalogue
+            <input
+              value={cropSearch}
+              onChange={(e) => setCropSearch(e.target.value)}
+              placeholder="Search any Indian crop"
+            />
+          </label>
+          <label>
+            Crop selection
+            <select
+              value={listing.crop}
+              onChange={(e) => setListing({ ...listing, crop: e.target.value })}
+            >
+              {matches.map((item) => (
+                <option key={item.name} value={item.name}>
+                  {item.name} · {item.category}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Quantity available (kg)
+            <input
+              required
+              type="number"
+              min="1"
+              value={listing.quantity}
+              onChange={(e) =>
+                setListing({ ...listing, quantity: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            Expected price per kg
+            <input
+              required
+              type="number"
+              min="1"
+              value={listing.price}
+              onChange={(e) =>
+                setListing({ ...listing, price: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            Description
+            <textarea
+              value={listing.description}
+              onChange={(e) =>
+                setListing({ ...listing, description: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            Produce photos
+            <input
+              required
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => selectPhoto(e.target.files?.[0])}
+            />
+            <small>
+              JPEG, PNG or WebP. Your photo is stored securely and displayed to
+              consumers.
+            </small>
+          </label>
+          {preview && (
+            <img
+              className="listing-preview"
+              src={preview}
+              alt="Selected produce preview"
+            />
+          )}
+          <button className="primary" disabled={saving} type="submit">
+            {saving ? "Publishing…" : "Publish listing with photo"}
+          </button>
+          {published && (
+            <div className="published-note">
+              <ShieldCheck size={18} />
+              <span>
+                <b>{published.crop} is live.</b> Its photo is visible in the
+                consumer marketplace.
+              </span>
+            </div>
+          )}
+        </form>
+      )}
+      {tab === "orders" && (
+        <div className="account-panel">
+          <h3>Incoming order management</h3>
+          <div className="tracking">
+            <b>ORD-FL-1029</b>
+            <span>25 kg tomato</span>
+            <span>Consumer pickup</span>
+            <button
+              onClick={() => notify("Order accepted and warehouse notified.")}
+            >
+              Accept order
+            </button>
+          </div>
+          <p>
+            Accept, pack and hand off orders to the assigned warehouse/logistics
+            partner.
+          </p>
+        </div>
+      )}
+      {tab === "logistics" && (
+        <div className="account-panel">
+          <h3>Logistics schedule</h3>
+          <div className="tracking">
+            <b>Pickup run JP-N-03</b>
+            <span>Tomorrow, 09:30</span>
+            <span>Jaipur North cluster</span>
+            <strong>Collector assigned</strong>
+          </div>
+        </div>
+      )}
+      {tab === "payments" && (
+        <div className="metric-grid">
+          <Metric
+            icon={<BarChart3 />}
+            label="Available earnings"
+            value="₹12,450"
+            note="Released after completed pickup"
+          />
+          <Metric
+            icon={<Clock3 />}
+            label="Pending settlement"
+            value="₹4,700"
+            note="2 orders in quality confirmation"
+          />
+          <Metric
+            icon={<ClipboardList />}
+            label="Transactions"
+            value="18"
+            note="Full payment history available"
+          />
+        </div>
+      )}
+      {tab === "performance" && (
+        <div className="metric-grid">
+          <Metric
+            icon={<BarChart3 />}
+            label="Sales trend"
+            value="+18%"
+            note="Compared with last month"
+          />
+          <Metric
+            icon={<Users />}
+            label="Repeat customers"
+            value="38%"
+            note="Healthy return rate"
+          />
+          <Metric
+            icon={<ShieldCheck />}
+            label="Average rating"
+            value="4.7 / 5"
+            note="From verified buyer reviews"
+          />
+        </div>
+      )}
+      {tab === "verification" && (
+        <div className="account-panel">
+          <h3>Farmer profile verification</h3>
+          <p>
+            Identity, farm location, bank account and FPO details are reviewed
+            before trust status is displayed to buyers.
+          </p>
+          <button
+            className="primary"
+            onClick={() =>
+              notify("Verification checklist opened for document upload.")
+            }
+          >
+            Continue verification
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+function AuthView({ setSession, setView, notify }) {
+  const [mode, setMode] = useState("login"),
+    [role, setRole] = useState("consumer"),
+    [farmerId, setFarmerId] = useState(""),
+    [resendEmail, setResendEmail] = useState(""),
+    [otpStep, setOtpStep] = useState(false),
+    [farmerPhone, setFarmerPhone] = useState(""),
+    [busy, setBusy] = useState(false);
+  const resendConfirmation = async () => {
+    if (!resendEmail) {
+      notify("Enter your consumer email address first.");
+      return;
+    }
+    if (!isSupabaseConfigured) {
+      notify("Email confirmation is available after Supabase is configured.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: resendEmail,
+        options: { emailRedirectTo: window.location.origin + "/" },
+      });
+      if (error) throw error;
+      notify(
+        "Confirmation email resent. Open the new link to return to FarmLink.",
+      );
+    } catch (error) {
+      notify(error.message || "Unable to resend confirmation email.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const finishLogin = async (user, requestedRole) => {
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("role,full_name,farmer_id")
+      .eq("id", user.id)
+      .single();
+    if (error || !profile) {
+      notify("Your FarmLink profile could not be loaded.");
+      return;
+    }
+    if (profile.role !== requestedRole) {
+      await supabase.auth.signOut();
+      notify("This account does not have access to that portal.");
+      return;
+    }
+    setSession({
+      role: profile.role,
+      label: profile.full_name,
+      name: profile.full_name,
+      farmerId: profile.farmer_id,
+      userId: user.id,
+    });
+    setView(
+      profile.role === "consumer"
+        ? "market"
+        : profile.role === "farmer"
+          ? "farmer"
+          : "admin",
+    );
+    notify(`Signed in as ${profile.role}.`);
+  };
+  const submit = async (e) => {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    const name = String(data.get("name") || "").trim();
+    if (mode === "register" && role !== "admin" && !name) {
+      notify("Please enter your full name.");
+      return;
+    }
+    if (!isSupabaseConfigured) {
+      const label =
+        role === "farmer"
+          ? farmerId || `FLR-${String(Date.now()).slice(-6)}`
+          : role === "admin"
+            ? "FarmLink Admin"
+            : name || "Consumer";
+      if (mode === "register" && role === "farmer" && !farmerId) {
+        setFarmerId(label);
+        notify(
+          `Registration complete. Your Farmer ID is ${label}. Use it with your password to sign in.`,
+        );
+        return;
+      }
+      setSession({
+        role,
+        label: name || label,
+        name,
+        farmerId: role === "farmer" ? label : undefined,
+      });
+      setView(
+        role === "consumer" ? "market" : role === "farmer" ? "farmer" : "admin",
+      );
+      notify(`Signed in as ${role}.`);
+      return;
+    }
+    setBusy(true);
+    try {
+      const password = String(data.get("password"));
+      const mobile = String(data.get("mobile") || "");
+      const address = String(data.get("address") || "");
+      if (mode === "register" && role === "admin") {
+        notify("Admin accounts must be created by an existing administrator.");
+        return;
+      }
+      if (mode === "login" && role === "farmer") {
+        const phone = otpStep ? farmerPhone : normalizeIndianPhone(mobile);
+        if (!phone)
+          throw new Error("Enter a valid 10-digit Indian mobile number.");
+        if (!otpStep) {
+          const { error } = await supabase.auth.signInWithOtp({ phone });
+          if (error) throw error;
+          setFarmerPhone(phone);
+          setOtpStep(true);
+          notify("OTP sent to your registered mobile number.");
+          return;
+        }
+        const { data: verified, error } = await supabase.auth.verifyOtp({
+          phone,
+          type: "sms",
+          token: String(data.get("otp") || "").trim(),
+        });
+        if (error || !verified.user)
+          throw error || new Error("OTP verification failed.");
+        await finishLogin(verified.user, "farmer");
+        return;
+      }
+      if (mode === "register" && role === "consumer") {
+        const { data: signup, error } = await supabase.auth.signUp({
+          email: String(data.get("email")),
+          password,
+          options: {
+            emailRedirectTo: window.location.origin + "/",
+            data: { full_name: name, mobile, address },
+          },
+        });
+        if (error) throw error;
+        if (!signup.session) {
+          notify(
+            "Check your email to confirm your consumer account. You will return to FarmLink after confirming.",
+          );
+          return;
+        }
+        await finishLogin(signup.user, "consumer");
+        return;
+      }
+      if (mode === "register" && role === "farmer") {
+        const phone = normalizeIndianPhone(mobile);
+        if (!phone)
+          throw new Error("Enter a valid 10-digit Indian mobile number.");
+        const { data, error } = await supabase.functions.invoke(
+          "register-farmer",
+          { body: { fullName: name, mobile: phone, address } },
+        );
+        if (error) throw error;
+        setFarmerId(data.farmerId);
+        setMode("login");
+        setFarmerPhone(phone);
+        setOtpStep(false);
+        notify(
+          `Farmer ID issued: ${data.farmerId}. Request an OTP to sign in.`,
+        );
+        return;
+      }
+      const loginName = String(data.get("email") || "")
+        .trim()
+        .toLowerCase();
+      const email =
+        role === "admin"
+          ? loginName.includes("@")
+            ? loginName
+            : loginName + "@farmlink.admin"
+          : loginName;
+      const { data: login, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+      await finishLogin(login.user, role);
+    } catch (error) {
+      notify(error.message || "Unable to complete this request.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="auth-page">
+      <div className="auth-aside">
+        <div className="brand light">
+          <span>
+            <Sprout size={24} />
+          </span>
+          Farm<span>Link</span>
+        </div>
+        <div>
+          <p className="eyebrow">FARMER-FIRST ACCESS</p>
+          <h1>
+            One platform.
+            <br />
+            Three clear roles.
+          </h1>
+          <p>
+            Consumers shop trusted local stock. Farmers manage their harvest.
+            Admins monitor the full connected flow.
+          </p>
+        </div>
+        <div className="role-list">
+          <span>
+            <ShoppingCart />
+            Consumer marketplace only
+          </span>
+          <span>
+            <Sprout />
+            Farmer dashboard & Farmer ID
+          </span>
+          <span>
+            <ShieldCheck />
+            Admin monitoring controls
+          </span>
+        </div>
+      </div>
+      <div className="auth-card">
+        <div className="auth-switch">
+          <button
+            type="button"
+            className={mode === "login" ? "active" : ""}
+            onClick={() => setMode("login")}
+          >
+            Login
+          </button>
+          <button
+            type="button"
+            className={mode === "register" ? "active" : ""}
+            onClick={() => {
+              setMode("register");
+              setFarmerId("");
+              setOtpStep(false);
+            }}
+          >
+            Register
+          </button>
+        </div>
+        <p className="eyebrow green">
+          {mode === "login" ? "WELCOME BACK" : "CREATE YOUR ACCOUNT"}
+        </p>
+        <h2>
+          {mode === "login" ? "Sign in to FarmLink" : "Register as a user"}
+        </h2>
+        <div className="role-tabs">
+          {[
+            ["consumer", "Consumer", ShoppingCart],
+            ["farmer", "Farmer", Sprout],
+            ["admin", "Admin", ShieldCheck],
+          ].map(([key, label, Icon]) => (
+            <button
+              type="button"
+              key={key}
+              className={role === key ? "role-active" : ""}
+              onClick={() => {
+                setRole(key);
+                setFarmerId("");
+                setOtpStep(false);
+              }}
+            >
+              <Icon size={17} />
+              {label}
+            </button>
+          ))}
+        </div>
+        <form onSubmit={submit}>
+          {mode === "register" && role !== "admin" && (
+            <Field
+              icon={<UserRound />}
+              label="Full name"
+              name="name"
+              type="text"
+            />
+          )}
+          {mode === "register" && role !== "admin" && (
+            <Field
+              icon={<MapPinned />}
+              label="Full address"
+              name="address"
+              type="text"
+            />
+          )}
+          {role === "consumer" && (
+            <Field
+              icon={<Mail />}
+              label="Email address"
+              name="email"
+              type="email"
+              onChange={(e) => setResendEmail(e.target.value)}
+            />
+          )}{" "}
+          {role === "farmer" && mode === "login" && otpStep && (
+            <Field
+              icon={<LockKeyhole />}
+              label="6-digit OTP"
+              name="otp"
+              type="text"
+            />
+          )}
+          {((mode === "register" && role !== "admin") ||
+            (mode === "login" && role === "farmer")) && (
+            <Field
+              icon={<Phone />}
+              label="Mobile number"
+              name="mobile"
+              type="tel"
+            />
+          )}
+          {role === "admin" && (
+            <Field
+              icon={<UserRound />}
+              label="Admin username"
+              name="email"
+              type="text"
+            />
+          )}
+          {role !== "farmer" && (
+            <Field
+              icon={<LockKeyhole />}
+              label="Password"
+              name="password"
+              type="password"
+            />
+          )}
+          {farmerId && (
+            <div className="farmer-id">
+              <Sprout />
+              <div>
+                <small>YOUR FARMER ID</small>
+                <b>{farmerId}</b>
+                <span>Keep this ID safe for future logins.</span>
+              </div>
+            </div>
+          )}
+          <button className="primary auth-submit" disabled={busy} type="submit">
+            {busy
+              ? "Please wait…"
+              : role === "farmer" && mode === "login"
+                ? otpStep
+                  ? "Verify OTP"
+                  : "Send OTP"
+                : mode === "register"
+                  ? "Create account"
+                  : "Sign in"}
+            <ArrowUpRight size={17} />
+          </button>
+        </form>
+        {role === "consumer" && mode === "login" && (
+          <button
+            className="text-btn"
+            disabled={busy}
+            onClick={resendConfirmation}
+          >
+            Resend email confirmation
+          </button>
+        )}
+        {role === "admin" && (
+          <p className="admin-note">
+            <ShieldCheck />
+            Admin accounts are provisioned by FarmLink. This demo mode accepts
+            an administrator-provisioned username.
+          </p>
+        )}
+        <small className="auth-note">
+          {isSupabaseConfigured
+            ? "Supabase Auth is active."
+            : "Demo mode: configure Supabase environment variables to enable secure account storage."}
+        </small>
+      </div>
+    </section>
+  );
+}
+function Field({ icon, label, name, type, onChange }) {
+  return (
+    <label className="auth-field">
+      <span>{icon}</span>
+      <input
+        aria-label={label}
+        name={name}
+        placeholder={label}
+        type={type}
+        onChange={onChange}
+        required
+      />
+    </label>
+  );
+}
+function AdminView({ lots, orders, produceRequests, setView, logout, notify }) {
+  const value = lots.reduce((sum, l) => sum + l.qty * l.price, 0);
+  const [tab, setTab] = useState("users");
+  return (
+    <section className="page admin-page">
+      <div className="page-top">
+        <div>
+          <p className="eyebrow green">PLATFORM COMMAND CENTER</p>
+          <h1>FarmLink Admin</h1>
+          <p>
+            Monitor farmer collection requests, consumer pickup orders,
+            warehouse stock and market operations.
+          </p>
+        </div>
+        <button className="secondary" onClick={logout}>
+          <LogOut size={17} />
+          Sign out
+        </button>
+      </div>
+      <div className="metric-grid">
+        <Metric
+          icon={<Users />}
+          label="Registered farmers"
+          value="152"
+          note={produceRequests.length + " new collection request(s)"}
+        />
+        <Metric
+          icon={<ShoppingCart />}
+          label="Consumer pickup orders"
+          value={String(orders.length)}
+          note="Awaiting warehouse fulfillment"
+        />
+        <Metric
+          icon={<PackageCheck />}
+          label="Live inventory"
+          value={lots.reduce((s, l) => s + l.qty, 0).toLocaleString() + " kg"}
+          note="Across 2 warehouses"
+        />
+        <Metric
+          icon={<BarChart3 />}
+          label="Stock value"
+          value={"₹" + value.toLocaleString()}
+          note="Indicative live value"
+        />
+      </div>
+      <div className="admin-grid">
+        <QueuePanel
+          title="New farmer collection requests"
+          empty="No new farmer produce or cluster requests."
+          items={produceRequests}
+          render={(r) => (
+            <>
+              <b>
+                {r.crop} · {r.grossWeight} kg gross
+              </b>
+              <small>
+                {r.type} · {r.farmer} · {r.cluster}
+              </small>
+            </>
+          )}
+        />
+        <QueuePanel
+          title="Consumer pickup orders"
+          empty="No consumer pickup orders yet."
+          items={orders}
+          render={(o) => (
+            <>
+              <b>
+                {o.id} · {o.quantity} kg
+              </b>
+              <small>
+                Pickup at {o.pickupWarehouse} · {o.status}
+              </small>
+            </>
+          )}
+        />
+      </div>
+      <div className="admin-grid">
+        <div className="admin-panel">
+          <h3>Warehouse & inventory events</h3>
+          {lots.map((l, i) => (
+            <div key={l.id} className="admin-row">
+              <span className="dot"></span>
+              <div>
+                <b>
+                  {l.id} · {l.crop}
+                </b>
+                <small>
+                  {i === 0
+                    ? "Grade verified and available to buy"
+                    : "Live inventory record · " + l.warehouse}
+                </small>
+              </div>
+              <strong>{l.qty} kg</strong>
+            </div>
+          ))}
+          <button className="wide-btn" onClick={() => setView("warehouse")}>
+            Open admin warehouse console
+          </button>
+        </div>
+        <div className="admin-panel">
+          <h3>Operations queue</h3>
+          <div className="queue">
+            <span className="warn">3</span>
+            <div>
+              <b>Buyer verification</b>
+              <small>Bulk buyer accounts pending review</small>
+            </div>
+          </div>
+          <div className="queue">
+            <span className="ok">2</span>
+            <div>
+              <b>Finance enquiries</b>
+              <small>Consent received; partner follow-up needed</small>
+            </div>
+          </div>
+          <div className="queue">
+            <span className="neutral">5</span>
+            <div>
+              <b>Stock-age alerts</b>
+              <small>Review markdown / redistribution action</small>
+            </div>
+          </div>
+          <button
+            className="primary"
+            onClick={() => notify("Operations report generated for review.")}
+          >
+            Generate report
+          </button>
+        </div>
+      </div>
+      <section className="admin-control">
+        <p className="eyebrow green">GOVERNANCE & MODERATION</p>
+        <div className="tabs">
+          {[
+            "users",
+            "verification",
+            "listings",
+            "disputes",
+            "configuration",
+          ].map((x) => (
+            <button
+              key={x}
+              className={tab === x ? "selected" : ""}
+              onClick={() => setTab(x)}
+            >
+              {x}
+            </button>
+          ))}
+        </div>
+        {tab === "users" && (
+          <div className="account-panel">
+            <h3>User management</h3>
+            <div className="contract-row">
+              <b>Ramesh Kumar</b>
+              <span>Farmer · verified</span>
+              <span>Active</span>
+              <button onClick={() => notify("User moderation profile opened.")}>
+                Manage
+              </button>
+            </div>
+            <div className="contract-row">
+              <b>Metro Fresh Foods</b>
+              <span>Bulk buyer · GST pending</span>
+              <span>Review required</span>
+              <button
+                onClick={() => notify("Bulk buyer GST verification opened.")}
+              >
+                Verify GST
+              </button>
+            </div>
+          </div>
+        )}
+        {tab === "verification" && (
+          <div className="account-panel">
+            <h3>Farmer & buyer verification queue</h3>
+            <p>
+              Review document uploads, farm/FPO details and GST credentials
+              before enabling trust badges and wholesale purchasing.
+            </p>
+            <button
+              className="primary"
+              onClick={() =>
+                notify("Verification queue assigned to current administrator.")
+              }
+            >
+              Review pending applications
+            </button>
+          </div>
+        )}
+        {tab === "listings" && (
+          <div className="account-panel">
+            <h3>Listing moderation</h3>
+            <div className="contract-row">
+              <b>Organic onion – 500 kg</b>
+              <span>AI grade B</span>
+              <span>Awaiting moderation</span>
+              <button onClick={() => notify("Listing approved and published.")}>
+                Approve
+              </button>
+            </div>
+            <button
+              className="secondary"
+              onClick={() =>
+                notify("Listing rejected with farmer-visible reason request.")
+              }
+            >
+              Reject selected listing
+            </button>
+          </div>
+        )}
+        {tab === "disputes" && (
+          <div className="account-panel">
+            <h3>Dispute resolution</h3>
+            <p>
+              Record customer complaints, evidence, warehouse findings, remedies
+              and final outcome in an auditable resolution timeline.
+            </p>
+            <button
+              className="primary"
+              onClick={() => notify("New dispute case created.")}
+            >
+              Create resolution case
+            </button>
+          </div>
+        )}
+        {tab === "configuration" && (
+          <div className="account-panel form-grid">
+            <h3>System configuration</h3>
+            <label>
+              Marketplace category
+              <input defaultValue="Vegetables" />
+            </label>
+            <label>
+              AI grade confidence threshold
+              <input type="number" defaultValue="85" />
+            </label>
+            <label>
+              Stock freshness alert (days)
+              <input type="number" defaultValue="3" />
+            </label>
+            <button
+              className="primary"
+              onClick={() => notify("Configuration draft saved for review.")}
+            >
+              Save configuration
+            </button>
+          </div>
+        )}
+      </section>
+    </section>
+  );
+}
+function Metric({ icon, label, value, note }) {
+  return (
+    <div className="metric">
+      <i>{icon}</i>
+      <small>{label}</small>
+      <b>{value}</b>
+      <span>{note}</span>
+    </div>
+  );
+}
+function Checkout({ cart, close, placeOrder, placingOrder }) {
+  const [warehouse, setWarehouse] = useState("Jaipur North");
+  const total = cart.reduce((sum, l) => sum + l.price * 10, 0);
+  return (
+    <div className="modal-back">
+      <div className="modal checkout-modal">
+        <button className="close" onClick={close}>
+          <X />
+        </button>
+        <p className="eyebrow green">CONSUMER CHECKOUT</p>
+        <h2>Choose your pickup warehouse</h2>
+        <p className="checkout-copy">
+          Your items are reserved. Select a verified FarmLink warehouse, then
+          confirm your pickup order.
+        </p>
+        <div className="checkout-lines">
+          {cart.map((lot, index) => (
+            <div className="checkout-line" key={`${lot.id}-${index}`}>
+              <span>
+                {lot.crop === "Tomato"
+                  ? "🍅"
+                  : lot.crop === "Onion"
+                    ? "🧅"
+                    : "🥔"}
+              </span>
+              <div>
+                <b>
+                  {lot.crop}, Grade {lot.grade}
+                </b>
+                <small>10 kg from lot {lot.id}</small>
+              </div>
+              <strong>₹{lot.price * 10}</strong>
+            </div>
+          ))}
+        </div>
+        <label className="pickup-choice">
+          Pickup warehouse
+          <select
+            value={warehouse}
+            onChange={(e) => setWarehouse(e.target.value)}
+          >
+            <option>Jaipur North</option>
+            <option>Sanganer Hub</option>
+          </select>
+          <small>
+            Your order will appear in this warehouse's admin fulfillment queue.
+          </small>
+        </label>
+        <div className="checkout-total">
+          <span>Total payable at pickup</span>
+          <b>₹{total}</b>
+        </div>
+        <button
+          className="primary checkout-confirm"
+          disabled={placingOrder}
+          onClick={() => placeOrder(warehouse)}
+        >
+          <PackageCheck size={18} />
+          {placingOrder ? "Placing order…" : "Confirm pickup order"}
+        </button>
+      </div>
+    </div>
+  );
+}
+function AI({ close }) {
+  return (
+    <div className="modal-back">
+      <div className="modal">
+        <button className="close" onClick={close}>
+          <X />
+        </button>
+        <p className="eyebrow green">EXPLAINABLE FARM ADVISORY</p>
+        <h2>Tomato: consider selling this week</h2>
+        <div className="recommend">
+          <div>
+            <small>SUGGESTED RANGE</small>
+            <b>₹26 - ₹29/kg</b>
+          </div>
+          <div>
+            <small>CONFIDENCE</small>
+            <b>78%</b>
+          </div>
+          <div>
+            <small>DATA FRESHNESS</small>
+            <b>Today, 9:00 AM</b>
+          </div>
+        </div>
+        <h3>Why this guidance?</h3>
+        <ul>
+          <li>Nearby demand is up 8% this week.</li>
+          <li>Grade A availability is moderate.</li>
+          <li>Your lot is 1 day old; shelf-life risk is low.</li>
+        </ul>
+        <div className="disclaimer">
+          <ShieldCheck />
+          This is a recommendation, not a guaranteed price. You remain in
+          control of your sale decision.
+        </div>
+        <div className="modal-actions">
+          <button className="secondary" onClick={close}>
+            I’ll hold
+          </button>
+          <button className="primary" onClick={close}>
+            List for buyers
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+function Voice({ close, notify }) {
+  const [provider, setProvider] = useState("bhashini"),
+    [language, setLanguage] = useState("hi"),
+    [recording, setRecording] = useState(false),
+    [status, setStatus] = useState(
+      "Record a Hindi or English request to transcribe it.",
+    ),
+    [transcript, setTranscript] = useState("");
+  const recorderRef = useRef(null),
+    chunksRef = useRef([]);
+  const transcribe = async (blob) => {
+    if (!isSupabaseConfigured) {
+      setStatus("Connect Supabase to use secure transcription.");
+      return;
+    }
+    setStatus("Transcribing securely…");
+    try {
+      const form = new FormData();
+      form.append(
+        "audio",
+        new File([blob], "farmlink-recording.webm", { type: "audio/webm" }),
+      );
+      form.append("provider", provider);
+      form.append("language", language);
+      const { data, error } = await supabase.functions.invoke(
+        "transcribe-audio",
+        { body: form },
+      );
+      if (error) throw error;
+      if (!data?.text)
+        throw new Error(data?.error || "No transcript returned.");
+      setTranscript(data.text);
+      setStatus(
+        "Transcript ready via " +
+          (data.provider === "bhashini" ? "BHASHINI" : "Whisper") +
+          ".",
+      );
+      notify("Voice request transcribed successfully.");
+    } catch (error) {
+      setStatus(error.message || "Transcription failed.");
+      notify(error.message || "Transcription failed.");
+    }
+  };
+  const start = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        transcribe(new Blob(chunksRef.current, { type: "audio/webm" }));
+      };
+      recorder.start();
+      recorderRef.current = recorder;
+      setRecording(true);
+      setTranscript("");
+      setStatus("Recording… tap Stop & transcribe when finished.");
+    } catch (error) {
+      setStatus("Microphone access is required to record voice input.");
+    }
+  };
+  const stop = () => {
+    if (recorderRef.current?.state === "recording") {
+      recorderRef.current.stop();
+      setRecording(false);
+    }
+  };
+  return (
+    <div className="modal-back">
+      <div className="modal voice-modal">
+        <button className="close" onClick={close}>
+          <X />
+        </button>
+        <div className="voice-orb">
+          <Mic size={42} />
+        </div>
+        <p className="eyebrow green">MULTILINGUAL VOICE INPUT</p>
+        <h2>Speak in Hindi or English</h2>
+        <p>
+          Choose an engine, record a short request, and FarmLink securely sends
+          the audio to the selected speech-to-text provider.
+        </p>
+        <div className="voice-options">
+          <label>
+            Engine
+            <select
+              value={provider}
+              onChange={(e) => setProvider(e.target.value)}
+            >
+              <option value="bhashini">BHASHINI ASR</option>
+              <option value="whisper">OpenAI Whisper</option>
+            </select>
+          </label>
+          <label>
+            Language
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+            >
+              <option value="hi">Hindi</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+        </div>
+        <button className="primary" onClick={recording ? stop : start}>
+          <Mic size={18} />
+          {recording ? "Stop & transcribe" : "Start recording"}
+        </button>
+        <p className="voice-status">{status}</p>
+        {transcript && (
+          <div className="transcript">
+            <small>TRANSCRIPT</small>
+            <b>{transcript}</b>
+          </div>
+        )}
+        <small>
+          Audio is sent only after you tap Stop. Credentials remain on the
+          server; do not speak financial or identity secrets.
+        </small>
+      </div>
+    </div>
+  );
+}
+createRoot(document.getElementById("root")).render(<App />);
