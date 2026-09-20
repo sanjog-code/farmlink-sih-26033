@@ -3640,6 +3640,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
   const [listings, setListings] = useState([]);
   const [farmers, setFarmers] = useState([]);
   const [assignments, setAssignments] = useState({});
+  const [clusterSelections, setClusterSelections] = useState({});
   const [listingWarehouses, setListingWarehouses] = useState({});
   const [route, setRoute] = useState({ origin: warehouses[0]?.name || "", destination: warehouses[1]?.name || "" });
   const refresh = () => setLiveTick((tick) => tick + 1);
@@ -3651,10 +3652,18 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
   }, [tab, liveTick]);
   useEffect(() => {
     if (!isSupabaseConfigured || tab !== "wholesale") return;
-    supabase.from("profiles").select("id,full_name,farmer_id").eq("role", "farmer").order("full_name").then(({ data, error }) => {
-      if (error) notify(error.message); else setFarmers(data || []);
+    supabase.from("produce_lots").select("farmer_id,crop,quantity_kg,profiles(full_name,farmer_id)").gt("quantity_kg", 0).then(({ data, error }) => {
+      if (error) return notify(error.message);
+      const indexed = new Map();
+      (data || []).forEach((lot) => {
+        if (!lot.farmer_id) return;
+        const current = indexed.get(lot.farmer_id) || { id: lot.farmer_id, full_name: lot.profiles?.full_name || "Farmer", farmer_id: lot.profiles?.farmer_id || "", stock: {} };
+        current.stock[lot.crop] = (current.stock[lot.crop] || 0) + Number(lot.quantity_kg || 0);
+        indexed.set(lot.farmer_id, current);
+      });
+      setFarmers([...indexed.values()].sort((a, b) => a.full_name.localeCompare(b.full_name)));
     });
-  }, [tab]);
+  }, [tab, liveTick]);
   const update = async (table, id, status, message) => {
     const { error } = await supabase.from(table).update({ status }).eq("id", id);
     if (error) return notify(error.message);
@@ -3698,9 +3707,30 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
   const assignFarmer = async (request) => {
     const farmerId = assignments[request.id] || request.farmer_id;
     if (!farmerId) return notify("Choose a farmer before connecting this quote.");
-    const { error } = await supabase.from("bulk_requests").update({ farmer_id: farmerId, status: "negotiation" }).eq("id", request.id);
+    const { error } = await supabase.rpc("assign_bulk_request_farmer", { p_request_id: request.id, p_farmer_id: farmerId });
     if (error) return notify(error.message);
-    notify("Quote connected to the selected farmer. Only the farmer can accept the sale."); refresh();
+    notify("Quote connected to a farmer with enough verified stock in this crop. Only that farmer can accept the sale."); refresh();
+  };
+  const eligibleFarmers = (request) => farmers.filter((farmer) => Number(farmer.stock[request.crop] || 0) > 0);
+  const toggleClusterFarmer = (requestId, farmerId) => setClusterSelections((current) => {
+    const selected = current[requestId] || [];
+    return { ...current, [requestId]: selected.includes(farmerId) ? selected.filter((id) => id !== farmerId) : [...selected, farmerId] };
+  });
+  const assignCluster = async (request) => {
+    const selectedIds = clusterSelections[request.id] || [];
+    const selected = eligibleFarmers(request).filter((farmer) => selectedIds.includes(farmer.id));
+    if (selected.length < 2) return notify("Select at least two farmers with this crop to create a cluster.");
+    let remaining = Number(request.quantity_kg);
+    const allocations = selected.map((farmer) => {
+      const allocated = Math.min(Number(farmer.stock[request.crop] || 0), remaining);
+      remaining -= allocated;
+      return { farmer_id: farmer.id, allocated_quantity_kg: allocated };
+    }).filter((item) => item.allocated_quantity_kg > 0);
+    if (remaining > 0) return notify(`Selected farmers can supply only ${Number(request.quantity_kg) - remaining} kg; choose more farmers for this ${request.quantity_kg} kg request.`);
+    const { error } = await supabase.rpc("assign_bulk_request_cluster", { p_request_id: request.id, p_allocations: allocations });
+    if (error) return notify(error.message);
+    notify(`Cluster created from ${allocations.length} eligible farmers. The lead farmer can now negotiate the MSP-protected quote.`);
+    refresh();
   };
   const addRoute = async (event) => {
     event.preventDefault();
@@ -3720,7 +3750,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
       <QueuePanel title="Logistics scheduling" empty="No logistics jobs awaiting action." items={logisticsJobs.slice(0, 8)} render={(item) => <><b>{item.source_type.replaceAll("_", " ")}</b><small>{item.details} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={item.status === "scheduled"} onClick={() => update("logistics_jobs", item.id, "scheduled", "Logistics job scheduled across live dashboards.")}>{item.status === "scheduled" ? "Scheduled ✓" : "Schedule job"}</button>}/>
     </div>}
     {tab === "listings" && <div className="admin-work-panel"><h3>Farmer listing scheduling</h3><p>Inspect the farmer photo, select an intake warehouse, then schedule it. Marketplace publication happens only after warehouse photo capture and grade confirmation.</p>{listings.length ? listings.map((item) => <article className="listing-review" key={item.id}><img src={item.image_url} alt={`${item.crop} submitted by farmer`}/><div><b>{item.crop} · {item.quantity_kg} kg · ₹{item.price_per_kg}/kg</b><small>{item.profiles?.full_name || "Farmer"} · {item.category}</small><p>{item.description}</p><select value={listingWarehouses[item.id] || warehouses[0]?.id || ""} onChange={(event) => setListingWarehouses({ ...listingWarehouses, [item.id]: event.target.value })}><option value="">Choose intake warehouse</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name} · {warehouse.address}</option>)}</select><button className="primary" onClick={() => scheduleListing(item)}>Schedule warehouse intake</button> <button className="secondary" onClick={() => reviewListing(item.id, "rejected")}>Reject</button></div></article>) : <p className="empty-state">No farmer listings are awaiting scheduling.</p>}</div>}
-    {tab === "wholesale" && <div className="admin-work-panel"><h3>Connect verified wholesale requests to farmers</h3><p>The MSP-protected offer is sent to the chosen farmer, who can accept, decline, or counter it.</p>{bulkRequests.length ? bulkRequests.filter((request) => !["confirmed","declined"].includes(request.status)).map((request) => <div className="assignment-row" key={request.id}><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · MSP floor ₹{Number(request.msp_per_kg || 0).toFixed(2)}/kg · {request.status}</small></div><select value={assignments[request.id] || request.farmer_id || ""} onChange={(event) => setAssignments({ ...assignments, [request.id]: event.target.value })}><option value="">Choose farmer</option>{farmers.map((farmer) => <option key={farmer.id} value={farmer.id}>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""}</option>)}</select><button className="primary" onClick={() => assignFarmer(request)}>Connect quote</button></div>) : <p className="empty-state">No wholesale requests are awaiting review.</p>}</div>}
+    {tab === "wholesale" && <div className="admin-work-panel"><h3>Connect wholesale requests to crop-matched farmers</h3><p>Only farmers with live, verified stock of the requested crop can receive a quote. If no one farmer can fulfil it, create a capacity-checked farmer cluster.</p>{bulkRequests.length ? bulkRequests.filter((request) => !["confirmed","declined"].includes(request.status)).map((request) => { const eligible = eligibleFarmers(request); const selected = clusterSelections[request.id] || []; const clusterCapacity = eligible.filter((farmer) => selected.includes(farmer.id)).reduce((sum, farmer) => sum + Number(farmer.stock[request.crop] || 0), 0); return <div className="quote-assignment" key={request.id}><div className="assignment-row"><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · MSP floor ₹{Number(request.msp_per_kg || 0).toFixed(2)}/kg · {request.status}</small><small>{eligible.length} crop-matched farmer(s) · {eligible.reduce((sum, farmer) => sum + Number(farmer.stock[request.crop] || 0), 0)} kg live capacity</small></div><select value={assignments[request.id] || request.farmer_id || ""} onChange={(event) => setAssignments({ ...assignments, [request.id]: event.target.value })}><option value="">Choose an eligible farmer</option>{eligible.filter((farmer) => Number(farmer.stock[request.crop] || 0) >= Number(request.quantity_kg)).map((farmer) => <option key={farmer.id} value={farmer.id}>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""} · {farmer.stock[request.crop]} kg</option>)}</select><button className="primary" disabled={!eligible.some((farmer) => Number(farmer.stock[request.crop] || 0) >= Number(request.quantity_kg))} onClick={() => assignFarmer(request)}>Assign single farmer</button></div><div className="cluster-picker"><b>Or create a farmer cluster</b><small>Select contributors with {request.crop}; capacity is allocated automatically up to the buyer requirement.</small>{eligible.map((farmer) => <label key={farmer.id}><input type="checkbox" checked={selected.includes(farmer.id)} onChange={() => toggleClusterFarmer(request.id, farmer.id)}/><span>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""}</span><strong>{farmer.stock[request.crop]} kg available</strong></label>)}{eligible.length ? <div><span>Selected capacity: <b>{clusterCapacity} / {request.quantity_kg} kg</b></span><button className="secondary" disabled={selected.length < 2 || clusterCapacity < Number(request.quantity_kg)} onClick={() => assignCluster(request)}>Create cluster & assign quote</button></div> : <p className="empty-state">No farmer currently has published live stock of {request.crop}.</p>}</div></div>; }) : <p className="empty-state">No wholesale requests are awaiting review.</p>}</div>}
     {tab === "warehouses" && <div className="admin-work-panel"><h3>Warehouse inspection menu</h3><p>Open a warehouse to handle intake, consumer pickups, and its associated live queue.</p>{warehouses.map((warehouse) => <div className="contract-row" key={warehouse.id || warehouse.name}><div><b>{warehouse.name}</b><small>{warehouse.address}</small></div><span>{orders.filter((order) => order.pickupWarehouse === warehouse.name).length} pickup order(s)</span><button className="primary" onClick={() => setView("warehouse")}>Inspect</button></div>)}</div>}
     {tab === "routes" && <div className="admin-work-panel"><h3>Farm-to-warehouse route mapping</h3><p>Map collection → intake warehouse → inter-warehouse transfer → pickup fulfilment.</p><LiveRoutePlanner notify={notify} initialOrigin={warehouses[0]?.address || ""} initialDestination={warehouses[1]?.address || warehouses[0]?.address || ""}/><form className="route-form" onSubmit={addRoute}><select value={route.origin} onChange={(event) => setRoute({ ...route, origin: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><span>→</span><select value={route.destination} onChange={(event) => setRoute({ ...route, destination: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><button className="primary" type="submit">Save transfer route</button></form><button className="secondary" onClick={() => setView("warehouse")}>Open warehouse operations</button></div>}
     </section>
