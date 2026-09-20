@@ -35,7 +35,7 @@ values (
   true,
   'Government of India — Press Information Bureau / CACP notifications',
   'https://www.pib.gov.in/',
-  'Seasonal official notification; source checked daily',
+  'Seasonal official notification',
   now(),
   'MSP applies only where the Government has issued a current crop and season notification. Daily mandi prices are separate market data.'
 )
