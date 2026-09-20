@@ -4,6 +4,7 @@ alter table public.bulk_requests add column if not exists listing_id uuid refere
 alter table public.bulk_requests add column if not exists msp_per_kg numeric not null default 0 check (msp_per_kg >= 0);
 alter table public.bulk_requests add column if not exists agreed_price_per_kg numeric check (agreed_price_per_kg >= 0);
 alter table public.bulk_requests drop constraint if exists bulk_requests_quantity_kg_check;
+alter table public.bulk_requests drop constraint if exists bulk_requests_min_quantity;
 alter table public.bulk_requests add constraint bulk_requests_min_quantity check (quantity_kg >= 250) not valid;
 alter table public.bulk_requests drop constraint if exists bulk_requests_status_check;
 alter table public.bulk_requests add constraint bulk_requests_status_check check (status in ('pending', 'verified', 'quoted', 'rejected', 'negotiation', 'countered', 'confirmed', 'declined'));
@@ -72,6 +73,13 @@ alter table public.msp_rates enable row level security;
 alter table public.bulk_quotes enable row level security;
 drop policy if exists "buyers and admins read bulk requests" on public.bulk_requests;
 drop policy if exists "admins verify bulk requests" on public.bulk_requests;
+drop policy if exists "participants and admins read bulk requests" on public.bulk_requests;
+drop policy if exists "admins manage bulk requests" on public.bulk_requests;
+drop policy if exists "buyers create bulk requests" on public.bulk_requests;
+drop policy if exists "participants read bulk quotes" on public.bulk_quotes;
+drop policy if exists "participants create bulk quotes" on public.bulk_quotes;
+drop policy if exists "admins manage bulk quotes" on public.bulk_quotes;
+drop policy if exists "authenticated users read msp rates" on public.msp_rates;
 create policy "participants and admins read bulk requests" on public.bulk_requests for select using (buyer_id=auth.uid() or farmer_id=auth.uid() or public.is_admin());
 create policy "admins manage bulk requests" on public.bulk_requests for update using (public.is_admin()) with check (public.is_admin());
 create policy "buyers create bulk requests" on public.bulk_requests for insert with check (buyer_id=auth.uid());
@@ -102,4 +110,14 @@ begin
 end; $$;
 grant execute on function public.respond_to_bulk_quote(uuid,uuid,text) to authenticated;
 
-alter publication supabase_realtime add table public.bulk_quotes;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_rel relation
+    join pg_publication publication on publication.oid = relation.prpubid
+    where publication.pubname = 'supabase_realtime'
+      and relation.prrelid = 'public.bulk_quotes'::regclass
+  ) then
+    alter publication supabase_realtime add table public.bulk_quotes;
+  end if;
+end $$;

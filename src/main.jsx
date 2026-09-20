@@ -33,6 +33,7 @@ import "./auth.css";
 import "./workflows.css";
 import "./checkout.css";
 import "./crop-images.css";
+import "./intake-pipeline.css";
 import { isSupabaseConfigured, supabase } from "./supabase";
 
 const initialLots = [];
@@ -623,7 +624,7 @@ function App() {
     if (!isSupabaseConfigured || !session?.userId) return;
     supabase
       .from("farmer_listings")
-      .select("id,crop,category,description,quantity_kg,price_per_kg,image_url")
+      .select("id,crop,category,description,quantity_kg,price_per_kg,image_url,warehouse_image_url,warehouse_grade,grading_confidence,warehouses(name)")
       .eq("status", "published")
       .then(({ data }) => {
         if (data)
@@ -635,15 +636,17 @@ function App() {
               listingId: listing.id,
               crop: listing.crop,
               hi: listing.crop,
-              grade: "Farmer listed",
+              grade: listing.warehouse_grade || "Intake verified",
               qty: Number(listing.quantity_kg),
               price: Number(listing.price_per_kg),
               old: 0,
-              warehouse: "Direct farmer listing",
+              warehouse: listing.warehouses?.name || "Verified warehouse intake",
               farmer: "Verified farmer",
               dist: "Direct",
               trend: 0,
               imageUrl: listing.image_url,
+              warehouseImageUrl: listing.warehouse_image_url,
+              gradingConfidence: listing.grading_confidence,
               description: listing.description,
               category: listing.category,
             })),
@@ -779,9 +782,9 @@ function App() {
     setTimeout(() => setToast(""), 3000);
   };
   const reserve = (lot) => {
-    if (lot.listing) {
+    if (lot.listing && !lot.warehouseImageUrl) {
       notify(
-        "This farmer photo listing is visible now; warehouse intake will enable checkout after stock verification.",
+        "This farmer photo listing is awaiting warehouse intake. Checkout opens once a live grading photo confirms the stock.",
       );
       return;
     }
@@ -843,7 +846,7 @@ function App() {
   useEffect(() => {
     const expired = orders.filter(
       (order) =>
-        order.status === "Pending verification" &&
+        String(order.status).toLowerCase() === "pending verification" &&
         order.cancellationDeadline &&
         now >= order.cancellationDeadline,
     );
@@ -963,7 +966,7 @@ function App() {
     const order = orders.find((item) => item.id === id);
     if (
       !order ||
-      order.status !== "Pending verification" ||
+      String(order.status).toLowerCase() !== "pending verification" ||
       now >= order.cancellationDeadline
     ) {
       notify("This cancellation window has closed.");
@@ -1158,6 +1161,7 @@ function App() {
             setOrderStatus={setOrderStatus}
             warehouses={warehouses}
             setWarehouses={setWarehouses}
+            liveTick={liveTick}
             setLiveTick={setLiveTick}
             notify={notify}
           />
@@ -1684,14 +1688,15 @@ function ProductDetail({
         </div>
       </div>
       <div className="detail-sections">
-        <article>
-          <h3>Quality report</h3>
-          <p>
-            Visual defects: low · Size uniformity: high · Maturity: optimal.
-            This AI-assisted report is reviewed by the intake operator before
-            listing.
-          </p>
-        </article>
+          <article>
+            <h3>Quality report</h3>
+            <p>
+              Visual defects: low · Size uniformity: high · Maturity: optimal.
+              This AI-assisted report is reviewed by the intake operator before
+              listing.
+            </p>
+            {lot.warehouseImageUrl && <><img className="intake-proof-photo" src={lot.warehouseImageUrl} alt={`${lot.crop} photographed during warehouse grading`} /><small>Live warehouse intake photo · Grade {lot.grade}{lot.gradingConfidence ? ` · ${lot.gradingConfidence}% AI confidence` : ""}</small></>}
+          </article>
         <article>
           <h3>Farmer profile</h3>
           <p>
@@ -1759,7 +1764,7 @@ function ConsumerHub({
           {orders.length ? (
             orders.map((order) => {
               const canCancel =
-                order.status === "Pending verification" &&
+                String(order.status).toLowerCase() === "pending verification" &&
                 order.cancellationDeadline &&
                 now < order.cancellationDeadline;
               return (
@@ -2150,6 +2155,7 @@ function WarehouseView({
   setOrderStatus,
   warehouses,
   setWarehouses,
+  liveTick,
   setLiveTick,
   notify,
 }) {
@@ -2158,8 +2164,18 @@ function WarehouseView({
     weight: "350",
     grade: "A",
     warehouse: warehouses[0]?.name || "Jaipur North",
+    listingId: "",
   });
   const [newWarehouse, setNewWarehouse] = useState({ name: "", address: "" });
+  const [scheduledListings, setScheduledListings] = useState([]);
+  const [warehousePhoto, setWarehousePhoto] = useState(null);
+  const [warehousePreview, setWarehousePreview] = useState("");
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    supabase.from("farmer_listings").select("id,crop,category,description,quantity_kg,price_per_kg,image_url,intake_warehouse_id,warehouses(name),profiles(full_name)").eq("status", "scheduled").order("scheduled_at", { ascending: true }).then(({ data, error }) => {
+      if (error) notify(error.message); else setScheduledListings(data || []);
+    });
+  }, [liveTick]);
   const submit = async (e) => {
     e.preventDefault();
     let id = `FL-${24094 + lots.length}`;
@@ -2224,6 +2240,23 @@ function WarehouseView({
     );
     notify(`${request.crop} intake marked received.`);
   };
+  const confirmScheduledIntake = async () => {
+    const listing = scheduledListings.find((item) => item.id === form.listingId);
+    if (!listing) return notify("Select a scheduled farmer listing.");
+    if (!warehousePhoto) return notify("Capture or upload the live warehouse grading photo first.");
+    try {
+      const extension = (warehousePhoto.name.split(".").pop() || "jpg").replace(/[^a-z0-9]/gi, "");
+      const path = `${session.userId}/warehouse-intake/${listing.id}-${crypto.randomUUID()}.${extension}`;
+      const { error: uploadError } = await supabase.storage.from("produce-photos").upload(path, warehousePhoto, { contentType: warehousePhoto.type, upsert: false });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("produce-photos").getPublicUrl(path);
+      const { error } = await supabase.from("farmer_listings").update({ status: "published", warehouse_image_url: urlData.publicUrl, warehouse_grade: form.grade, grading_confidence: 91, intake_confirmed_at: new Date().toISOString(), reviewed_at: new Date().toISOString() }).eq("id", listing.id);
+      if (error) throw error;
+      setScheduledListings((current) => current.filter((item) => item.id !== listing.id));
+      setForm({ ...form, listingId: "", grade: "A" }); setWarehousePhoto(null); setWarehousePreview(""); setLiveTick((tick) => tick + 1);
+      notify(`${listing.crop} intake confirmed. The farmer photo and warehouse AI-grade photo are now live in the marketplace.`);
+    } catch (error) { notify(error.message || "Warehouse intake confirmation failed."); }
+  };
   return (
     <section className="page warehouse-page">
       <div className="page-top">
@@ -2240,6 +2273,26 @@ function WarehouseView({
         </div>
       </div>
       <div className="warehouse-grid">
+        <div className="intake">
+          <p className="eyebrow green">SCHEDULED FARMER LISTINGS</p>
+          <h3>Confirm live warehouse intake</h3>
+          <label>Listing scheduled by admin
+            <select value={form.listingId} onChange={(event) => {
+              const listing = scheduledListings.find((item) => item.id === event.target.value);
+              setForm({ ...form, listingId: event.target.value, crop: listing?.crop || form.crop, weight: listing?.quantity_kg || form.weight, warehouse: listing?.warehouses?.name || form.warehouse });
+            }}>
+              <option value="">Choose scheduled listing</option>
+              {scheduledListings.map((listing) => <option key={listing.id} value={listing.id}>{cropEmoji(listing.crop, listing.category)} {listing.crop} · {listing.quantity_kg} kg · {listing.warehouses?.name || "Warehouse"}</option>)}
+            </select>
+          </label>
+          {form.listingId && <img className="intake-photo-preview" src={scheduledListings.find((item) => item.id === form.listingId)?.image_url} alt="Farmer submitted produce" />}
+          <label>Live warehouse photo for AI grading
+            <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(event) => { const file = event.target.files?.[0] || null; setWarehousePhoto(file); setWarehousePreview(file ? URL.createObjectURL(file) : ""); }} />
+          </label>
+          {warehousePreview && <img className="intake-photo-preview" src={warehousePreview} alt="Warehouse grading capture preview" />}
+          <label>Confirmed grade<select value={form.grade} onChange={(event) => setForm({ ...form, grade: event.target.value })}><option>A</option><option>B</option><option>C</option></select></label>
+          <button className="primary" type="button" onClick={confirmScheduledIntake}><BrainCircuit size={18}/>Confirm AI grade & publish</button>
+        </div>
         <form className="intake" onSubmit={submit}>
           <h3>Confirm produce intake</h3>
           <label>
@@ -3574,6 +3627,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
   const [listings, setListings] = useState([]);
   const [farmers, setFarmers] = useState([]);
   const [assignments, setAssignments] = useState({});
+  const [listingWarehouses, setListingWarehouses] = useState({});
   const [route, setRoute] = useState({ origin: warehouses[0]?.name || "", destination: warehouses[1]?.name || "" });
   const refresh = () => setLiveTick((tick) => tick + 1);
   useEffect(() => {
@@ -3597,6 +3651,17 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
     const { error } = await supabase.from("farmer_listings").update({ status, reviewed_at: new Date().toISOString() }).eq("id", id);
     if (error) return notify(error.message);
     notify(status === "published" ? "Listing verified and published with the farmer photo." : "Listing rejected; the farmer can correct it and resubmit."); refresh();
+  };
+  const scheduleListing = async (listing) => {
+    const warehouseId = listingWarehouses[listing.id] || warehouses[0]?.id;
+    const warehouse = warehouses.find((item) => item.id === warehouseId);
+    if (!warehouseId || !warehouse) return notify("Choose a warehouse before scheduling this listing.");
+    const { error } = await supabase.from("farmer_listings").update({ status: "scheduled", intake_warehouse_id: warehouseId, scheduled_at: new Date().toISOString() }).eq("id", listing.id);
+    if (error) return notify(error.message);
+    const { error: jobError } = await supabase.from("logistics_jobs").insert({ requested_by: session.userId, source_type: "farmer_listing_intake", source_id: listing.id, details: `${listing.crop} · ${listing.quantity_kg} kg → ${warehouse.name}` });
+    if (jobError) notify(`Listing scheduled, but logistics job needs review: ${jobError.message}`);
+    else notify(`Listing scheduled to ${warehouse.name}. It is now visible in warehouse intake.`);
+    refresh();
   };
   const assignFarmer = async (request) => {
     const farmerId = assignments[request.id] || request.farmer_id;
@@ -3622,7 +3687,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
       <QueuePanel title="Newest consumer orders" empty="No pending consumer orders." items={orders.slice(0, 8)} render={(item) => <><b>{item.id} · {item.quantity} kg</b><small>{item.pickupWarehouse} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["verified","ready for pickup"].includes(String(item.status).toLowerCase())} onClick={() => update("consumer_orders", item.dbId, "verified", "Consumer order verified across admin and warehouse queues.")}>{["verified","ready for pickup"].includes(String(item.status).toLowerCase()) ? "Verified" : "Verify order"}</button>}/>
       <QueuePanel title="Logistics scheduling" empty="No logistics jobs awaiting action." items={logisticsJobs.slice(0, 8)} render={(item) => <><b>{item.source_type.replaceAll("_", " ")}</b><small>{item.details} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={item.status === "scheduled"} onClick={() => update("logistics_jobs", item.id, "scheduled", "Logistics job scheduled across live dashboards.")}>{item.status === "scheduled" ? "Scheduled ✓" : "Schedule job"}</button>}/>
     </div>}
-    {tab === "listings" && <div className="admin-work-panel"><h3>Farmer photo listing verification</h3><p>Only approved images and produce data become visible in the consumer marketplace.</p>{listings.length ? listings.map((item) => <article className="listing-review" key={item.id}><img src={item.image_url} alt={`${item.crop} submitted listing`}/><div><b>{item.crop} · {item.quantity_kg} kg · ₹{item.price_per_kg}/kg</b><small>{item.profiles?.full_name || "Farmer"} · {item.category}</small><p>{item.description}</p><button className="primary" onClick={() => reviewListing(item.id, "published")}>Verify & publish</button> <button className="secondary" onClick={() => reviewListing(item.id, "rejected")}>Reject</button></div></article>) : <p className="empty-state">No photo listings are awaiting review.</p>}</div>}
+    {tab === "listings" && <div className="admin-work-panel"><h3>Farmer listing scheduling</h3><p>Inspect the farmer photo, select an intake warehouse, then schedule it. Marketplace publication happens only after warehouse photo capture and grade confirmation.</p>{listings.length ? listings.map((item) => <article className="listing-review" key={item.id}><img src={item.image_url} alt={`${item.crop} submitted by farmer`}/><div><b>{item.crop} · {item.quantity_kg} kg · ₹{item.price_per_kg}/kg</b><small>{item.profiles?.full_name || "Farmer"} · {item.category}</small><p>{item.description}</p><select value={listingWarehouses[item.id] || warehouses[0]?.id || ""} onChange={(event) => setListingWarehouses({ ...listingWarehouses, [item.id]: event.target.value })}><option value="">Choose intake warehouse</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name} · {warehouse.address}</option>)}</select><button className="primary" onClick={() => scheduleListing(item)}>Schedule warehouse intake</button> <button className="secondary" onClick={() => reviewListing(item.id, "rejected")}>Reject</button></div></article>) : <p className="empty-state">No farmer listings are awaiting scheduling.</p>}</div>}
     {tab === "wholesale" && <div className="admin-work-panel"><h3>Connect verified wholesale requests to farmers</h3><p>The MSP-protected offer is sent to the chosen farmer, who can accept, decline, or counter it.</p>{bulkRequests.length ? bulkRequests.filter((request) => !["confirmed","declined"].includes(request.status)).map((request) => <div className="assignment-row" key={request.id}><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · MSP floor ₹{Number(request.msp_per_kg || 0).toFixed(2)}/kg · {request.status}</small></div><select value={assignments[request.id] || request.farmer_id || ""} onChange={(event) => setAssignments({ ...assignments, [request.id]: event.target.value })}><option value="">Choose farmer</option>{farmers.map((farmer) => <option key={farmer.id} value={farmer.id}>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""}</option>)}</select><button className="primary" onClick={() => assignFarmer(request)}>Connect quote</button></div>) : <p className="empty-state">No wholesale requests are awaiting review.</p>}</div>}
     {tab === "warehouses" && <div className="admin-work-panel"><h3>Warehouse inspection menu</h3><p>Open a warehouse to handle intake, consumer pickups, and its associated live queue.</p>{warehouses.map((warehouse) => <div className="contract-row" key={warehouse.id || warehouse.name}><div><b>{warehouse.name}</b><small>{warehouse.address}</small></div><span>{orders.filter((order) => order.pickupWarehouse === warehouse.name).length} pickup order(s)</span><button className="primary" onClick={() => setView("warehouse")}>Inspect</button></div>)}</div>}
     {tab === "routes" && <div className="admin-work-panel"><h3>Farm-to-warehouse route mapping</h3><p>Map collection → intake warehouse → inter-warehouse transfer → pickup fulfilment.</p><form className="route-form" onSubmit={addRoute}><select value={route.origin} onChange={(event) => setRoute({ ...route, origin: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><span>→</span><select value={route.destination} onChange={(event) => setRoute({ ...route, destination: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><button className="primary" type="submit">Add transfer route</button></form><button className="secondary" onClick={() => setView("warehouse")}>Open warehouse operations</button></div>}
