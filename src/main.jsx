@@ -571,6 +571,7 @@ function App() {
     [session, setSession] = useState(null),
     [produceRequests, setProduceRequests] = useState([]),
     [orders, setOrders] = useState([]),
+    [notifications, setNotifications] = useState([]),
     [bulkRequests, setBulkRequests] = useState([]),
     [logisticsJobs, setLogisticsJobs] = useState([]),
     [warehouses, setWarehouses] = useState([
@@ -755,6 +756,12 @@ function App() {
     return () => { active = false; window.clearInterval(refreshTimer); };
   }, [session?.role, session?.userId, liveTick]);
   useEffect(() => {
+    if (!isSupabaseConfigured || session?.role !== "consumer" || !session?.userId) return;
+    supabase.from("consumer_notifications").select("id,title,body,created_at,read_at").eq("consumer_id", session.userId).order("created_at", { ascending: false }).limit(8).then(({ data, error }) => {
+      if (!error) setNotifications(data || []);
+    });
+  }, [session?.role, session?.userId, liveTick]);
+  useEffect(() => {
     if (!isSupabaseConfigured || !session?.userId) return;
     const admin = session.role === "admin";
     const bulkQuery = admin
@@ -774,6 +781,7 @@ function App() {
       .channel("farmlink-live-operations")
       .on("postgres_changes", { event: "*", schema: "public", table: "produce_requests" }, () => setLiveTick((tick) => tick + 1))
       .on("postgres_changes", { event: "*", schema: "public", table: "consumer_orders" }, () => setLiveTick((tick) => tick + 1))
+      .on("postgres_changes", { event: "*", schema: "public", table: "consumer_notifications" }, () => setLiveTick((tick) => tick + 1))
       .on("postgres_changes", { event: "*", schema: "public", table: "bulk_requests" }, () => setLiveTick((tick) => tick + 1))
       .on("postgres_changes", { event: "*", schema: "public", table: "logistics_jobs" }, () => setLiveTick((tick) => tick + 1))
       .on("postgres_changes", { event: "*", schema: "public", table: "farmer_listings" }, () => setLiveTick((tick) => tick + 1))
@@ -993,6 +1001,18 @@ function App() {
     notify("Order confirmed. The cancellation window has been closed and warehouse fulfillment can begin.");
     return true;
   };
+  const confirmOrderCollection = async (id) => {
+    const order = orders.find((item) => item.id === id);
+    if (!order || String(order.status).toLowerCase() !== "ready for pickup") return false;
+    if (isSupabaseConfigured && order.dbId) {
+      const { error } = await supabase.rpc("confirm_consumer_order_collection", { p_order_id: order.dbId });
+      if (error) { notify(error.message); return false; }
+    }
+    setOrders((current) => current.map((item) => item.id === id ? { ...item, status: "Completed" } : item));
+    setLiveTick((tick) => tick + 1);
+    notify("Collection confirmed. The warehouse and admin teams have been updated.");
+    return true;
+  };
   const orderAgain = (id) => {
     const order = orders.find((item) => item.id === id);
     if (!order?.lineItems?.length) {
@@ -1157,6 +1177,8 @@ function App() {
             now={now}
             cancelOrder={cancelOrder}
             confirmOrderNow={confirmOrderNow}
+            confirmOrderCollection={confirmOrderCollection}
+            notifications={notifications}
             orderAgain={orderAgain}
             setView={setView}
             notify={notify}
@@ -1764,13 +1786,16 @@ function ConsumerHub({
   now,
   cancelOrder,
   confirmOrderNow,
+  confirmOrderCollection,
+  notifications,
   orderAgain,
   setView,
   notify,
 }) {
   const [tab, setTab] = useState("orders"),
     [review, setReview] = useState(""),
-    [confirmingOrder, setConfirmingOrder] = useState(null);
+    [confirmingOrder, setConfirmingOrder] = useState(null),
+    [collectingOrder, setCollectingOrder] = useState(null);
   const countdown = (deadline) => {
     const seconds = Math.max(0, Math.ceil((deadline - now) / 1000));
     return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
@@ -1804,6 +1829,7 @@ function ConsumerHub({
       {tab === "orders" && (
         <div className="account-panel">
           <h3>Order tracking</h3>
+          {notifications.filter((item) => !item.read_at).map((item) => <div className="published-note" key={item.id}><PackageCheck size={18}/><span><b>{item.title}</b>{item.body}</span></div>)}
           {orders.length ? (
             orders.map((order) => {
               const canCancel =
@@ -1843,6 +1869,7 @@ function ConsumerHub({
                           Order again
                         </button>
                       )}
+                      {order.status === "Ready For Pickup" && <button className="primary" onClick={() => setCollectingOrder(order)}>Confirm collection</button>}
                     </>
                   )}
                 </div>
@@ -1929,6 +1956,7 @@ function ConsumerHub({
         </div>
       )}
       {confirmingOrder && <div className="confirm-order-back" role="dialog" aria-modal="true" aria-labelledby="confirm-order-title"><div className="confirm-order-card"><p className="eyebrow green">CONFIRM ORDER NOW</p><h2 id="confirm-order-title">Skip the cancellation window?</h2><p>You are confirming <b>{confirmingOrder.id}</b> for pickup at <b>{confirmingOrder.pickupWarehouse}</b>. Once confirmed, this order cannot be cancelled from your account and fulfillment can begin immediately.</p><div><button className="secondary" onClick={() => setConfirmingOrder(null)}>Keep cancellation window</button><button className="primary" onClick={async () => { if (await confirmOrderNow(confirmingOrder.id)) setConfirmingOrder(null); }}>Yes, confirm order</button></div></div></div>}
+      {collectingOrder && <div className="confirm-order-back" role="dialog" aria-modal="true" aria-labelledby="collect-order-title"><div className="confirm-order-card"><p className="eyebrow green">PICKUP CONFIRMATION</p><h2 id="collect-order-title">Have you collected this order?</h2><p>Confirm only after receiving <b>{collectingOrder.id}</b> from <b>{collectingOrder.pickupWarehouse}</b>. This records the completed handoff for the warehouse and FarmLink admin team.</p><div><button className="secondary" onClick={() => setCollectingOrder(null)}>Not yet</button><button className="primary" onClick={async () => { if (await confirmOrderCollection(collectingOrder.id)) setCollectingOrder(null); }}>Yes, I collected it</button></div></div></div>}
     </section>
   );
 }
@@ -2408,6 +2436,9 @@ function WarehouseView({
     setForm({ ...form, listingId: "" }); setRejectionReason(""); setRejectingListing(false); setWarehousePhoto(null); setWarehousePreview(""); setLiveTick((tick) => tick + 1);
     notify(`${listing.crop} intake was rejected. The farmer has been notified with the warehouse reason.`);
   };
+  const readyPickupOrders = orders.filter((order) => String(order.status).toLowerCase() === "ready for pickup");
+  const collectedOrders = orders.filter((order) => String(order.status).toLowerCase() === "completed");
+  const collectedValue = collectedOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
   return (
     <section className="page warehouse-page">
       <div className="page-top">
@@ -2426,7 +2457,8 @@ function WarehouseView({
       <section className="warehouse-command">
         <div><small>INTAKE QUEUE</small><b>{scheduledListings.length}</b><span>farmer listings awaiting inspection</span></div>
         <div><small>LIVE INVENTORY</small><b>{lots.reduce((sum, lot) => sum + Number(lot.qty || 0), 0)} kg</b><span>visible verified warehouse stock</span></div>
-        <div><small>PICKUP ORDERS</small><b>{orders.filter((order) => !["Cancelled", "Completed"].includes(order.status)).length}</b><span>active consumer fulfillment tasks</span></div>
+        <div><small>PICKUP ORDERS</small><b>{orders.filter((order) => !["Cancelled", "Completed"].includes(order.status)).length}</b><span>{readyPickupOrders.length} packed and awaiting collection</span></div>
+        <div><small>COLLECTED LIVE</small><b>{collectedOrders.length}</b><span>₹{collectedValue.toFixed(2)} completed pickup value</span></div>
         <div><small>OPERATOR STANDARD</small><b>Photo + grade</b><span>every intake gets a live proof image</span></div>
       </section>
       <div className="warehouse-grid">
@@ -2578,7 +2610,7 @@ function WarehouseView({
                 {o.id} · {o.quantity} kg
               </b>
               <small>
-                {o.pickupWarehouse} · {o.items} lot(s) · {o.status}
+                {o.consumerName || "Consumer"}{o.consumerMobile ? ` · ${o.consumerMobile}` : ""} · {o.pickupWarehouse} · {o.items} lot(s) · {o.status}
               </small>
             </>
           )}
@@ -3969,9 +4001,12 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
     setFloorForm({ ...floorForm, price: "", source: "" }); refresh();
   };
   const pending = produceRequests.filter((item) => !["collection_scheduled", "received"].includes(item.status)).length + orders.filter((item) => !["verified", "ready for pickup"].includes(String(item.status).toLowerCase())).length + logisticsJobs.filter((item) => item.status !== "scheduled").length;
+  const completedOrders = orders.filter((item) => String(item.status).toLowerCase() === "completed");
+  const readyOrders = orders.filter((item) => String(item.status).toLowerCase() === "ready for pickup");
+  const collectedValue = completedOrders.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0);
   return <section className="page admin-page">
     <div className="page-top"><div><p className="eyebrow green">LIVE OPERATIONS COMMAND CENTER</p><h1>FarmLink Admin</h1><p>Verify listings, coordinate collection and warehouse work, connect wholesale buyers, and map the route for every handoff.</p></div><button className="secondary" onClick={logout}><LogOut size={17}/>Sign out</button></div>
-    <div className="metric-grid"><Metric icon={<Users/>} label="Farmer requests" value={String(produceRequests.length)} note={`${pending} item(s) require attention`}/><Metric icon={<ShoppingCart/>} label="Consumer orders" value={String(orders.length)} note="Live pickup fulfilment"/><Metric icon={<Truck/>} label="Logistics jobs" value={String(logisticsJobs.length)} note="Route and schedule tracking"/><Metric icon={<PackageCheck/>} label="Live inventory" value={`${lots.reduce((sum, lot) => sum + lot.qty, 0)} kg`} note="Verified warehouse stock"/></div>
+    <div className="metric-grid"><Metric icon={<Users/>} label="Farmer requests" value={String(produceRequests.length)} note={`${pending} item(s) require attention`}/><Metric icon={<ShoppingCart/>} label="Consumer orders" value={String(orders.length)} note={`${readyOrders.length} packed and awaiting collection`}/><Metric icon={<PackageCheck/>} label="Collections confirmed" value={String(completedOrders.length)} note={`₹${collectedValue.toFixed(2)} completed pickup value`}/><Metric icon={<Truck/>} label="Logistics jobs" value={String(logisticsJobs.length)} note="Route and schedule tracking"/><Metric icon={<PackageCheck/>} label="Live inventory" value={`${lots.reduce((sum, lot) => sum + lot.qty, 0)} kg`} note="Verified warehouse stock"/></div>
     <section className="admin-control"><div className="tabs">{[["action","Action centre"],["listings","Listing approvals"],["wholesale","Wholesale desk"],["warehouses","Warehouse inspector"],["routes","Route map"],["price floors","Price floors"]].map(([key,label]) => <button key={key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>
     {tab === "action" && <div className="admin-grid">
       <QueuePanel title="Newest farmer & cluster requests" empty="No open farmer requests." items={produceRequests.slice(0, 8)} render={(item) => <><b>{item.crop} · {item.grossWeight} kg</b><small>{item.farmer} · {item.cluster} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["collection_scheduled","received"].includes(item.status)} onClick={() => scheduleClusterRequest(item)}>{["collection_scheduled","received"].includes(item.status) ? "Scheduled" : "Verify & schedule"}</button>}/>
