@@ -34,6 +34,7 @@ import "./workflows.css";
 import "./checkout.css";
 import "./crop-images.css";
 import "./intake-pipeline.css";
+import "./route-planner.css";
 import { isSupabaseConfigured, supabase } from "./supabase";
 
 const initialLots = [];
@@ -2045,7 +2046,7 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
               </button>
             </div>
           ) : (
-            <div><p className="empty-state">Choose a produce listing from Discover to start an RFQ.</p>{myQuotes.map((item) => <div className="tracking" key={item.id}><b>{item.crop} · {item.quantity_kg} kg</b><span>Your offer: {item.bulk_quotes?.find((entry) => entry.proposed_by === "buyer") ? `₹${item.bulk_quotes.find((entry) => entry.proposed_by === "buyer").offered_price_per_kg}/kg` : "pending"}</span><strong>{item.status}</strong></div>)}</div>
+            <div><p className="empty-state">Choose a produce listing from Discover to start an RFQ.</p>{myQuotes.map((item) => { const buyerOffer = item.bulk_quotes?.filter((entry) => entry.proposed_by === "buyer").at(-1); const farmerCounter = item.bulk_quotes?.filter((entry) => entry.proposed_by === "farmer" && entry.status === "proposed").at(-1); return <div className="tracking" key={item.id}><b>{item.crop} · {item.quantity_kg} kg</b><span>Your offer: {buyerOffer ? `₹${buyerOffer.offered_price_per_kg}/kg` : "pending"}{farmerCounter ? ` · Farmer counter: ₹${farmerCounter.offered_price_per_kg}/kg` : ""}</span><strong>{item.status}</strong></div>; })}</div>
           )}
         </div>
       )}
@@ -2681,6 +2682,7 @@ function FarmerOperations({ notify, session, liveTick }) {
     [saving, setSaving] = useState(false),
     [published, setPublished] = useState(null),
     [quotes, setQuotes] = useState([]),
+    [counterOffers, setCounterOffers] = useState({}),
     [farmerListings, setFarmerListings] = useState([]),
     [farmerOrders, setFarmerOrders] = useState([]),
     [farmerJobs, setFarmerJobs] = useState([]),
@@ -2713,6 +2715,28 @@ function FarmerOperations({ notify, session, liveTick }) {
     if (error) return notify(error.message);
     notify(action === "accept" ? "Sale confirmed. Buyer and warehouse workflow have been updated." : "Offer declined. The buyer has been notified.");
     setQuotes((current) => current.map((item) => item.id === request.id ? { ...item, status: action === "accept" ? "confirmed" : "declined" } : item));
+  };
+  const sendCounterOffer = async (request) => {
+    const offeredPrice = Number(counterOffers[request.id]);
+    const mspFloor = Number(request.msp_per_kg || 0);
+    if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
+      return notify("Enter a valid counter-offer price per kg.");
+    }
+    if (offeredPrice < mspFloor) {
+      return notify(`A counter-offer cannot be below the MSP floor of ₹${mspFloor.toFixed(2)}/kg.`);
+    }
+    const { data, error } = await supabase
+      .from("bulk_quotes")
+      .insert({ request_id: request.id, offered_price_per_kg: offeredPrice, proposed_by: "farmer", status: "proposed" })
+      .select("id,offered_price_per_kg,proposed_by,status")
+      .single();
+    if (error) return notify(error.message);
+    setQuotes((current) => current.map((item) => item.id === request.id ? {
+      ...item,
+      bulk_quotes: [...(item.bulk_quotes || []), data],
+    } : item));
+    setCounterOffers((current) => ({ ...current, [request.id]: "" }));
+    notify("Your counter-offer has been sent to the wholesale buyer. You remain in control of the final sale.");
   };
   const matches = useMemo(
     () =>
@@ -2911,6 +2935,7 @@ function FarmerOperations({ notify, session, liveTick }) {
         <div className="account-panel">
           <h3>Live logistics schedule</h3>
           {farmerJobs.length ? farmerJobs.map((job) => <div className="tracking" key={job.id}><b>{job.source_type.replaceAll("_", " ")}</b><span>{job.details}</span><span>{new Date(job.created_at).toLocaleString()}</span><strong>{job.status.replaceAll("_", " ")}</strong></div>) : <p className="empty-state">Collection and warehouse intake jobs linked to your produce will appear here.</p>}
+          <LiveRoutePlanner notify={notify} />
         </div>
       )}
       {tab === "payments" && (
@@ -2980,7 +3005,8 @@ function FarmerOperations({ notify, session, liveTick }) {
           <p>Every offer is protected by the applicable MSP floor. You alone decide whether a sale is confirmed.</p>
           {quotes.length ? quotes.map((request) => {
             const offer = (request.bulk_quotes || []).filter((item) => item.proposed_by === "buyer" && item.status === "proposed").at(-1);
-            return <div className="contract-row" key={request.id}><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · MSP floor ₹{Number(request.msp_per_kg || 0).toFixed(2)}/kg · {request.status}</small>{offer && <strong>Buyer offer: ₹{Number(offer.offered_price_per_kg).toFixed(2)}/kg</strong>}</div>{offer ? <span><button className="primary" onClick={() => respondToQuote(request, offer, "accept")}>Accept sale</button> <button className="secondary" onClick={() => respondToQuote(request, offer, "reject")}>Decline</button></span> : <span>Waiting for buyer offer</span>}</div>;
+            const counter = (request.bulk_quotes || []).filter((item) => item.proposed_by === "farmer" && item.status === "proposed").at(-1);
+            return <div className="contract-row quote-request" key={request.id}><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · MSP floor ₹{Number(request.msp_per_kg || 0).toFixed(2)}/kg · {request.status}</small>{offer && <strong>Buyer offer: ₹{Number(offer.offered_price_per_kg).toFixed(2)}/kg</strong>}{counter && <strong>Your counter: ₹{Number(counter.offered_price_per_kg).toFixed(2)}/kg</strong>}</div>{offer ? <div className="quote-actions"><label>Counter ₹/kg<input type="number" min={request.msp_per_kg || 0} step="0.01" value={counterOffers[request.id] || ""} onChange={(event) => setCounterOffers({ ...counterOffers, [request.id]: event.target.value })} placeholder={`Min ₹${request.msp_per_kg || 0}`} /></label><button onClick={() => sendCounterOffer(request)}>Send counter</button><button className="primary" onClick={() => respondToQuote(request, offer, "accept")}>Accept sale</button> <button className="secondary" onClick={() => respondToQuote(request, offer, "reject")}>Decline</button></div> : <span>Waiting for buyer offer</span>}</div>;
           }) : <p className="empty-state">No wholesale quote requests have been assigned to you yet.</p>}
         </div>
       )}
@@ -3643,6 +3669,25 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
     else notify(`Listing scheduled to ${warehouse.name}. It is now visible in warehouse intake.`);
     refresh();
   };
+  const scheduleClusterRequest = async (request) => {
+    const { error } = await supabase
+      .from("produce_requests")
+      .update({ status: "collection_scheduled" })
+      .eq("id", request.id);
+    if (error) return notify(error.message);
+    const { error: jobError } = await supabase.from("logistics_jobs").insert({
+      requested_by: session.userId,
+      source_type: "cluster_collection",
+      source_id: request.id,
+      details: `${request.crop} · ${request.grossWeight} kg · ${request.cluster || "Farm cluster"} → collection scheduled`,
+    });
+    if (jobError) {
+      notify(`Collection was verified, but the linked logistics job needs attention: ${jobError.message}`);
+    } else {
+      notify("Cluster collection verified and scheduled. The job is now live in farmer, warehouse and admin dashboards.");
+    }
+    refresh();
+  };
   const assignFarmer = async (request) => {
     const farmerId = assignments[request.id] || request.farmer_id;
     if (!farmerId) return notify("Choose a farmer before connecting this quote.");
@@ -3663,16 +3708,56 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
     <div className="metric-grid"><Metric icon={<Users/>} label="Farmer requests" value={String(produceRequests.length)} note={`${pending} item(s) require attention`}/><Metric icon={<ShoppingCart/>} label="Consumer orders" value={String(orders.length)} note="Live pickup fulfilment"/><Metric icon={<Truck/>} label="Logistics jobs" value={String(logisticsJobs.length)} note="Route and schedule tracking"/><Metric icon={<PackageCheck/>} label="Live inventory" value={`${lots.reduce((sum, lot) => sum + lot.qty, 0)} kg`} note="Verified warehouse stock"/></div>
     <section className="admin-control"><div className="tabs">{[["action","Action centre"],["listings","Listing approvals"],["wholesale","Wholesale desk"],["warehouses","Warehouse inspector"],["routes","Route map"]].map(([key,label]) => <button key={key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>
     {tab === "action" && <div className="admin-grid">
-      <QueuePanel title="Newest farmer & cluster requests" empty="No open farmer requests." items={produceRequests.slice(0, 8)} render={(item) => <><b>{item.crop} · {item.grossWeight} kg</b><small>{item.farmer} · {item.cluster} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["collection_scheduled","received"].includes(item.status)} onClick={() => update("produce_requests", item.id, "collection_scheduled", "Collection request verified and scheduled.")}>{["collection_scheduled","received"].includes(item.status) ? "Scheduled" : "Verify & schedule"}</button>}/>
+      <QueuePanel title="Newest farmer & cluster requests" empty="No open farmer requests." items={produceRequests.slice(0, 8)} render={(item) => <><b>{item.crop} · {item.grossWeight} kg</b><small>{item.farmer} · {item.cluster} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["collection_scheduled","received"].includes(item.status)} onClick={() => scheduleClusterRequest(item)}>{["collection_scheduled","received"].includes(item.status) ? "Scheduled" : "Verify & schedule"}</button>}/>
       <QueuePanel title="Newest consumer orders" empty="No pending consumer orders." items={orders.slice(0, 8)} render={(item) => <><b>{item.id} · {item.quantity} kg</b><small>{item.pickupWarehouse} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["verified","ready for pickup"].includes(String(item.status).toLowerCase())} onClick={async () => { if (await setOrderStatus(item.id, "Verified")) notify("Consumer order verified across admin, consumer and warehouse queues."); }}>{["verified","ready for pickup"].includes(String(item.status).toLowerCase()) ? "Verified" : "Verify order"}</button>}/>
       <QueuePanel title="Logistics scheduling" empty="No logistics jobs awaiting action." items={logisticsJobs.slice(0, 8)} render={(item) => <><b>{item.source_type.replaceAll("_", " ")}</b><small>{item.details} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={item.status === "scheduled"} onClick={() => update("logistics_jobs", item.id, "scheduled", "Logistics job scheduled across live dashboards.")}>{item.status === "scheduled" ? "Scheduled ✓" : "Schedule job"}</button>}/>
     </div>}
     {tab === "listings" && <div className="admin-work-panel"><h3>Farmer listing scheduling</h3><p>Inspect the farmer photo, select an intake warehouse, then schedule it. Marketplace publication happens only after warehouse photo capture and grade confirmation.</p>{listings.length ? listings.map((item) => <article className="listing-review" key={item.id}><img src={item.image_url} alt={`${item.crop} submitted by farmer`}/><div><b>{item.crop} · {item.quantity_kg} kg · ₹{item.price_per_kg}/kg</b><small>{item.profiles?.full_name || "Farmer"} · {item.category}</small><p>{item.description}</p><select value={listingWarehouses[item.id] || warehouses[0]?.id || ""} onChange={(event) => setListingWarehouses({ ...listingWarehouses, [item.id]: event.target.value })}><option value="">Choose intake warehouse</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name} · {warehouse.address}</option>)}</select><button className="primary" onClick={() => scheduleListing(item)}>Schedule warehouse intake</button> <button className="secondary" onClick={() => reviewListing(item.id, "rejected")}>Reject</button></div></article>) : <p className="empty-state">No farmer listings are awaiting scheduling.</p>}</div>}
     {tab === "wholesale" && <div className="admin-work-panel"><h3>Connect verified wholesale requests to farmers</h3><p>The MSP-protected offer is sent to the chosen farmer, who can accept, decline, or counter it.</p>{bulkRequests.length ? bulkRequests.filter((request) => !["confirmed","declined"].includes(request.status)).map((request) => <div className="assignment-row" key={request.id}><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · MSP floor ₹{Number(request.msp_per_kg || 0).toFixed(2)}/kg · {request.status}</small></div><select value={assignments[request.id] || request.farmer_id || ""} onChange={(event) => setAssignments({ ...assignments, [request.id]: event.target.value })}><option value="">Choose farmer</option>{farmers.map((farmer) => <option key={farmer.id} value={farmer.id}>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""}</option>)}</select><button className="primary" onClick={() => assignFarmer(request)}>Connect quote</button></div>) : <p className="empty-state">No wholesale requests are awaiting review.</p>}</div>}
     {tab === "warehouses" && <div className="admin-work-panel"><h3>Warehouse inspection menu</h3><p>Open a warehouse to handle intake, consumer pickups, and its associated live queue.</p>{warehouses.map((warehouse) => <div className="contract-row" key={warehouse.id || warehouse.name}><div><b>{warehouse.name}</b><small>{warehouse.address}</small></div><span>{orders.filter((order) => order.pickupWarehouse === warehouse.name).length} pickup order(s)</span><button className="primary" onClick={() => setView("warehouse")}>Inspect</button></div>)}</div>}
-    {tab === "routes" && <div className="admin-work-panel"><h3>Farm-to-warehouse route mapping</h3><p>Map collection → intake warehouse → inter-warehouse transfer → pickup fulfilment.</p><form className="route-form" onSubmit={addRoute}><select value={route.origin} onChange={(event) => setRoute({ ...route, origin: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><span>→</span><select value={route.destination} onChange={(event) => setRoute({ ...route, destination: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><button className="primary" type="submit">Add transfer route</button></form><button className="secondary" onClick={() => setView("warehouse")}>Open warehouse operations</button></div>}
+    {tab === "routes" && <div className="admin-work-panel"><h3>Farm-to-warehouse route mapping</h3><p>Map collection → intake warehouse → inter-warehouse transfer → pickup fulfilment.</p><LiveRoutePlanner notify={notify} initialOrigin={warehouses[0]?.address || ""} initialDestination={warehouses[1]?.address || warehouses[0]?.address || ""}/><form className="route-form" onSubmit={addRoute}><select value={route.origin} onChange={(event) => setRoute({ ...route, origin: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><span>→</span><select value={route.destination} onChange={(event) => setRoute({ ...route, destination: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><button className="primary" type="submit">Save transfer route</button></form><button className="secondary" onClick={() => setView("warehouse")}>Open warehouse operations</button></div>}
     </section>
   </section>;
+}
+function LiveRoutePlanner({ notify, initialOrigin = "", initialDestination = "" }) {
+  const [origin, setOrigin] = useState(initialOrigin);
+  const [destination, setDestination] = useState(initialDestination);
+  const [route, setRoute] = useState(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => { if (initialOrigin) setOrigin(initialOrigin); }, [initialOrigin]);
+  useEffect(() => { if (initialDestination) setDestination(initialDestination); }, [initialDestination]);
+  const calculateRoute = async (event) => {
+    event.preventDefault();
+    if (!origin.trim() || !destination.trim()) return notify("Enter both pickup and destination locations.");
+    setLoading(true);
+    try {
+      const geocode = async (place) => {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(place)}`);
+        if (!response.ok) throw new Error("Location search is temporarily unavailable.");
+        const result = await response.json();
+        if (!result[0]) throw new Error(`We could not find “${place}”. Try a fuller village, city or warehouse address.`);
+        return result[0];
+      };
+      const [from, to] = await Promise.all([geocode(origin), geocode(destination)]);
+      const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=false`);
+      if (!response.ok) throw new Error("Road-route service is temporarily unavailable.");
+      const result = await response.json();
+      const drivingRoute = result.routes?.[0];
+      if (!drivingRoute) throw new Error("No drivable route was found between these locations.");
+      const mapUrl = `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${from.lat}%2C${from.lon}%3B${to.lat}%2C${to.lon}`;
+      setRoute({
+        distanceKm: (drivingRoute.distance / 1000).toFixed(1),
+        durationMinutes: Math.max(1, Math.round(drivingRoute.duration / 60)),
+        from: from.display_name,
+        to: to.display_name,
+        mapUrl,
+      });
+    } catch (error) {
+      notify(error.message || "Route could not be calculated right now.");
+      setRoute(null);
+    } finally { setLoading(false); }
+  };
+  return <section className="route-planner" aria-label="Live distance and route planner"><div><p className="eyebrow green"><MapPinned size={14}/> LIVE ROAD ROUTE</p><h4>Calculate collection distance</h4><p>Uses OpenStreetMap road data to estimate driving distance and time.</p></div><form onSubmit={calculateRoute}><label>Pickup / farm cluster<input value={origin} onChange={(event) => setOrigin(event.target.value)} placeholder="Village, district or farm address"/></label><label>Warehouse / destination<input value={destination} onChange={(event) => setDestination(event.target.value)} placeholder="Warehouse or delivery address"/></label><button className="primary" type="submit" disabled={loading}>{loading ? "Calculating…" : "Calculate live route"}</button></form>{route && <div className="route-result"><div><small>Driving distance</small><b>{route.distanceKm} km</b></div><div><small>Estimated travel</small><b>{route.durationMinutes} min</b></div><p><MapPin size={15}/><span>{route.from} → {route.to}</span></p><a className="secondary" href={route.mapUrl} target="_blank" rel="noreferrer">Open interactive map <ArrowUpRight size={15}/></a></div>}</section>;
 }
 function Metric({ icon, label, value, note }) {
   return (
