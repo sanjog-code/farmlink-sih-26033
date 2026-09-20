@@ -255,6 +255,14 @@ const cropEmoji = (crop = "", category = "") => {
   if (group.includes("plantation")) return "🌴";
   return "🌱";
 };
+const FLOWER_CROPS = new Set(["Rose", "Marigold", "Jasmine", "Chrysanthemum", "Tuberose", "Gladiolus", "Gerbera", "Carnation"]);
+const freshnessForListing = (grade, harvestDate, category, crop) => {
+  const ageDays = harvestDate ? Math.max(0, Math.floor((Date.now() - new Date(`${harvestDate}T00:00:00`).getTime()) / 86400000)) : 0;
+  const perishable = String(category).toLowerCase().includes("fruit") || String(category).toLowerCase().includes("vegetable") || FLOWER_CROPS.has(crop);
+  const gradeIndex = ["A", "B", "C"].indexOf(String(grade || "").toUpperCase());
+  const adjustedGrade = perishable && gradeIndex >= 0 ? ["A", "B", "C"][Math.min(2, gradeIndex + Math.floor(ageDays / 7))] : grade;
+  return { grade: adjustedGrade || "Intake verified", ageDays, perishable };
+};
 const normalizeIndianPhone = (value) => {
   const digits = String(value || "").replace(/\D/g, "");
   if (digits.length === 10) return "+91" + digits;
@@ -601,6 +609,7 @@ function App() {
       .select(
         "id,lot_code,crop,grade,quantity_kg,price_per_kg,warehouses(name)",
       )
+      .eq("marketplace_visible", true)
       .then(({ data }) => {
         if (data)
           setLots(
@@ -625,23 +634,25 @@ function App() {
     if (!isSupabaseConfigured || !session?.userId) return;
     supabase
       .from("farmer_listings")
-      .select("id,produce_lot_id,crop,category,description,quantity_kg,price_per_kg,image_url,warehouse_image_url,warehouse_grade,grading_confidence,warehouses(name)")
+      .select("id,produce_lot_id,crop,category,description,quantity_kg,price_per_kg,image_url,warehouse_image_url,warehouse_grade,grading_confidence,harvest_date,created_at,warehouses(name)")
       .eq("status", "published")
       .then(({ data }) => {
         if (data)
           setLots((current) => [
-            ...current.filter((lot) => !lot.listing),
-            ...data.map((listing, index) => ({
+            ...current.filter((lot) => !lot.listing && !data.some((listing) => listing.produce_lot_id === lot.dbId)),
+            ...data.map((listing, index) => {
+              const freshness = freshnessForListing(listing.warehouse_grade, listing.harvest_date, listing.category, listing.crop);
+              return {
               id: "LIST-" + listing.id.slice(-6).toUpperCase(),
               listing: true,
               listingId: listing.id,
               dbId: listing.produce_lot_id,
               crop: listing.crop,
               hi: listing.crop,
-              grade: listing.warehouse_grade || "Intake verified",
+              grade: freshness.grade,
               qty: Number(listing.quantity_kg),
               price: Number(listing.price_per_kg),
-              old: 0,
+              old: freshness.ageDays,
               warehouse: listing.warehouses?.name || "Verified warehouse intake",
               farmer: "Verified farmer",
               dist: "Direct",
@@ -651,7 +662,10 @@ function App() {
               gradingConfidence: listing.grading_confidence,
               description: listing.description,
               category: listing.category,
-            })),
+              harvestDate: listing.harvest_date,
+              uploadedAt: listing.created_at,
+              freshnessGradeChanged: freshness.perishable && freshness.grade !== listing.warehouse_grade,
+            }; }),
           ]);
       });
   }, [session?.userId, liveTick]);
@@ -1382,9 +1396,10 @@ function LotCard({ lot, onClick }) {
           <span>{lot.qty} kg available</span>
           <span>
             <Clock3 size={14} />
-            {lot.old} day old
+            {lot.harvestDate ? `Harvested ${new Date(`${lot.harvestDate}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · ${lot.old} day${lot.old === 1 ? "" : "s"} fresh` : `${lot.old} day old`}
           </span>
         </div>
+        {lot.harvestDate && <small className="freshness-metric">Freshness: Grade {lot.grade}{lot.freshnessGradeChanged ? " · adjusted by harvest age" : " · intake verified"}</small>}
         <div className="buy">
           <b>
             ₹{lot.price}
@@ -1643,10 +1658,11 @@ function ProductDetail({
               <small>From warehouse</small>
             </div>
             <div>
-              <b>{lot.old} day</b>
-              <small>Stock age</small>
+              <b>{lot.harvestDate ? `${lot.old} day${lot.old === 1 ? "" : "s"}` : `${lot.old} day`}</b>
+              <small>{lot.harvestDate ? `Fresh since ${new Date(`${lot.harvestDate}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : "Stock age"}</small>
             </div>
           </div>
+          {lot.uploadedAt && <p className="freshness-detail">Listed on {new Date(lot.uploadedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}. {lot.freshnessGradeChanged ? "This perishable item’s displayed grade has been adjusted for harvest age." : "Freshness grade is monitored from the recorded harvest date."}</p>}
           <div className="detail-actions">
             <button className="primary" onClick={() => reserve(lot)}>
               Add 10 kg to cart
@@ -2699,6 +2715,7 @@ function FarmerOperations({ notify, session, liveTick }) {
       description: "Fresh produce from our verified farm cluster.",
       quantity: "100",
       price: "25",
+      harvestDate: new Date().toISOString().slice(0, 10),
     });
   useEffect(() => {
     if (!isSupabaseConfigured || !session?.userId) return;
@@ -2810,6 +2827,7 @@ function FarmerOperations({ notify, session, liveTick }) {
         description: listing.description,
         quantity_kg: Number(listing.quantity),
         price_per_kg: Number(listing.price),
+        harvest_date: listing.harvestDate,
         image_url: urlData.publicUrl,
         status: "pending",
       };
@@ -2892,6 +2910,11 @@ function FarmerOperations({ notify, session, liveTick }) {
                 setListing({ ...listing, quantity: e.target.value })
               }
             />
+          </label>
+          <label>
+            Exact harvest date
+            <input required type="date" max={new Date().toISOString().slice(0, 10)} value={listing.harvestDate} onChange={(e) => setListing({ ...listing, harvestDate: e.target.value })} />
+            <small>This is shown to consumers and drives freshness grading for fruits, vegetables and flowers.</small>
           </label>
           <label>
             Expected price per kg
@@ -3667,7 +3690,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
   const refresh = () => setLiveTick((tick) => tick + 1);
   useEffect(() => {
     if (!isSupabaseConfigured || tab !== "listings") return;
-    supabase.from("farmer_listings").select("id,crop,category,description,quantity_kg,price_per_kg,image_url,created_at,profiles(full_name)").eq("status", "pending").order("created_at", { ascending: false }).then(({ data, error }) => {
+    supabase.from("farmer_listings").select("id,crop,category,description,quantity_kg,price_per_kg,image_url,harvest_date,status,created_at,profiles(full_name)").in("status", ["pending", "published"]).order("created_at", { ascending: false }).then(({ data, error }) => {
       if (error) notify(error.message); else setListings(data || []);
     });
   }, [tab, liveTick]);
@@ -3700,6 +3723,13 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
     const { error } = await supabase.from("farmer_listings").update({ status, reviewed_at: new Date().toISOString() }).eq("id", id);
     if (error) return notify(error.message);
     notify(status === "published" ? "Listing verified and published with the farmer photo." : "Listing rejected; the farmer can correct it and resubmit."); refresh();
+  };
+  const removeMarketplaceListing = async (listing) => {
+    if (!window.confirm(`Remove ${listing.crop} from the marketplace? The traceable intake record will be retained.`)) return;
+    const { error } = await supabase.rpc("remove_marketplace_listing", { p_listing_id: listing.id });
+    if (error) return notify(error.message);
+    notify(`${listing.crop} has been removed from the marketplace. The underlying traceability record was retained.`);
+    refresh();
   };
   const scheduleListing = async (listing) => {
     const warehouseId = listingWarehouses[listing.id] || warehouses[0]?.id;
@@ -3785,7 +3815,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
       <QueuePanel title="Newest consumer orders" empty="No pending consumer orders." items={orders.slice(0, 8)} render={(item) => <><b>{item.id} · {item.quantity} kg</b><small>{item.pickupWarehouse} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["verified","ready for pickup"].includes(String(item.status).toLowerCase())} onClick={async () => { if (await setOrderStatus(item.id, "Verified")) notify("Consumer order verified across admin, consumer and warehouse queues."); }}>{["verified","ready for pickup"].includes(String(item.status).toLowerCase()) ? "Verified" : "Verify order"}</button>}/>
       <QueuePanel title="Logistics scheduling" empty="No logistics jobs awaiting action." items={logisticsJobs.slice(0, 8)} render={(item) => <><b>{item.source_type.replaceAll("_", " ")}</b><small>{item.details} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={item.status === "scheduled"} onClick={() => update("logistics_jobs", item.id, "scheduled", "Logistics job scheduled across live dashboards.")}>{item.status === "scheduled" ? "Scheduled ✓" : "Schedule job"}</button>}/>
     </div>}
-    {tab === "listings" && <div className="admin-work-panel"><h3>Farmer listing scheduling</h3><p>Inspect the farmer photo, select an intake warehouse, then schedule it. Marketplace publication happens only after warehouse photo capture and grade confirmation.</p>{listings.length ? listings.map((item) => <article className="listing-review" key={item.id}><img src={item.image_url} alt={`${item.crop} submitted by farmer`}/><div><b>{item.crop} · {item.quantity_kg} kg · ₹{item.price_per_kg}/kg</b><small>{item.profiles?.full_name || "Farmer"} · {item.category}</small><p>{item.description}</p><select value={listingWarehouses[item.id] || warehouses[0]?.id || ""} onChange={(event) => setListingWarehouses({ ...listingWarehouses, [item.id]: event.target.value })}><option value="">Choose intake warehouse</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name} · {warehouse.address}</option>)}</select><button className="primary" onClick={() => scheduleListing(item)}>Schedule warehouse intake</button> <button className="secondary" onClick={() => reviewListing(item.id, "rejected")}>Reject</button></div></article>) : <p className="empty-state">No farmer listings are awaiting scheduling.</p>}</div>}
+    {tab === "listings" && <div className="admin-work-panel"><h3>Farmer listings & marketplace controls</h3><p>Inspect submitted photos, schedule warehouse intake, and remove any live listing from the marketplace while retaining its traceability record.</p>{listings.length ? listings.map((item) => <article className="listing-review" key={item.id}><img src={item.image_url} alt={`${item.crop} submitted by farmer`}/><div><b>{item.crop} · {item.quantity_kg} kg · ₹{item.price_per_kg}/kg</b><small>{item.profiles?.full_name || "Farmer"} · {item.category} · harvested {item.harvest_date ? new Date(`${item.harvest_date}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "not recorded"}</small><p>{item.description}</p>{item.status === "published" ? <><span className="listing-live">● Live in marketplace</span><button className="danger" onClick={() => removeMarketplaceListing(item)}>Remove listing</button></> : <><select value={listingWarehouses[item.id] || warehouses[0]?.id || ""} onChange={(event) => setListingWarehouses({ ...listingWarehouses, [item.id]: event.target.value })}><option value="">Choose intake warehouse</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name} · {warehouse.address}</option>)}</select><button className="primary" onClick={() => scheduleListing(item)}>Schedule warehouse intake</button> <button className="secondary" onClick={() => reviewListing(item.id, "rejected")}>Reject</button></>}</div></article>) : <p className="empty-state">No farmer listings are awaiting scheduling or live in the marketplace.</p>}</div>}
     {tab === "wholesale" && <div className="admin-work-panel"><h3>Connect wholesale requests to crop-matched farmers</h3><p>Only farmers with live, verified stock of the requested crop can receive a quote. If no one farmer can fulfil it, create a capacity-checked farmer cluster.</p>{bulkRequests.length ? bulkRequests.filter((request) => !["confirmed","declined"].includes(request.status)).map((request) => { const eligible = eligibleFarmers(request); const selected = clusterSelections[request.id] || []; const clusterCapacity = eligible.filter((farmer) => selected.includes(farmer.id)).reduce((sum, farmer) => sum + Number(farmer.stock[request.crop] || 0), 0); return <div className="quote-assignment" key={request.id}><div className="assignment-row"><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · MSP floor ₹{Number(request.msp_per_kg || 0).toFixed(2)}/kg · {request.status}</small><small>{eligible.length} crop-matched farmer(s) · {eligible.reduce((sum, farmer) => sum + Number(farmer.stock[request.crop] || 0), 0)} kg live capacity</small></div><select value={assignments[request.id] || request.farmer_id || ""} onChange={(event) => setAssignments({ ...assignments, [request.id]: event.target.value })}><option value="">Choose an eligible farmer</option>{eligible.filter((farmer) => Number(farmer.stock[request.crop] || 0) >= Number(request.quantity_kg)).map((farmer) => <option key={farmer.id} value={farmer.id}>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""} · {farmer.stock[request.crop]} kg</option>)}</select><button className="primary" disabled={!eligible.some((farmer) => Number(farmer.stock[request.crop] || 0) >= Number(request.quantity_kg))} onClick={() => assignFarmer(request)}>Assign single farmer</button></div><div className="cluster-picker"><b>Or create a farmer cluster</b><small>Select contributors with {request.crop}; capacity is allocated automatically up to the buyer requirement.</small>{eligible.map((farmer) => <label key={farmer.id}><input type="checkbox" checked={selected.includes(farmer.id)} onChange={() => toggleClusterFarmer(request.id, farmer.id)}/><span>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""}</span><strong>{farmer.stock[request.crop]} kg available</strong></label>)}{eligible.length ? <div><span>Selected capacity: <b>{clusterCapacity} / {request.quantity_kg} kg</b></span><button className="secondary" disabled={selected.length < 2 || clusterCapacity < Number(request.quantity_kg)} onClick={() => assignCluster(request)}>Create cluster & assign quote</button></div> : <p className="empty-state">No farmer currently has published live stock of {request.crop}.</p>}</div></div>; }) : <p className="empty-state">No wholesale requests are awaiting review.</p>}</div>}
     {tab === "warehouses" && <div className="admin-work-panel"><h3>Warehouse inspection menu</h3><p>Open a warehouse to handle intake, consumer pickups, and its associated live queue.</p>{warehouses.map((warehouse) => <div className="contract-row" key={warehouse.id || warehouse.name}><div><b>{warehouse.name}</b><small>{warehouse.address}</small></div><span>{orders.filter((order) => order.pickupWarehouse === warehouse.name).length} pickup order(s)</span><button className="primary" onClick={() => setView("warehouse")}>Inspect</button></div>)}</div>}
     {tab === "routes" && <div className="admin-work-panel"><h3>Farm-to-warehouse route mapping</h3><p>Map collection → intake warehouse → inter-warehouse transfer → pickup fulfilment.</p><LiveRoutePlanner notify={notify} initialOrigin={warehouses[0]?.address || ""} initialDestination={warehouses[1]?.address || warehouses[0]?.address || ""}/><form className="route-form" onSubmit={addRoute}><select value={route.origin} onChange={(event) => setRoute({ ...route, origin: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><span>→</span><select value={route.destination} onChange={(event) => setRoute({ ...route, destination: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><button className="primary" type="submit">Save transfer route</button></form><button className="secondary" onClick={() => setView("warehouse")}>Open warehouse operations</button></div>}
