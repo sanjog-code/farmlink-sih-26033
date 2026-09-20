@@ -715,12 +715,12 @@ function App() {
         ? supabase
             .from("consumer_orders")
             .select(
-              "id,order_code,total_kg,status,cancellation_expires_at,created_at,warehouses(name),order_items(quantity_kg,unit_price,produce_lots(id,lot_code,crop,grade))",
+              "id,order_code,total_kg,status,cancellation_expires_at,created_at,warehouses(name)",
             ).order("created_at", { ascending: false })
         : supabase
             .from("consumer_orders")
             .select(
-              "id,order_code,total_kg,status,cancellation_expires_at,created_at,warehouses(name),order_items(quantity_kg,unit_price,produce_lots(id,lot_code,crop,grade))",
+              "id,order_code,total_kg,status,cancellation_expires_at,created_at,warehouses(name)",
             )
             .eq("consumer_id", session.userId)
             .order("created_at", { ascending: false });
@@ -742,14 +742,6 @@ function App() {
               : null,
             pickupWarehouse: order.warehouses?.name || "Warehouse",
             createdAt: order.created_at,
-            lineItems: (order.order_items || []).map((item) => ({
-              id: item.produce_lots?.lot_code || `${order.id}-${item.quantity_kg}`,
-              dbId: item.produce_lots?.id,
-              crop: item.produce_lots?.crop || "Produce",
-              grade: item.produce_lots?.grade || "Verified",
-              quantityKg: Number(item.quantity_kg),
-              price: Number(item.unit_price),
-            })),
           })),
         );
     });
