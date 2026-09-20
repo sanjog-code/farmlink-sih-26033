@@ -1,6 +1,7 @@
 -- Farmer photo listing → admin scheduling → warehouse photo/AI grade → marketplace.
 alter table public.farmer_listings
   add column if not exists intake_warehouse_id uuid references public.warehouses(id),
+  add column if not exists produce_lot_id uuid references public.produce_lots(id),
   add column if not exists warehouse_image_url text,
   add column if not exists warehouse_grade text,
   add column if not exists grading_confidence numeric check (grading_confidence >= 0 and grading_confidence <= 100),

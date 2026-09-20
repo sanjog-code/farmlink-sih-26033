@@ -624,7 +624,7 @@ function App() {
     if (!isSupabaseConfigured || !session?.userId) return;
     supabase
       .from("farmer_listings")
-      .select("id,crop,category,description,quantity_kg,price_per_kg,image_url,warehouse_image_url,warehouse_grade,grading_confidence,warehouses(name)")
+      .select("id,produce_lot_id,crop,category,description,quantity_kg,price_per_kg,image_url,warehouse_image_url,warehouse_grade,grading_confidence,warehouses(name)")
       .eq("status", "published")
       .then(({ data }) => {
         if (data)
@@ -634,6 +634,7 @@ function App() {
               id: "LIST-" + listing.id.slice(-6).toUpperCase(),
               listing: true,
               listingId: listing.id,
+              dbId: listing.produce_lot_id,
               crop: listing.crop,
               hi: listing.crop,
               grade: listing.warehouse_grade || "Intake verified",
@@ -2172,7 +2173,7 @@ function WarehouseView({
   const [warehousePreview, setWarehousePreview] = useState("");
   useEffect(() => {
     if (!isSupabaseConfigured) return;
-    supabase.from("farmer_listings").select("id,crop,category,description,quantity_kg,price_per_kg,image_url,intake_warehouse_id,warehouses(name),profiles(full_name)").eq("status", "scheduled").order("scheduled_at", { ascending: true }).then(({ data, error }) => {
+    supabase.from("farmer_listings").select("id,farmer_id,crop,category,description,quantity_kg,price_per_kg,image_url,intake_warehouse_id,warehouses(name),profiles(full_name)").eq("status", "scheduled").order("scheduled_at", { ascending: true }).then(({ data, error }) => {
       if (error) notify(error.message); else setScheduledListings(data || []);
     });
   }, [liveTick]);
@@ -2250,7 +2251,9 @@ function WarehouseView({
       const { error: uploadError } = await supabase.storage.from("produce-photos").upload(path, warehousePhoto, { contentType: warehousePhoto.type, upsert: false });
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from("produce-photos").getPublicUrl(path);
-      const { error } = await supabase.from("farmer_listings").update({ status: "published", warehouse_image_url: urlData.publicUrl, warehouse_grade: form.grade, grading_confidence: 91, intake_confirmed_at: new Date().toISOString(), reviewed_at: new Date().toISOString() }).eq("id", listing.id);
+      const { data: lot, error: lotError } = await supabase.from("produce_lots").insert({ lot_code: `FL-${String(Date.now()).slice(-8)}`, farmer_id: listing.farmer_id, crop: listing.crop, grade: form.grade, quantity_kg: listing.quantity_kg, price_per_kg: listing.price_per_kg, warehouse_id: listing.intake_warehouse_id }).select("id").single();
+      if (lotError) throw lotError;
+      const { error } = await supabase.from("farmer_listings").update({ status: "published", produce_lot_id: lot.id, warehouse_image_url: urlData.publicUrl, warehouse_grade: form.grade, grading_confidence: 91, intake_confirmed_at: new Date().toISOString(), reviewed_at: new Date().toISOString() }).eq("id", listing.id);
       if (error) throw error;
       setScheduledListings((current) => current.filter((item) => item.id !== listing.id));
       setForm({ ...form, listingId: "", grade: "A" }); setWarehousePhoto(null); setWarehousePreview(""); setLiveTick((tick) => tick + 1);
@@ -2707,6 +2710,9 @@ function FarmerOperations({ notify, session, liveTick }) {
     [saving, setSaving] = useState(false),
     [published, setPublished] = useState(null),
     [quotes, setQuotes] = useState([]),
+    [farmerListings, setFarmerListings] = useState([]),
+    [farmerOrders, setFarmerOrders] = useState([]),
+    [farmerJobs, setFarmerJobs] = useState([]),
     [listing, setListing] = useState({
       crop: "Tomato",
       description: "Fresh produce from our verified farm cluster.",
@@ -2717,6 +2723,18 @@ function FarmerOperations({ notify, session, liveTick }) {
     if (!isSupabaseConfigured || !session?.userId) return;
     supabase.from("bulk_requests").select("id,crop,quantity_kg,buyer_name,msp_per_kg,status,bulk_quotes(id,offered_price_per_kg,proposed_by,status)").eq("farmer_id", session.userId).order("created_at", { ascending: false }).then(({ data, error }) => {
       if (error) notify(error.message); else setQuotes(data || []);
+    });
+  }, [session?.userId, liveTick]);
+  useEffect(() => {
+    if (!isSupabaseConfigured || !session?.userId) return;
+    Promise.all([
+      supabase.from("farmer_listings").select("id,crop,quantity_kg,price_per_kg,status,image_url,warehouse_image_url,warehouse_grade,grading_confidence,created_at,warehouses(name)").eq("farmer_id", session.userId).order("created_at", { ascending: false }),
+      supabase.from("order_items").select("id,quantity_kg,unit_price,produce_lots!inner(farmer_id,crop),consumer_orders(order_code,status,created_at,warehouses(name))").eq("produce_lots.farmer_id", session.userId).order("id", { ascending: false }),
+      supabase.from("logistics_jobs").select("id,source_type,details,status,created_at").order("created_at", { ascending: false }),
+    ]).then(([listingResult, orderResult, jobsResult]) => {
+      if (listingResult.error) notify(listingResult.error.message); else setFarmerListings(listingResult.data || []);
+      if (orderResult.error) notify(orderResult.error.message); else setFarmerOrders(orderResult.data || []);
+      if (jobsResult.error) notify(jobsResult.error.message); else setFarmerJobs(jobsResult.data || []);
     });
   }, [session?.userId, liveTick]);
   const respondToQuote = async (request, quote, action) => {
@@ -2734,6 +2752,9 @@ function FarmerOperations({ notify, session, liveTick }) {
       ).slice(0, 80),
     [cropSearch],
   );
+  const activeOrders = farmerOrders.filter((item) => String(item.consumer_orders?.status || "").toLowerCase() !== "cancelled");
+  const grossEarnings = activeOrders.reduce((sum, item) => sum + Number(item.quantity_kg || 0) * Number(item.unit_price || 0), 0);
+  const fulfilledOrders = activeOrders.filter((item) => ["ready_for_pickup", "completed"].includes(String(item.consumer_orders?.status || "").toLowerCase()));
   const selectPhoto = (file) => {
     setImage(file || null);
     setPreview(file ? URL.createObjectURL(file) : "");
@@ -2810,6 +2831,11 @@ function FarmerOperations({ notify, session, liveTick }) {
         ))}
       </div>
       {tab === "listings" && (
+        <>
+        <div className="account-panel">
+          <h3>Live listing status</h3>
+          {farmerListings.length ? farmerListings.map((item) => <div className="contract-row" key={item.id}><span>{cropEmoji(item.crop)}</span><div><b>{item.crop} · {item.quantity_kg} kg</b><small>{item.warehouses?.name || "Awaiting warehouse"} · {item.warehouse_grade ? `Grade ${item.warehouse_grade} · ${item.grading_confidence || 0}% AI confidence` : "Farmer photo received"}</small></div><strong>{String(item.status).replaceAll("_", " ")}</strong></div>) : <p className="empty-state">Your submitted listings will update here live.</p>}
+        </div>
         <form
           className="account-panel form-grid photo-listing"
           onSubmit={submitListing}
@@ -2902,56 +2928,39 @@ function FarmerOperations({ notify, session, liveTick }) {
             </div>
           )}
         </form>
+        </>
       )}
       {tab === "orders" && (
         <div className="account-panel">
-          <h3>Incoming order management</h3>
-          <div className="tracking">
-            <b>ORD-FL-1029</b>
-            <span>25 kg tomato</span>
-            <span>Consumer pickup</span>
-            <button
-              onClick={() => notify("Order accepted and warehouse notified.")}
-            >
-              Accept order
-            </button>
-          </div>
-          <p>
-            Accept, pack and hand off orders to the assigned warehouse/logistics
-            partner.
-          </p>
+          <h3>Live incoming orders</h3>
+          {farmerOrders.length ? farmerOrders.map((item) => <div className="tracking" key={item.id}><b>{item.consumer_orders?.order_code || "Order"}</b><span>{item.produce_lots?.crop} · {item.quantity_kg} kg</span><span>{item.consumer_orders?.warehouses?.name || "Warehouse pickup"}</span><strong>{String(item.consumer_orders?.status || "pending").replaceAll("_", " ")}</strong></div>) : <p className="empty-state">Orders for your warehouse-confirmed lots will appear here live.</p>}
         </div>
       )}
       {tab === "logistics" && (
         <div className="account-panel">
-          <h3>Logistics schedule</h3>
-          <div className="tracking">
-            <b>Pickup run JP-N-03</b>
-            <span>Tomorrow, 09:30</span>
-            <span>Jaipur North cluster</span>
-            <strong>Collector assigned</strong>
-          </div>
+          <h3>Live logistics schedule</h3>
+          {farmerJobs.length ? farmerJobs.map((job) => <div className="tracking" key={job.id}><b>{job.source_type.replaceAll("_", " ")}</b><span>{job.details}</span><span>{new Date(job.created_at).toLocaleString()}</span><strong>{job.status.replaceAll("_", " ")}</strong></div>) : <p className="empty-state">Collection and warehouse intake jobs linked to your produce will appear here.</p>}
         </div>
       )}
       {tab === "payments" && (
         <div className="metric-grid">
           <Metric
             icon={<BarChart3 />}
-            label="Available earnings"
-            value="₹12,450"
-            note="Released after completed pickup"
+            label="Live order value"
+            value={`₹${grossEarnings.toFixed(2)}`}
+            note={`${activeOrders.length} non-cancelled order line(s)`}
           />
           <Metric
             icon={<Clock3 />}
-            label="Pending settlement"
-            value="₹4,700"
-            note="2 orders in quality confirmation"
+            label="Ready / completed value"
+            value={`₹${fulfilledOrders.reduce((sum, item) => sum + Number(item.quantity_kg || 0) * Number(item.unit_price || 0), 0).toFixed(2)}`}
+            note="Based on live warehouse order status"
           />
           <Metric
             icon={<ClipboardList />}
             label="Transactions"
-            value="18"
-            note="Full payment history available"
+            value={String(farmerOrders.length)}
+            note="Order lines from your verified lots"
           />
         </div>
       )}
@@ -2959,21 +2968,21 @@ function FarmerOperations({ notify, session, liveTick }) {
         <div className="metric-grid">
           <Metric
             icon={<BarChart3 />}
-            label="Sales trend"
-            value="+18%"
-            note="Compared with last month"
+            label="Published listings"
+            value={String(farmerListings.filter((item) => item.status === "published").length)}
+            note="Live marketplace-ready produce"
           />
           <Metric
             icon={<Users />}
-            label="Repeat customers"
-            value="38%"
-            note="Healthy return rate"
+            label="Fulfilled orders"
+            value={String(fulfilledOrders.length)}
+            note="Ready for pickup or completed"
           />
           <Metric
             icon={<ShieldCheck />}
-            label="Average rating"
-            value="4.7 / 5"
-            note="From verified buyer reviews"
+            label="Intake confirmations"
+            value={String(farmerListings.filter((item) => item.warehouse_image_url).length)}
+            note="Listings with a live warehouse AI-grade photo"
           />
         </div>
       )}
