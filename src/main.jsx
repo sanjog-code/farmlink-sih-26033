@@ -714,28 +714,25 @@ function App() {
       !["admin", "consumer"].includes(session.role)
     )
       return;
-    const query =
-      session.role === "admin"
-        ? supabase
+    let active = true;
+    const loadOrders = async (showError = true) => {
+      const result = session.role === "admin"
+        ? await supabase.rpc("get_admin_consumer_orders")
+        : await supabase
             .from("consumer_orders")
-            .select(
-              "id,order_code,total_kg,status,cancellation_expires_at,created_at,warehouses(name)",
-            ).order("created_at", { ascending: false })
-        : supabase
-            .from("consumer_orders")
-            .select(
-              "id,order_code,total_kg,status,cancellation_expires_at,created_at,warehouses(name)",
-            )
+            .select("id,order_code,total_kg,total_amount,status,cancellation_expires_at,created_at,warehouses(name)")
             .eq("consumer_id", session.userId)
             .order("created_at", { ascending: false });
-    query.then(({ data, error }) => {
-      if (error) { notify(`Orders could not be loaded: ${error.message}`); return; }
-      if (data)
-        setOrders(
-          data.map((order) => ({
+      const { data, error } = result;
+      if (error) {
+        if (showError) notify(`Orders could not be loaded: ${error.message}`);
+        return;
+      }
+      if (active && data) setOrders(data.map((order) => ({
             id: order.order_code,
             dbId: order.id,
             quantity: Number(order.total_kg),
+            totalAmount: Number(order.total_amount || 0),
             items: 0,
             status: (order.status || "pending_verification")
               .split("_")
@@ -744,11 +741,17 @@ function App() {
             cancellationDeadline: order.cancellation_expires_at
               ? new Date(order.cancellation_expires_at).getTime()
               : null,
-            pickupWarehouse: order.warehouses?.name || "Warehouse",
+            pickupWarehouse: order.warehouse_name || order.warehouses?.name || "Warehouse",
+            consumerName: order.consumer_name || "",
+            consumerAddress: order.consumer_address || "",
+            consumerMobile: order.consumer_mobile || "",
             createdAt: order.created_at,
-          })),
-        );
-    });
+          })));
+    };
+    loadOrders();
+    // Covers an order made in another browser when a realtime event is missed.
+    const refreshTimer = window.setInterval(() => loadOrders(false), 5000);
+    return () => { active = false; window.clearInterval(refreshTimer); };
   }, [session?.role, session?.userId, liveTick]);
   useEffect(() => {
     if (!isSupabaseConfigured || !session?.userId) return;
@@ -3936,7 +3939,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
     <section className="admin-control"><div className="tabs">{[["action","Action centre"],["listings","Listing approvals"],["wholesale","Wholesale desk"],["warehouses","Warehouse inspector"],["routes","Route map"],["price floors","Price floors"]].map(([key,label]) => <button key={key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>
     {tab === "action" && <div className="admin-grid">
       <QueuePanel title="Newest farmer & cluster requests" empty="No open farmer requests." items={produceRequests.slice(0, 8)} render={(item) => <><b>{item.crop} · {item.grossWeight} kg</b><small>{item.farmer} · {item.cluster} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["collection_scheduled","received"].includes(item.status)} onClick={() => scheduleClusterRequest(item)}>{["collection_scheduled","received"].includes(item.status) ? "Scheduled" : "Verify & schedule"}</button>}/>
-      <QueuePanel title="Newest consumer orders" empty="No pending consumer orders." items={orders.slice(0, 8)} render={(item) => <><b>{item.id} · {item.quantity} kg</b><small>{item.pickupWarehouse} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["verified","ready for pickup"].includes(String(item.status).toLowerCase())} onClick={async () => { if (await setOrderStatus(item.id, "Verified")) notify("Consumer order verified across admin, consumer and warehouse queues."); }}>{["verified","ready for pickup"].includes(String(item.status).toLowerCase()) ? "Verified" : "Verify order"}</button>}/>
+      <QueuePanel title="Newest consumer orders" empty="No pending consumer orders." items={orders.slice(0, 8)} render={(item) => <><b>{item.id} · {item.quantity} kg · ₹{item.totalAmount.toFixed(2)}</b><small>{item.consumerName || "Consumer"}{item.consumerMobile ? ` · ${item.consumerMobile}` : ""}</small><small>{item.consumerAddress || "Address not provided"} · Pickup: {item.pickupWarehouse} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["verified","ready for pickup"].includes(String(item.status).toLowerCase())} onClick={async () => { if (await setOrderStatus(item.id, "Verified")) notify("Consumer order verified across admin, consumer and warehouse queues."); }}>{["verified","ready for pickup"].includes(String(item.status).toLowerCase()) ? "Verified" : "Verify order"}</button>}/>
       <QueuePanel title="Logistics scheduling" empty="No logistics jobs awaiting action." items={logisticsJobs.slice(0, 8)} render={(item) => <><b>{item.source_type.replaceAll("_", " ")}</b><small>{item.details} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={item.status === "scheduled"} onClick={() => update("logistics_jobs", item.id, "scheduled", "Logistics job scheduled across live dashboards.")}>{item.status === "scheduled" ? "Scheduled ✓" : "Schedule job"}</button>}/>
     </div>}
     {tab === "listings" && <div className="admin-work-panel"><h3>Farmer listings & marketplace controls</h3><p>Inspect submitted photos, schedule warehouse intake, and remove any live listing from the marketplace while retaining its traceability record.</p>{listings.length ? listings.map((item) => <article className="listing-review" key={item.id}><img src={item.image_url} alt={`${item.crop} submitted by farmer`}/><div><b>{item.crop} · {item.quantity_kg} kg · ₹{item.price_per_kg}/kg</b><small>{item.profiles?.full_name || "Farmer"} · {item.category} · harvested {item.harvest_date ? new Date(`${item.harvest_date}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "not recorded"}</small><p>{item.description}</p>{item.status === "published" ? <><span className="listing-live">● Live in marketplace</span><button className="danger" onClick={() => removeMarketplaceListing(item)}>Remove listing</button></> : <><select value={listingWarehouses[item.id] || warehouses[0]?.id || ""} onChange={(event) => setListingWarehouses({ ...listingWarehouses, [item.id]: event.target.value })}><option value="">Choose intake warehouse</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name} · {warehouse.address}</option>)}</select><button className="primary" onClick={() => scheduleListing(item)}>Schedule warehouse intake</button> <button className="secondary" onClick={() => reviewListing(item.id, "rejected")}>Reject</button></>}</div></article>) : <p className="empty-state">No farmer listings are awaiting scheduling or live in the marketplace.</p>}</div>}
