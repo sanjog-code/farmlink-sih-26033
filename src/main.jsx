@@ -715,12 +715,12 @@ function App() {
         ? supabase
             .from("consumer_orders")
             .select(
-              "id,order_code,total_kg,status,cancellation_expires_at,warehouses(name)",
+              "id,order_code,total_kg,status,cancellation_expires_at,created_at,warehouses(name),order_items(quantity_kg,unit_price,produce_lots(id,lot_code,crop,grade))",
             ).order("created_at", { ascending: false })
         : supabase
             .from("consumer_orders")
             .select(
-              "id,order_code,total_kg,status,cancellation_expires_at,warehouses(name)",
+              "id,order_code,total_kg,status,cancellation_expires_at,created_at,warehouses(name),order_items(quantity_kg,unit_price,produce_lots(id,lot_code,crop,grade))",
             )
             .eq("consumer_id", session.userId)
             .order("created_at", { ascending: false });
@@ -741,6 +741,15 @@ function App() {
               ? new Date(order.cancellation_expires_at).getTime()
               : null,
             pickupWarehouse: order.warehouses?.name || "Warehouse",
+            createdAt: order.created_at,
+            lineItems: (order.order_items || []).map((item) => ({
+              id: item.produce_lots?.lot_code || `${order.id}-${item.quantity_kg}`,
+              dbId: item.produce_lots?.id,
+              crop: item.produce_lots?.crop || "Produce",
+              grade: item.produce_lots?.grade || "Verified",
+              quantityKg: Number(item.quantity_kg),
+              price: Number(item.unit_price),
+            })),
           })),
         );
     });
@@ -1021,6 +1030,12 @@ function App() {
       notify(`Please sign in as ${role}.`);
     }
   };
+  const openCart = () => {
+    if (!session) return access("consumer", "consumer");
+    if (session.role !== "consumer") return notify("The checkout cart is available only to consumer accounts.");
+    if (!cart.length) { setView("market"); return notify("Your cart is empty. Add marketplace produce before checking out."); }
+    setModal("checkout");
+  };
   const logout = async () => {
     if (isSupabaseConfigured) await supabase.auth.signOut();
     setSession(null);
@@ -1091,7 +1106,7 @@ function App() {
           </span>
           <button
             className="cart"
-            onClick={() => access("consumer", "consumer")}
+            onClick={openCart}
           >
             <ShoppingCart size={18} />
             {cart.length || ""}
