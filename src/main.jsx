@@ -658,7 +658,11 @@ function App() {
               farmer: "Verified farmer",
               dist: "Direct",
               trend: 0,
-              imageUrl: listing.image_url,
+              // Once intake is complete, the current warehouse capture is the
+              // marketplace cover photo; the original farmer photo remains in
+              // the traceability record and product detail.
+              imageUrl: listing.warehouse_image_url || listing.image_url,
+              farmerImageUrl: listing.image_url,
               warehouseImageUrl: listing.warehouse_image_url,
               gradingConfidence: listing.grading_confidence,
               description: listing.description,
@@ -1667,11 +1671,7 @@ function ProductDetail({
             cropEmoji(lot.crop, lot.category)
           )}
           <i className="crop-emoji-badge detail-crop-emoji" aria-label={`${lot.crop} crop icon`}>{cropEmoji(lot.crop, lot.category)}</i>
-          <span>
-            {lot.listing
-              ? "Farmer photo listing"
-              : "Verified Grade " + lot.grade}
-          </span>
+          <span>{lot.listing ? (lot.warehouseImageUrl ? "Warehouse-verified photo" : "Farmer photo listing") : "Verified Grade " + lot.grade}</span>
         </div>
         <div>
           <p className="eyebrow green">TRACEABLE LOT {lot.id}</p>
@@ -1730,6 +1730,7 @@ function ProductDetail({
               listing.
             </p>
             {lot.warehouseImageUrl && <><img className="intake-proof-photo" src={lot.warehouseImageUrl} alt={`${lot.crop} photographed during warehouse grading`} /><small>Live warehouse intake photo · Grade {lot.grade}{lot.gradingConfidence ? ` · ${lot.gradingConfidence}% AI confidence` : ""}</small></>}
+            {lot.farmerImageUrl && lot.farmerImageUrl !== lot.imageUrl && <><img className="intake-proof-photo" src={lot.farmerImageUrl} alt={`${lot.crop} photo submitted by the farmer`} /><small>Original farmer listing photo</small></>}
           </article>
         <article>
           <h3>Farmer profile</h3>
