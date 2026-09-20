@@ -19,10 +19,13 @@ Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (request.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: corsHeaders })
 
-  const { fullName, mobile, address } = await request.json()
+  const { fullName, mobile, address, password } = await request.json()
   const phone = normalisePhone(mobile)
   if (![fullName, address].every((value) => typeof value === 'string' && value.trim()) || !phone) {
     return new Response(JSON.stringify({ error: 'Name, address, and a valid mobile number are required.' }), { status: 400, headers: corsHeaders })
+  }
+  if (typeof password !== 'string' || password.length < 8) {
+    return new Response(JSON.stringify({ error: 'Choose a password with at least 8 characters.' }), { status: 400, headers: corsHeaders })
   }
 
   const admin = createClient(
@@ -39,6 +42,7 @@ Deno.serve(async (request) => {
   const { data, error } = await admin.auth.admin.createUser({
     email: `${farmerId.toLowerCase()}@farmer.farmlink.local`,
     email_confirm: true,
+    password,
     phone,
     phone_confirm: false,
     user_metadata: { full_name: fullName.trim(), mobile: phone, address: address.trim() },

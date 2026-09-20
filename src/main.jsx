@@ -33,12 +33,6 @@ import "./auth.css";
 import "./workflows.css";
 import "./checkout.css";
 import { isSupabaseConfigured, supabase } from "./supabase";
-import { firebaseAuth, isFirebaseConfigured } from "./firebase";
-import {
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  useDeviceLanguage,
-} from "firebase/auth";
 
 const initialLots = [];
 const INDIA_CROPS = [
@@ -2941,14 +2935,9 @@ function AuthView({ initialRole = "consumer", setSession, setView, notify }) {
     [role, setRole] = useState(initialRole),
     [farmerId, setFarmerId] = useState(""),
     [resendEmail, setResendEmail] = useState(""),
-    [otpStep, setOtpStep] = useState(false),
-    [farmerPhone, setFarmerPhone] = useState(""),
     [busy, setBusy] = useState(false);
-  const firebaseConfirmation = useRef(null);
-  const firebaseVerifier = useRef(null);
   useEffect(() => {
     setRole(initialRole);
-    setOtpStep(false);
   }, [initialRole]);
   const resendConfirmation = async () => {
     if (!resendEmail) {
@@ -3051,68 +3040,11 @@ function AuthView({ initialRole = "consumer", setSession, setView, notify }) {
         return;
       }
       if (mode === "login" && role === "farmer") {
-        const phone = otpStep ? farmerPhone : normalizeIndianPhone(mobile);
-        if (!phone)
-          throw new Error("Enter a valid 10-digit Indian mobile number.");
-        if (!otpStep) {
-          if (!isFirebaseConfigured) {
-            throw new Error(
-              "Firebase Phone Authentication is not configured yet. Add the Firebase web configuration in Vercel first.",
-            );
-          }
-          const auth = firebaseAuth();
-          useDeviceLanguage(auth);
-          if (!firebaseVerifier.current) {
-            firebaseVerifier.current = new RecaptchaVerifier(
-              auth,
-              "firebase-recaptcha",
-              { size: "invisible" },
-            );
-          }
-          try {
-            firebaseConfirmation.current = await signInWithPhoneNumber(
-              auth,
-              phone,
-              firebaseVerifier.current,
-            );
-          } catch (error) {
-            firebaseVerifier.current.clear();
-            firebaseVerifier.current = null;
-            throw error;
-          }
-          setFarmerPhone(phone);
-          setOtpStep(true);
-          notify("Firebase OTP sent to your registered mobile number.");
-          return;
-        }
-        if (!firebaseConfirmation.current) {
-          throw new Error("Request a new Firebase OTP first.");
-        }
-        const firebaseResult = await firebaseConfirmation.current.confirm(
-          String(data.get("otp") || "").trim(),
-        );
-        const idToken = await firebaseResult.user.getIdToken();
-        const { data: otp, error: otpError } = await supabase.functions.invoke(
-          "firebase-phone-session",
-          { body: { idToken } },
-        );
-        if (otpError) {
-          let detail;
-          try {
-            detail = await otpError.context?.json();
-          } catch {
-            // Use the provider error below when no structured response exists.
-          }
-          throw new Error(detail?.error || otpError.message);
-        }
-        if (otp?.error) throw new Error(otp.error);
-        const { data: verified, error } = await supabase.auth.verifyOtp({
-          token_hash: otp.tokenHash,
-          type: "magiclink",
-        });
-        if (error || !verified.user)
-          throw error || new Error("OTP verification failed.");
-        await finishLogin(verified.user, "farmer");
+        const farmerLoginId = String(data.get("farmerId") || "").trim().toLowerCase();
+        if (!/^flr-[a-z0-9-]+$/.test(farmerLoginId)) throw new Error("Enter the Farmer ID issued during registration (for example, FLR-AB12CD34).");
+        const { data: login, error } = await supabase.auth.signInWithPassword({ email: `${farmerLoginId}@farmer.farmlink.local`, password });
+        if (error || !login.user) throw error || new Error("Farmer ID or password is incorrect.");
+        await finishLogin(login.user, "farmer");
         return;
       }
       if (mode === "register" && role === "consumer") {
@@ -3146,15 +3078,13 @@ function AuthView({ initialRole = "consumer", setSession, setView, notify }) {
           throw new Error("Enter a valid 10-digit Indian mobile number.");
         const { data, error } = await supabase.functions.invoke(
           "register-farmer",
-          { body: { fullName: name, mobile: phone, address } },
+          { body: { fullName: name, mobile: phone, address, password } },
         );
         if (error) throw error;
         setFarmerId(data.farmerId);
         setMode("login");
-        setFarmerPhone(phone);
-        setOtpStep(false);
         notify(
-          `Farmer ID issued: ${data.farmerId}. Request an OTP to sign in.`,
+          `Farmer ID issued: ${data.farmerId}. Use it with the password you just set to sign in.`,
         );
         return;
       }
@@ -3230,7 +3160,6 @@ function AuthView({ initialRole = "consumer", setSession, setView, notify }) {
             onClick={() => {
               setMode("register");
               setFarmerId("");
-              setOtpStep(false);
             }}
           >
             Register
@@ -3255,7 +3184,6 @@ function AuthView({ initialRole = "consumer", setSession, setView, notify }) {
               onClick={() => {
                 setRole(key);
                 setFarmerId("");
-                setOtpStep(false);
               }}
             >
               <Icon size={17} />
@@ -3289,16 +3217,10 @@ function AuthView({ initialRole = "consumer", setSession, setView, notify }) {
               onChange={(e) => setResendEmail(e.target.value)}
             />
           )}{" "}
-          {role === "farmer" && mode === "login" && otpStep && (
-            <Field
-              icon={<LockKeyhole />}
-              label="6-digit OTP"
-              name="otp"
-              type="text"
-            />
+          {role === "farmer" && mode === "login" && (
+            <Field icon={<Sprout />} label="Farmer ID (e.g. FLR-AB12CD34)" name="farmerId" type="text" />
           )}
-          {((mode === "register" && role !== "admin") ||
-            (mode === "login" && role === "farmer")) && (
+          {mode === "register" && role !== "admin" && (
             <Field
               icon={<Phone />}
               label="Mobile number"
@@ -3314,14 +3236,14 @@ function AuthView({ initialRole = "consumer", setSession, setView, notify }) {
               type="text"
             />
           )}
-          {role !== "farmer" && (
+          {role !== "admin" || role === "farmer" ? (
             <Field
               icon={<LockKeyhole />}
               label="Password"
               name="password"
               type="password"
             />
-          )}
+          ) : null}
           {farmerId && (
             <div className="farmer-id">
               <Sprout />
@@ -3332,17 +3254,10 @@ function AuthView({ initialRole = "consumer", setSession, setView, notify }) {
               </div>
             </div>
           )}
-          {role === "farmer" && mode === "login" && !otpStep && (
-            <div id="firebase-recaptcha" className="firebase-recaptcha" />
-          )}
           <button className="primary auth-submit" disabled={busy} type="submit">
             {busy
               ? "Please wait…"
-              : role === "farmer" && mode === "login"
-                ? otpStep
-                  ? "Verify OTP"
-                  : "Send OTP"
-                : mode === "register"
+              : mode === "register"
                   ? "Create account"
                   : "Sign in"}
             <ArrowUpRight size={17} />
