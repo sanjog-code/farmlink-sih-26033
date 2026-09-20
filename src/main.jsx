@@ -37,6 +37,7 @@ import "./crop-images.css";
 import "./intake-pipeline.css";
 import "./route-planner.css";
 import { isSupabaseConfigured, supabase } from "./supabase";
+import FreeAdvisory from "./ai/FreeAdvisory";
 
 const initialLots = [];
 const INDIA_CROPS = [
@@ -1246,7 +1247,7 @@ function App() {
       {modal === "voice" && (
         <Voice close={() => setModal(null)} notify={notify} />
       )}{" "}
-      {modal === "ai" && <AI close={() => setModal(null)} />}{" "}
+      {modal === "ai" && <FreeAdvisory close={() => setModal(null)} />}{" "}
       {modal === "checkout" && (
           <Checkout
             cart={cart}
@@ -4211,7 +4212,7 @@ function AI({ close }) {
   );
 }
 function Voice({ close, notify }) {
-  const [provider, setProvider] = useState("bhashini"),
+  const [provider, setProvider] = useState("browser"),
     [language, setLanguage] = useState("hi"),
     [recording, setRecording] = useState(false),
     [status, setStatus] = useState(
@@ -4219,7 +4220,15 @@ function Voice({ close, notify }) {
     ),
     [transcript, setTranscript] = useState("");
   const recorderRef = useRef(null),
-    chunksRef = useRef([]);
+    chunksRef = useRef([]), recognitionRef = useRef(null);
+  useEffect(() => () => {
+    recognitionRef.current?.abort();
+    if (recorderRef.current) {
+      recorderRef.current.onstop = null;
+      if (recorderRef.current.state === 'recording') recorderRef.current.stop();
+      recorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+  }, []);
   const transcribe = async (blob) => {
     if (!isSupabaseConfigured) {
       setStatus("Connect Supabase to use secure transcription.");
@@ -4262,6 +4271,23 @@ function Voice({ close, notify }) {
     }
   };
   const start = async () => {
+    if (provider === 'browser') {
+      const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!Recognition) return setStatus('Speech recognition is unavailable in this browser. You can type your request below.');
+      const recognition = new Recognition();
+      recognitionRef.current = recognition;
+      recognition.lang = language === 'hi' ? 'hi-IN' : 'en-IN';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.onresult = event => {
+        setTranscript(event.results[0][0].transcript);
+        setStatus('Review and correct the transcript before using it.');
+      };
+      recognition.onerror = event => {setStatus(`Speech recognition: ${event.error}. You can type below.`);setRecording(false);};
+      recognition.onend = () => setRecording(false);
+      try {recognition.start();setRecording(true);setTranscript('');setStatus('Listening…');} catch {setStatus('Speech recognition could not start. Please try again.');}
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
@@ -4283,6 +4309,7 @@ function Voice({ close, notify }) {
     }
   };
   const stop = () => {
+    if (provider === 'browser') { recognitionRef.current?.stop(); setRecording(false); return; }
     if (recorderRef.current?.state === "recording") {
       recorderRef.current.stop();
       setRecording(false);
@@ -4308,16 +4335,19 @@ function Voice({ close, notify }) {
             Engine
             <select
               value={provider}
+              disabled={recording}
               onChange={(e) => setProvider(e.target.value)}
             >
-              <option value="bhashini">BHASHINI ASR</option>
-              <option value="whisper">OpenAI Whisper</option>
+              <option value="browser">Browser speech — no API key</option>
+              <option value="bhashini" disabled>BHASHINI — access not configured</option>
+              <option value="whisper" disabled>Whisper — hosting not configured</option>
             </select>
           </label>
           <label>
             Language
             <select
               value={language}
+              disabled={recording}
               onChange={(e) => setLanguage(e.target.value)}
             >
               <option value="hi">Hindi</option>
@@ -4330,15 +4360,10 @@ function Voice({ close, notify }) {
           {recording ? "Stop & transcribe" : "Start recording"}
         </button>
         <p className="voice-status">{status}</p>
-        {transcript && (
-          <div className="transcript">
-            <small>TRANSCRIPT</small>
-            <b>{transcript}</b>
-          </div>
-        )}
+        <label>Review or type your request<textarea value={transcript} onChange={event=>setTranscript(event.target.value)} placeholder="Type here if speech recognition is unavailable"/></label>
         <small>
-          Audio is sent only after you tap Stop. Credentials remain on the
-          server; do not speak financial or identity secrets.
+          Browser speech may send audio to your browser provider during recognition.
+          Availability depends on your browser. No action is taken from a transcript automatically.
         </small>
       </div>
     </div>
