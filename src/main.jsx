@@ -1425,6 +1425,13 @@ function Market({
     [organic, setOrganic] = useState(false),
     [sort, setSort] = useState("smart"),
     [query, setQuery] = useState("");
+  const cropCategories = useMemo(
+    () => [...new Set(lots.map((lot) => lot.crop).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [lots],
+  );
+  useEffect(() => {
+    if (filter !== "All" && !cropCategories.includes(filter)) setFilter("All");
+  }, [cropCategories, filter]);
   const visible = useMemo(
     () =>
       lots
@@ -1510,13 +1517,13 @@ function Market({
         </label>
       </div>
       <div className="filters">
-        {["All", "Tomato", "Onion", "Potato"].map((x) => (
+        {["All", ...cropCategories].map((x) => (
           <button
             key={x}
             className={filter === x ? "selected" : ""}
             onClick={() => setFilter(x)}
           >
-            {x}
+            {x === "All" ? "All produce" : <>{cropEmoji(x)} {x} <small>({lots.filter((lot) => lot.crop === x).length})</small></>}
           </button>
         ))}
       </div>
