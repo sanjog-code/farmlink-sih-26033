@@ -635,7 +635,7 @@ function App() {
     if (!isSupabaseConfigured) return;
     supabase
       .from("farmer_listings")
-      .select("id,produce_lot_id,crop,category,description,quantity_kg,price_per_kg,image_url,warehouse_image_url,warehouse_grade,grading_confidence,harvest_date,created_at,warehouses(name)")
+      .select("id,produce_lot_id,crop,category,description,quantity_kg,price_per_kg,image_url,image_urls,warehouse_image_url,warehouse_grade,grading_confidence,harvest_date,created_at,warehouses(name)")
       .eq("status", "published")
       .then(({ data }) => {
         if (data)
@@ -663,6 +663,7 @@ function App() {
               // the traceability record and product detail.
               imageUrl: listing.warehouse_image_url || listing.image_url,
               farmerImageUrl: listing.image_url,
+              farmerImageUrls: listing.image_urls?.length ? listing.image_urls : [listing.image_url].filter(Boolean),
               warehouseImageUrl: listing.warehouse_image_url,
               gradingConfidence: listing.grading_confidence,
               description: listing.description,
@@ -1661,6 +1662,7 @@ function ProductDetail({
       </section>
     );
   const saved = wishlist.some((x) => x.id === lot.id);
+  const galleryPhotos = [...new Set([lot.imageUrl, ...(lot.farmerImageUrls || []), lot.warehouseImageUrl].filter(Boolean))];
   return (
     <section className="page product-detail">
       <button className="text-btn" onClick={() => setView("market")}>
@@ -1675,6 +1677,7 @@ function ProductDetail({
           )}
           <i className="crop-emoji-badge detail-crop-emoji" aria-label={`${lot.crop} crop icon`}>{cropEmoji(lot.crop, lot.category)}</i>
           <span>{lot.listing ? (lot.warehouseImageUrl ? "Warehouse-verified photo" : "Farmer photo listing") : "Verified Grade " + lot.grade}</span>
+          {galleryPhotos.length > 1 && <div className="product-photo-gallery">{galleryPhotos.map((photo, index) => <img key={photo} src={photo} alt={`${lot.crop} gallery image ${index + 1}`} />)}</div>}
         </div>
         <div>
           <p className="eyebrow green">TRACEABLE LOT {lot.id}</p>
@@ -2245,6 +2248,7 @@ function WarehouseView({
   const [form, setForm] = useState({
     crop: "Tomato",
     weight: "350",
+    price: "25",
     grade: "A",
     warehouse: warehouses[0]?.name || "Jaipur North",
     listingId: "",
@@ -2256,6 +2260,7 @@ function WarehouseView({
   const [cameraActive, setCameraActive] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejectingListing, setRejectingListing] = useState(false);
+  const [manualMsp, setManualMsp] = useState(0);
   const cameraVideoRef = useRef(null);
   const cameraStreamRef = useRef(null);
   useEffect(() => {
@@ -2264,6 +2269,14 @@ function WarehouseView({
       if (error) notify(error.message); else setScheduledListings(data || []);
     });
   }, [liveTick]);
+  useEffect(() => {
+    if (!isSupabaseConfigured || !form.crop) return;
+    supabase.from("msp_rates").select("msp_per_kg").eq("crop", form.crop).maybeSingle().then(({ data }) => {
+      const floor = Number(data?.msp_per_kg || 0);
+      setManualMsp(floor);
+      if (floor > 0 && Number(form.price) < floor) setForm((current) => ({ ...current, price: String(floor) }));
+    });
+  }, [form.crop]);
   useEffect(() => () => {
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
   }, []);
@@ -2306,7 +2319,7 @@ function WarehouseView({
       hi: form.crop,
       grade: form.grade,
       qty: +form.weight,
-      price: form.crop === "Tomato" ? 27 : 25,
+      price: Number(form.price),
       old: 0,
       warehouse: form.warehouse,
       farmer: "Demo Farmer",
@@ -2332,6 +2345,9 @@ function WarehouseView({
           quantity_kg: newLot.qty,
           price_per_kg: newLot.price,
           warehouse_id: warehouse.id,
+          // Manual stock has no farmer/gallery traceability, so it remains
+          // warehouse-only instead of leaking into the consumer marketplace.
+          marketplace_visible: false,
         })
         .select("id")
         .single();
@@ -2341,8 +2357,9 @@ function WarehouseView({
       }
       newLot.dbId = data.id;
     }
-    setLots([...lots, newLot]);
-    notify(`Lot ${id} recorded with an immutable intake event.`);
+    if (!isSupabaseConfigured) setLots([...lots, newLot]);
+    else setLiveTick((tick) => tick + 1);
+    notify(`Lot ${id} recorded as warehouse-only manual intake.`);
   };
   const receiveRequest = async (request) => {
     if (isSupabaseConfigured) {
@@ -2849,8 +2866,8 @@ function FarmerView({
 function FarmerOperations({ notify, session, liveTick }) {
   const [tab, setTab] = useState("listings"),
     [cropSearch, setCropSearch] = useState(""),
-    [image, setImage] = useState(null),
-    [preview, setPreview] = useState(""),
+    [images, setImages] = useState([]),
+    [previews, setPreviews] = useState([]),
     [saving, setSaving] = useState(false),
     [published, setPublished] = useState(null),
     [quotes, setQuotes] = useState([]),
@@ -2938,13 +2955,15 @@ function FarmerOperations({ notify, session, liveTick }) {
   const activeOrders = farmerOrders.filter((item) => String(item.consumer_orders?.status || "").toLowerCase() !== "cancelled");
   const grossEarnings = activeOrders.reduce((sum, item) => sum + Number(item.quantity_kg || 0) * Number(item.unit_price || 0), 0);
   const fulfilledOrders = activeOrders.filter((item) => ["ready_for_pickup", "completed"].includes(String(item.consumer_orders?.status || "").toLowerCase()));
-  const selectPhoto = (file) => {
-    setImage(file || null);
-    setPreview(file ? URL.createObjectURL(file) : "");
+  const selectPhotos = (files) => {
+    const selected = (files || []).filter((file) => ["image/jpeg", "image/png", "image/webp"].includes(file.type)).slice(0, 6);
+    if ((files || []).length !== selected.length) notify("Use JPEG, PNG, or WebP photos only.");
+    setImages(selected);
+    setPreviews(selected.map((file) => URL.createObjectURL(file)));
   };
   const submitListing = async (event) => {
     event.preventDefault();
-    if (!image) {
+    if (!images.length) {
       notify("Attach at least one produce photo before publishing.");
       return;
     }
@@ -2956,18 +2975,13 @@ function FarmerOperations({ notify, session, liveTick }) {
     setSaving(true);
     try {
       const cropMeta = INDIA_CROPS.find((item) => item.name === listing.crop);
-      const extension = (image.name.split(".").pop() || "jpg").replace(
-        /[^a-z0-9]/gi,
-        "",
-      );
-      const path = session.userId + "/" + crypto.randomUUID() + "." + extension;
-      const { error: uploadError } = await supabase.storage
-        .from("produce-photos")
-        .upload(path, image, { contentType: image.type, upsert: false });
-      if (uploadError) throw uploadError;
-      const { data: urlData } = supabase.storage
-        .from("produce-photos")
-        .getPublicUrl(path);
+      const urls = await Promise.all(images.map(async (image) => {
+        const extension = (image.name.split(".").pop() || "jpg").replace(/[^a-z0-9]/gi, "");
+        const path = `${session.userId}/${crypto.randomUUID()}.${extension}`;
+        const { error: uploadError } = await supabase.storage.from("produce-photos").upload(path, image, { contentType: image.type, upsert: false });
+        if (uploadError) throw uploadError;
+        return supabase.storage.from("produce-photos").getPublicUrl(path).data.publicUrl;
+      }));
       const record = {
         farmer_id: session.userId,
         crop: listing.crop,
@@ -2976,7 +2990,8 @@ function FarmerOperations({ notify, session, liveTick }) {
         quantity_kg: Number(listing.quantity),
         price_per_kg: Number(listing.price),
         harvest_date: listing.harvestDate,
-        image_url: urlData.publicUrl,
+        image_url: urls[0],
+        image_urls: urls,
         status: "pending",
       };
       const { data, error } = await supabase
@@ -3060,6 +3075,11 @@ function FarmerOperations({ notify, session, liveTick }) {
             />
           </label>
           <label>
+            Verified price per kg
+            <input type="number" min={manualMsp || 0.01} step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+            <small>{manualMsp > 0 ? `Official MSP minimum: ₹${manualMsp.toFixed(2)}/kg` : "No official MSP is notified for this crop."}</small>
+          </label>
+          <label>
             Exact harvest date
             <input required type="date" max={new Date().toISOString().slice(0, 10)} value={listing.harvestDate} onChange={(e) => setListing({ ...listing, harvestDate: e.target.value })} />
             <small>This is shown to consumers and drives freshness grading for fruits, vegetables and flowers.</small>
@@ -3088,25 +3108,20 @@ function FarmerOperations({ notify, session, liveTick }) {
             />
           </label>
           <label>
-            Produce photos
+            Produce photos (up to 6)
             <input
               required
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => selectPhoto(e.target.files?.[0])}
+              multiple
+              onChange={(e) => selectPhotos(Array.from(e.target.files || []))}
             />
             <small>
-              JPEG, PNG or WebP. Your photo is stored securely and displayed to
-              consumers.
+              JPEG, PNG or WebP. The first is the listing cover; every selected
+              photo is visible to consumers in the product gallery.
             </small>
           </label>
-          {preview && (
-            <img
-              className="listing-preview"
-              src={preview}
-              alt="Selected produce preview"
-            />
-          )}
+          {previews.length > 0 && <div className="intake-image-compare">{previews.map((preview, index) => <figure key={preview}><img className="listing-preview" src={preview} alt={`Selected produce preview ${index + 1}`}/><figcaption>Photo {index + 1}</figcaption></figure>)}</div>}
           <button className="primary" disabled={saving} type="submit">
             {saving ? "Publishing…" : "Publish listing with photo"}
           </button>
