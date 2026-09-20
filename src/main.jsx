@@ -2478,6 +2478,11 @@ function WarehouseView({
             />
           </label>
           <label>
+            Verified price per kg
+            <input type="number" min={manualMsp || 0.01} step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+            <small>{manualMsp > 0 ? `Official MSP minimum: ₹${manualMsp.toFixed(2)}/kg` : "No official MSP is notified for this crop."}</small>
+          </label>
+          <label>
             Human-verified grade
             <select
               value={form.grade}
@@ -3073,11 +3078,6 @@ function FarmerOperations({ notify, session, liveTick }) {
                 setListing({ ...listing, quantity: e.target.value })
               }
             />
-          </label>
-          <label>
-            Verified price per kg
-            <input type="number" min={manualMsp || 0.01} step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
-            <small>{manualMsp > 0 ? `Official MSP minimum: ₹${manualMsp.toFixed(2)}/kg` : "No official MSP is notified for this crop."}</small>
           </label>
           <label>
             Exact harvest date
