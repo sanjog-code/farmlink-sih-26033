@@ -27,6 +27,7 @@ import {
   BarChart3,
   LogOut,
   ClipboardList,
+  ArrowUp,
 } from "lucide-react";
 import "./styles.css";
 import "./auth.css";
@@ -1165,6 +1166,7 @@ function App() {
         {view === "auth" && (
           <AuthView initialRole={authRole} setSession={setSession} setView={setView} notify={notify} />
         )}{" "}
+        {["privacy", "terms", "disclaimer"].includes(view) && <LegalPage type={view} setView={setView} />}
         {view === "admin" && (
           <>
             <AdminView
@@ -1189,19 +1191,7 @@ function App() {
           </>
         )}
       </main>
-      <footer>
-        <div className="brand light">
-          <span>
-            <Sprout size={22} />
-          </span>
-          Farm<span>Link</span>
-        </div>
-        <p>Farmer-first aggregation • Transparent grade • Better choices</p>
-        <small>
-          Demo platform for SIH 2026 PS 26033. AI recommendations are
-          illustrative, not guarantees.
-        </small>
-      </footer>
+      <SiteFooter setView={setView} notify={notify} />
       {modal === "voice" && (
         <Voice close={() => setModal(null)} notify={notify} />
       )}{" "}
@@ -1221,11 +1211,38 @@ function App() {
           <Check size={17} />
           {toast}
         </div>
-      )}
+      )} 
     </>
   );
 }
 
+function SiteFooter({ setView, notify }) {
+  const [email, setEmail] = useState("");
+  const go = (view) => { setView(view); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const subscribe = (event) => {
+    event.preventDefault();
+    if (!/^\S+@\S+\.\S+$/.test(email)) return notify("Enter a valid email address to subscribe.");
+    notify("Thanks — your FarmLink updates subscription has been recorded.");
+    setEmail("");
+  };
+  return <footer className="site-footer">
+    <div className="footer-main">
+      <div className="footer-brand"><div className="brand light"><span><Sprout size={22}/></span>Farm<span>Link</span></div><p>Farm-to-market infrastructure for transparent, traceable trade.</p><div className="footer-socials"><a href="https://www.instagram.com/farmlink_30?stkn=MW5nZGM1NjYzdXh4cw==" target="_blank" rel="noreferrer" aria-label="FarmLink on Instagram">IG</a><a href="https://youtube.com/@farmlink_30?si=q0HJLuXgeHG6ggsb" target="_blank" rel="noreferrer" aria-label="FarmLink on YouTube">▶</a></div></div>
+      <div><h3>Explore</h3><button onClick={() => go("market")}>Marketplace</button><button onClick={() => go("bulk")}>Wholesale marketplace</button><button onClick={() => go("farmer")}>Farmer portal</button><button onClick={() => go("warehouse")}>Warehouse operations</button></div>
+      <div><h3>Contact</h3><a href="mailto:farmlink30@gmail.com">farmlink30@gmail.com</a><a href="tel:+918209193509">+91 82091 93509</a><p>India · FarmLink SIH 26033</p><button onClick={() => go("disclaimer")}>Platform disclaimer</button></div>
+      <div className="newsletter"><h3>Market updates</h3><p>Get updates on FarmLink features, fresh stock and farmer-first initiatives.</p><form onSubmit={subscribe}><input aria-label="Email for FarmLink updates" type="email" required placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)}/><button type="submit">Subscribe</button></form></div>
+    </div>
+    <div className="footer-bottom"><small>© 2026 FarmLink. All rights reserved.</small><div><button onClick={() => go("privacy")}>Privacy Policy</button><button onClick={() => go("terms")}>Terms of Service</button><button onClick={() => go("disclaimer")}>Disclaimer</button></div><button className="back-to-top" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>Back to top <ArrowUp size={15}/></button></div>
+  </footer>;
+}
+function LegalPage({ type, setView }) {
+  const content = {
+    privacy: { title: "Privacy Policy", intro: "FarmLink collects only the information needed to provide marketplace, fulfillment, and account services.", sections: [["Information we use", "Account details, contact information, farm and listing data, orders, and operational records are used to run the platform and maintain traceability."], ["How we protect it", "Access is role-based, operational data is stored in Supabase, and sensitive actions are restricted to authenticated users."], ["Your choices", "You may request access, correction, or deletion of eligible personal information by contacting farmlink30@gmail.com."]] },
+    terms: { title: "Terms of Service", intro: "By using FarmLink, you agree to use the platform lawfully and provide accurate account, listing, and transaction information.", sections: [["Marketplace conduct", "Farmers must provide accurate crop, harvest, price, and quality information. Buyers must submit genuine orders and quotations."], ["Pricing and fulfillment", "MSP or verified price floors are enforced where configured. Final grade, quantity, availability, and fulfillment remain subject to warehouse verification."], ["Accounts", "Keep your login credentials secure. FarmLink may restrict accounts that misuse the platform or compromise marketplace integrity."]] },
+    disclaimer: { title: "Platform Disclaimer", intro: "FarmLink is an SIH 2026 demonstration platform and not a lender, insurer, government procurement body, or legal adviser.", sections: [["AI guidance", "AI grading, ranking, route, and price insights are decision-support tools. They are not guarantees of quality, market outcome, delivery, or financial return."], ["Market data", "MSP and price-floor information must be verified against the cited official source. Administrators are responsible for source-backed reference floors for crops without an official MSP."], ["External services", "Maps, social sites, and third-party services are governed by their own terms and availability."]] },
+  }[type];
+  return <section className="page legal-page"><button className="secondary" onClick={() => setView("home")}>← Back to FarmLink</button><p className="eyebrow green">FARMLINK LEGAL</p><h1>{content.title}</h1><p className="legal-intro">{content.intro}</p>{content.sections.map(([heading, body]) => <article key={heading}><h2>{heading}</h2><p>{body}</p></article>)}<p className="legal-contact">Questions? Contact <a href="mailto:farmlink30@gmail.com">farmlink30@gmail.com</a>.</p></section>;
+}
 function Home({ t, lots, setView, access, reserve, setModal }) {
   return (
     <>
@@ -2484,6 +2501,9 @@ function FarmerView({
   const myLots = lots.filter(
     (l) => l.farmer === "Ramesh Kumar" || l.farmer === session?.name,
   );
+  const myRequests = produceRequests.filter((request) => request.farmer === (session?.name || "Farmer"));
+  const activeRequestCount = myRequests.filter((request) => !["received", "cancelled"].includes(String(request.status).toLowerCase())).length;
+  const listedValue = myLots.reduce((sum, lot) => sum + Number(lot.qty || 0) * Number(lot.price || 0), 0);
   const submit = async (e) => {
     e.preventDefault();
     const id = `REQ-${String(Date.now()).slice(-6)}`;
@@ -2542,6 +2562,12 @@ function FarmerView({
           <span>820 kg in storage</span>
         </div>
       </div>
+      <section className="farmer-overview" aria-label="Farmer dashboard summary">
+        <div><span className="overview-icon"><PackageCheck size={18}/></span><small>Live produce lots</small><b>{myLots.length}</b><em>Warehouse-verified inventory</em></div>
+        <div><span className="overview-icon"><Truck size={18}/></span><small>Collection requests</small><b>{activeRequestCount}</b><em>Awaiting pickup or grading</em></div>
+        <div><span className="overview-icon"><BarChart3 size={18}/></span><small>Indicative stock value</small><b>₹{listedValue.toLocaleString("en-IN")}</b><em>Based on live listed quantity</em></div>
+        <div><span className="overview-icon"><ShieldCheck size={18}/></span><small>Next action</small><b>{activeRequestCount ? "Track request" : "Add produce"}</b><em>{activeRequestCount ? "Collection is in progress" : "Start an intake request"}</em></div>
+      </section>
       <div className="farmer-grid workflow-grid">
         <form className="intake farmer-request" onSubmit={submit}>
           <p className="eyebrow green">PICKUP & GRADING</p>
@@ -2640,8 +2666,7 @@ function FarmerView({
               <strong>₹{l.price}/kg</strong>
             </div>
           ))}
-          {produceRequests
-            .filter((r) => r.farmer === (session?.name || "Farmer"))
+          {myRequests
             .map((r) => (
               <div className="my-lot" key={r.id}>
                 <span>{cropEmoji(r.crop)}</span>
