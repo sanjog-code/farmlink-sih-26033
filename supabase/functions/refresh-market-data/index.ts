@@ -66,8 +66,7 @@ Deno.serve(async (request) => {
       if (!upsert.ok) throw new Error(`Could not save market data: ${await upsert.text()}`)
     }
     await rest(`market_sync_runs?id=eq.${run.id}`, { method: 'PATCH', body: JSON.stringify({ status: snapshots.length ? 'succeeded' : 'partial', completed_at: new Date().toISOString(), records_received: rows.length, records_written: snapshots.length, details: snapshots.length ? 'Daily government mandi records imported.' : 'No supported FarmLink crop records were returned.' }) })
-    await rest('msp_source_status?id=eq.true', { method: 'PATCH', body: JSON.stringify({ last_checked_at: new Date().toISOString() }) })
-    return json({ source: 'data.gov.in / AGMARKNET', received: rows.length, written: snapshots.length, msp: 'Official MSP source check recorded; MSP values change only after a verified Government notification.' })
+    return json({ source: 'data.gov.in / AGMARKNET', received: rows.length, written: snapshots.length, msp: 'MSP remains tied to the verified seasonal Government notification; this daily job imports mandi prices only.' })
   } catch (error) {
     if (run?.id) await rest(`market_sync_runs?id=eq.${run.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'failed', completed_at: new Date().toISOString(), details: error instanceof Error ? error.message : 'Unknown refresh error' }) })
     return json({ error: error instanceof Error ? error.message : 'Market refresh failed.' }, 502)
