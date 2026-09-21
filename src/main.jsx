@@ -2005,6 +2005,7 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
     [quantity, setQuantity] = useState(250),
     [offer, setOffer] = useState(""),
     [quoteFloor, setQuoteFloor] = useState(null),
+    [quoteMarket, setQuoteMarket] = useState(null),
     [myQuotes, setMyQuotes] = useState([]),
     [negotiation, setNegotiation] = useState(null),
     [replyPrice, setReplyPrice] = useState(""),
@@ -2032,6 +2033,12 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
     });
     return () => { active = false; };
   }, [quote?.crop]);
+  useEffect(() => {
+    if (!isSupabaseConfigured || !quote?.crop) return;
+    let active = true;
+    supabase.from("market_price_snapshots").select("modal_price_per_kg,market,state,price_date,fetched_at").eq("crop", quote.crop).order("price_date", { ascending: false }).limit(1).maybeSingle().then(({ data }) => { if (active) setQuoteMarket(data || null); });
+    return () => { active = false; };
+  }, [quote?.crop, liveTick]);
   useEffect(() => {
     if (!isSupabaseConfigured || !contract.crop) return;
     let active = true;
@@ -2173,6 +2180,7 @@ function BulkMarket({ lots, setView, notify, session, liveTick, setLiveTick }) {
                 or decline.
               </p>
               <small className={quoteFloor?.price > 0 ? "floor-note" : "floor-note missing"}>{quoteFloor?.price > 0 ? <>Official MSP ({quoteFloor.season}): <b>₹{quoteFloor.price.toFixed(2)}/kg</b>{quoteFloor.updatedAt ? ` · verified ${new Date(quoteFloor.updatedAt).toLocaleDateString("en-IN")}` : ""}{quoteFloor.source ? <a href={quoteFloor.source} target="_blank" rel="noreferrer"> View Government notice</a> : ""}</> : "No official MSP is currently notified for this crop — you can make a market-based offer."}</small>
+              <small className="floor-note">{quoteMarket ? <>Latest mandi modal price: <b>₹{Number(quoteMarket.modal_price_per_kg).toFixed(2)}/kg</b> · {quoteMarket.market}{quoteMarket.state ? `, ${quoteMarket.state}` : ""} · {new Date(`${quoteMarket.price_date}T00:00:00`).toLocaleDateString("en-IN")}</> : "Daily mandi market data will appear after the first Government-data refresh."}</small>
               <label>
                 Quantity (minimum 250 kg)
                 <input type="number" min="250" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
@@ -2918,6 +2926,7 @@ function FarmerOperations({ notify, session, liveTick }) {
     [farmerOrders, setFarmerOrders] = useState([]),
     [farmerJobs, setFarmerJobs] = useState([]),
     [listingFloor, setListingFloor] = useState(null),
+    [listingMarket, setListingMarket] = useState(null),
     [listing, setListing] = useState({
       crop: "Tomato",
       description: "Fresh produce from our verified farm cluster.",
@@ -2943,6 +2952,12 @@ function FarmerOperations({ notify, session, liveTick }) {
     });
     return () => { active = false; };
   }, [listing.crop]);
+  useEffect(() => {
+    if (!isSupabaseConfigured || !listing.crop) return;
+    let active = true;
+    supabase.from("market_price_snapshots").select("modal_price_per_kg,market,state,price_date,fetched_at").eq("crop", listing.crop).order("price_date", { ascending: false }).limit(1).maybeSingle().then(({ data }) => { if (active) setListingMarket(data || null); });
+    return () => { active = false; };
+  }, [listing.crop, liveTick]);
   useEffect(() => {
     if (!isSupabaseConfigured || !session?.userId) return;
     Promise.all([
@@ -3133,6 +3148,7 @@ function FarmerOperations({ notify, session, liveTick }) {
               }
             />
             <small className={listingFloor?.price > 0 ? "floor-note" : "floor-note missing"}>{listingFloor?.price > 0 ? <>{listingFloor.label}{listingFloor.season ? ` (${listingFloor.season})` : ""}: <b>₹{listingFloor.price.toFixed(2)}/kg</b>{listingFloor.updatedAt ? ` · verified ${new Date(listingFloor.updatedAt).toLocaleDateString("en-IN")}` : ""}{listingFloor.source ? <a href={listingFloor.source} target="_blank" rel="noreferrer"> View Government notice</a> : ""}</> : "No official MSP is currently notified for this crop — you may list at a market-based price."}</small>
+            <small className="floor-note">{listingMarket ? <>Latest mandi modal price: <b>₹{Number(listingMarket.modal_price_per_kg).toFixed(2)}/kg</b> · {listingMarket.market}{listingMarket.state ? `, ${listingMarket.state}` : ""} · {new Date(`${listingMarket.price_date}T00:00:00`).toLocaleDateString("en-IN")}</> : "Daily mandi market data will appear after the first Government-data refresh."}</small>
           </label>
           <label>
             Description

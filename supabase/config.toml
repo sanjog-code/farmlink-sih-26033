@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.market-advisory]
 verify_jwt = true
+
+[functions.refresh-market-data]
+verify_jwt = false
