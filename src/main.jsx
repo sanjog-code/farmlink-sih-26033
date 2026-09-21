@@ -719,6 +719,9 @@ function App() {
       return;
     let active = true;
     const loadOrders = async (showError = true) => {
+      // Makes an expired cancellation window durable even on projects where
+      // database cron is unavailable, before reading the live order state.
+      await supabase.rpc("expire_consumer_cancellation_windows");
       const result = session.role === "admin"
         ? await supabase.rpc("get_admin_consumer_orders")
         : await supabase
