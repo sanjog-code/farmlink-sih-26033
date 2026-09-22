@@ -1056,9 +1056,18 @@ function App() {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+  const toastTimerRef = useRef(null);
+  const lastToastRef = useRef({ msg: "", time: 0 });
   const notify = (m) => {
+    if (!m) return;
+    const now = Date.now();
+    if (lastToastRef.current.msg === m && now - lastToastRef.current.time < 1200) {
+      return;
+    }
+    lastToastRef.current = { msg: m, time: now };
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast(m);
-    setTimeout(() => setToast(""), 3000);
+    toastTimerRef.current = setTimeout(() => setToast(""), 3000);
   };
   const reserve = (lot) => {
     if (!lot) return;
@@ -2628,6 +2637,12 @@ function WarehouseView({
   const [rejectingListing, setRejectingListing] = useState(false);
   const [manualMsp, setManualMsp] = useState(0);
   const [gradingReport, setGradingReport] = useState(null);
+  const [confirmingIntake, setConfirmingIntake] = useState(false);
+  const confirmingIntakeRef = useRef(false);
+  const lastIntakeConfirmRef = useRef(0);
+  const [submittingManualIntake, setSubmittingManualIntake] = useState(false);
+  const submittingManualIntakeRef = useRef(false);
+  const lastManualIntakeRef = useRef(0);
   const cameraVideoRef = useRef(null);
   const cameraStreamRef = useRef(null);
   useEffect(() => {
@@ -2679,54 +2694,68 @@ function WarehouseView({
   };
   const submit = async (e) => {
     e.preventDefault();
-    let id = `FL-${24094 + lots.length}`;
-    const newLot = {
-      id,
-      crop: form.crop,
-      hi: form.crop,
-      grade: form.grade,
-      qty: +form.weight,
-      price: Number(form.price),
-      old: 0,
-      warehouse: form.warehouse,
-      farmer: "Demo Farmer",
-      dist: "0 km",
-      trend: 4,
-    };
-    if (isSupabaseConfigured && session?.userId) {
-      const { data: warehouse, error: warehouseError } = await supabase
-        .from("warehouses")
-        .select("id")
-        .eq("name", form.warehouse)
-        .single();
-      if (warehouseError) {
-        notify("Warehouse could not be found.");
-        return;
-      }
-      const { data, error } = await supabase
-        .from("produce_lots")
-        .insert({
-          lot_code: id,
-          crop: form.crop,
-          grade: form.grade,
-          quantity_kg: newLot.qty,
-          price_per_kg: newLot.price,
-          warehouse_id: warehouse.id,
-          // Manual stock has no farmer/gallery traceability, so it remains
-          // warehouse-only instead of leaking into the consumer marketplace.
-          marketplace_visible: false,
-        })
-        .select("id")
-        .single();
-      if (error) {
-        notify(error.message);
-        return;
-      }
-      newLot.dbId = data.id;
+    const now = Date.now();
+    if (submittingManualIntakeRef.current || submittingManualIntake || now - lastManualIntakeRef.current < 2000) {
+      return;
     }
-    if (!isSupabaseConfigured) setLots([...lots, newLot]);
-    else setLiveTick((tick) => tick + 1);
-    notify(`Lot ${id} recorded as warehouse-only manual intake.`);
+    submittingManualIntakeRef.current = true;
+    lastManualIntakeRef.current = now;
+    setSubmittingManualIntake(true);
+    try {
+      let id = `FL-${24094 + lots.length}`;
+      const newLot = {
+        id,
+        crop: form.crop,
+        hi: form.crop,
+        grade: form.grade,
+        qty: +form.weight,
+        price: Number(form.price),
+        old: 0,
+        warehouse: form.warehouse,
+        farmer: "Demo Farmer",
+        dist: "0 km",
+        trend: 4,
+      };
+      if (isSupabaseConfigured && session?.userId) {
+        const { data: warehouse, error: warehouseError } = await supabase
+          .from("warehouses")
+          .select("id")
+          .eq("name", form.warehouse)
+          .single();
+        if (warehouseError) {
+          notify("Warehouse could not be found.");
+          return;
+        }
+        const { data, error } = await supabase
+          .from("produce_lots")
+          .insert({
+            lot_code: id,
+            crop: form.crop,
+            grade: form.grade,
+            quantity_kg: newLot.qty,
+            price_per_kg: newLot.price,
+            warehouse_id: warehouse.id,
+            // Manual stock has no farmer/gallery traceability, so it remains
+            // warehouse-only instead of leaking into the consumer marketplace.
+            marketplace_visible: false,
+          })
+          .select("id")
+          .single();
+        if (error) {
+          notify(error.message);
+          return;
+        }
+        newLot.dbId = data.id;
+      }
+      if (!isSupabaseConfigured) setLots([...lots, newLot]);
+      else setLiveTick((tick) => tick + 1);
+      notify(`Lot ${id} recorded as warehouse-only manual intake.`);
+    } finally {
+      setSubmittingManualIntake(false);
+      setTimeout(() => {
+        submittingManualIntakeRef.current = false;
+      }, 1000);
+    }
   };
   const receiveRequest = async (request) => {
     if (isSupabaseConfigured) {
@@ -2746,9 +2775,24 @@ function WarehouseView({
     notify(`${request.crop} intake marked received.`);
   };
   const confirmScheduledIntake = async () => {
+    const now = Date.now();
+    if (confirmingIntakeRef.current || confirmingIntake || now - lastIntakeConfirmRef.current < 2000) {
+      return;
+    }
+    confirmingIntakeRef.current = true;
+    lastIntakeConfirmRef.current = now;
+
     const listing = scheduledListings.find((item) => item.id === form.listingId);
-    if (!listing) return notify("Select a scheduled farmer listing.");
-    if (!warehousePhoto) { await startLiveCamera(); return notify("Capture the required live warehouse photo before confirming intake."); }
+    if (!listing) {
+      confirmingIntakeRef.current = false;
+      return notify("Select a scheduled farmer listing.");
+    }
+    if (!warehousePhoto) {
+      confirmingIntakeRef.current = false;
+      await startLiveCamera();
+      return notify("Capture the required live warehouse photo before confirming intake.");
+    }
+    setConfirmingIntake(true);
     try {
       const extension = (warehousePhoto.name.split(".").pop() || "jpg").replace(/[^a-z0-9]/gi, "");
       const path = `${session.userId}/warehouse-intake/${listing.id}-${crypto.randomUUID()}.${extension}`;
@@ -2759,18 +2803,46 @@ function WarehouseView({
       setScheduledListings((current) => current.filter((item) => item.id !== listing.id));
       setForm({ ...form, listingId: "", grade: "A" }); setWarehousePhoto(null); setWarehousePreview(""); setGradingReport(null); setLiveTick((tick) => tick + 1);
       notify(`${listing.crop} intake confirmed. The farmer photo, live warehouse photo, measured weight and operator grade are now live.`);
-    } catch (error) { notify(error.message || "Warehouse intake confirmation failed."); }
+    } catch (error) {
+      notify(error.message || "Warehouse intake confirmation failed.");
+    } finally {
+      setConfirmingIntake(false);
+      setTimeout(() => {
+        confirmingIntakeRef.current = false;
+      }, 1000);
+    }
   };
   const rejectScheduledIntake = async () => {
+    const now = Date.now();
+    if (confirmingIntakeRef.current || confirmingIntake || now - lastIntakeConfirmRef.current < 2000) {
+      return;
+    }
+    confirmingIntakeRef.current = true;
+    lastIntakeConfirmRef.current = now;
+
     const listing = scheduledListings.find((item) => item.id === form.listingId);
-    if (!listing) return notify("Select a scheduled farmer listing before rejecting it.");
-    if (!rejectionReason.trim()) return notify("Enter a clear rejection reason for the farmer.");
-    const { error } = await supabase.from("farmer_listings").update({ status: "rejected", warehouse_rejection_reason: rejectionReason.trim(), warehouse_rejected_at: new Date().toISOString() }).eq("id", listing.id);
-    if (error) return notify(error.message);
-    stopLiveCamera();
-    setScheduledListings((current) => current.filter((item) => item.id !== listing.id));
-    setForm({ ...form, listingId: "" }); setRejectionReason(""); setRejectingListing(false); setWarehousePhoto(null); setWarehousePreview(""); setLiveTick((tick) => tick + 1);
-    notify(`${listing.crop} intake was rejected. The farmer has been notified with the warehouse reason.`);
+    if (!listing) {
+      confirmingIntakeRef.current = false;
+      return notify("Select a scheduled farmer listing before rejecting it.");
+    }
+    if (!rejectionReason.trim()) {
+      confirmingIntakeRef.current = false;
+      return notify("Enter a clear rejection reason for the farmer.");
+    }
+    setConfirmingIntake(true);
+    try {
+      const { error } = await supabase.from("farmer_listings").update({ status: "rejected", warehouse_rejection_reason: rejectionReason.trim(), warehouse_rejected_at: new Date().toISOString() }).eq("id", listing.id);
+      if (error) return notify(error.message);
+      stopLiveCamera();
+      setScheduledListings((current) => current.filter((item) => item.id !== listing.id));
+      setForm({ ...form, listingId: "" }); setRejectionReason(""); setRejectingListing(false); setWarehousePhoto(null); setWarehousePreview(""); setLiveTick((tick) => tick + 1);
+      notify(`${listing.crop} intake was rejected. The farmer has been notified with the warehouse reason.`);
+    } finally {
+      setConfirmingIntake(false);
+      setTimeout(() => {
+        confirmingIntakeRef.current = false;
+      }, 1000);
+    }
   };
   const readyPickupOrders = orders.filter((order) => String(order.status).toLowerCase() === "ready for pickup");
   const collectedOrders = orders.filter((order) => String(order.status).toLowerCase() === "completed");
@@ -2816,8 +2888,8 @@ function WarehouseView({
           {form.listingId && !warehousePreview && <div className="camera-actions"><button className="secondary" type="button" onClick={startLiveCamera}>{cameraActive ? "Restart camera" : "Open live camera"}</button>{cameraActive && <button className="primary" type="button" onClick={captureLivePhoto}><ScanLine size={16}/>Capture live photo</button>}<label className="camera-upload">Fallback camera upload<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(event) => { const file = event.target.files?.[0] || null; setWarehousePhoto(file); setWarehousePreview(file ? URL.createObjectURL(file) : ""); stopLiveCamera(); }} /></label></div>}
           {form.listingId && <GradeReview image={warehousePhoto} crop={form.crop} listingId={form.listingId} onReport={setGradingReport}/>}
           <label>Confirmed grade<select value={form.grade} onChange={(event) => setForm({ ...form, grade: event.target.value })}><option>A</option><option>B</option><option>C</option></select></label>
-          <div className="intake-final-actions"><button className="primary" type="button" onClick={confirmScheduledIntake}><BrainCircuit size={18}/>Confirm grade & publish</button><button className="danger" type="button" onClick={() => setRejectingListing((current) => !current)}>Reject intake</button></div>
-          {rejectingListing && <div className="rejection-box"><b>Tell the farmer why this intake is rejected</b><textarea value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} placeholder="Example: Visible spoilage and damaged packaging observed at intake."/><button className="danger" type="button" onClick={rejectScheduledIntake}>Send rejection to farmer</button></div>}
+          <div className="intake-final-actions"><button className="primary" type="button" disabled={confirmingIntake} onClick={confirmScheduledIntake}><BrainCircuit size={18}/>{confirmingIntake ? "Confirming & publishing…" : "Confirm grade & publish"}</button><button className="danger" type="button" disabled={confirmingIntake} onClick={() => setRejectingListing((current) => !current)}>Reject intake</button></div>
+          {rejectingListing && <div className="rejection-box"><b>Tell the farmer why this intake is rejected</b><textarea value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} placeholder="Example: Visible spoilage and damaged packaging observed at intake."/><button className="danger" type="button" disabled={confirmingIntake} onClick={rejectScheduledIntake}>{confirmingIntake ? "Sending rejection…" : "Send rejection to farmer"}</button></div>}
         </div>
         <form className="intake" onSubmit={submit}>
           <h3>Confirm produce intake</h3>
@@ -2864,9 +2936,9 @@ function WarehouseView({
             </select>
           </label>
           <div className="grade-ai"><BrainCircuit/><div><b>Human inspection required</b><small>Manual stock stays warehouse-only. Scheduled farmer listings can use the configured photo model before operator approval.</small></div><span>Operator</span></div>
-          <button className="primary" type="submit">
+          <button className="primary" type="submit" disabled={submittingManualIntake}>
             <ScanLine size={18} />
-            Confirm grade & create lot
+            {submittingManualIntake ? "Recording intake…" : "Confirm grade & create lot"}
           </button>
         </form>
         <div className="ledger">
@@ -3019,37 +3091,56 @@ function FarmerView({
   const myRequests = produceRequests.filter((request) => request.farmer === (session?.name || "Farmer"));
   const activeRequestCount = myRequests.filter((request) => !["received", "cancelled"].includes(String(request.status).toLowerCase())).length;
   const listedValue = myLots.reduce((sum, lot) => sum + Number(lot.qty || 0) * Number(lot.price || 0), 0);
+  const [submittingProduce, setSubmittingProduce] = useState(false);
+  const submittingProduceRef = useRef(false);
+  const lastProduceSubmitTimeRef = useRef(0);
+
   const submit = async (e) => {
     e.preventDefault();
-    const id = `REQ-${String(Date.now()).slice(-6)}`;
-    const request = {
-      ...form,
-      id,
-      farmer: session?.name || "Farmer",
-      status: "pending",
-      created_at: new Date().toISOString(),
-    };
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from("produce_requests")
-        .insert({
-          crop: form.crop,
-          type: form.type,
-          gross_weight_kg: Number(form.grossWeight),
-          cluster: form.cluster,
-          farmer_name: session?.name || "Farmer",
-        })
-        .select("id")
-        .single();
-      if (error) {
-        notify(error.message);
-        return;
-      }
-      request.id = data.id;
+    const now = Date.now();
+    if (submittingProduceRef.current || submittingProduce || now - lastProduceSubmitTimeRef.current < 2000) {
+      return;
     }
-    setProduceRequests((current) => [request, ...current]);
-    setForm({ ...form, grossWeight: "" });
-    notify(`${form.type} ${id} sent to the warehouse admin.`);
+    submittingProduceRef.current = true;
+    lastProduceSubmitTimeRef.current = now;
+    setSubmittingProduce(true);
+
+    try {
+      const id = `REQ-${String(Date.now()).slice(-6)}`;
+      const request = {
+        ...form,
+        id,
+        farmer: session?.name || "Farmer",
+        status: "pending",
+        created_at: new Date().toISOString(),
+      };
+      if (isSupabaseConfigured) {
+        const { data, error } = await supabase
+          .from("produce_requests")
+          .insert({
+            crop: form.crop,
+            type: form.type,
+            gross_weight_kg: Number(form.grossWeight),
+            cluster: form.cluster,
+            farmer_name: session?.name || "Farmer",
+          })
+          .select("id")
+          .single();
+        if (error) {
+          notify(error.message);
+          return;
+        }
+        request.id = data.id;
+      }
+      setProduceRequests((current) => [request, ...current]);
+      setForm({ ...form, grossWeight: "" });
+      notify(`${form.type} ${id} sent to the warehouse admin.`);
+    } finally {
+      setSubmittingProduce(false);
+      setTimeout(() => {
+        submittingProduceRef.current = false;
+      }, 1000);
+    }
   };
   return (
     <section className="page farmer-page">
@@ -3185,9 +3276,9 @@ function FarmerView({
               </small>
             </div>
           </div>
-          <button className="primary" type="submit">
+          <button className="primary" disabled={submittingProduce} type="submit">
             <Truck size={18} />
-            Send request to warehouse
+            {submittingProduce ? "Sending request…" : "Send request to warehouse"}
           </button>
         </form>
         <div className="my-lots">
@@ -3288,6 +3379,9 @@ function FarmerView({
 function FarmerVerificationWorkflow({ farmerVerification, setFarmerVerification, notify, session }) {
   const [isEditing, setIsEditing] = useState(() => farmerVerification?.status === "unverified");
   const [step, setStep] = useState(1);
+  const [submittingKYC, setSubmittingKYC] = useState(false);
+  const submittingKYCRef = useRef(false);
+  const lastKYCSubmitRef = useRef(0);
   const [form, setForm] = useState({
     farmerName: session?.name || farmerVerification?.farmerName || "Ramesh Kumar",
     mobile: farmerVerification?.mobile || "+91 98290 14820",
@@ -3310,25 +3404,43 @@ function FarmerVerificationWorkflow({ farmerVerification, setFarmerVerification,
 
   const handleSubmit = (e) => {
     e?.preventDefault();
+    const now = Date.now();
+    if (submittingKYCRef.current || submittingKYC || now - lastKYCSubmitRef.current < 2000) {
+      return;
+    }
+    submittingKYCRef.current = true;
+    lastKYCSubmitRef.current = now;
+
     if (!form.farmerName || !form.mobile || !form.idNumber) {
+      submittingKYCRef.current = false;
       return notify("Please complete all required identity and KYC fields.");
     }
     if (!form.khasraNumber || !form.landAcres) {
+      submittingKYCRef.current = false;
       return notify("Please enter your land Khasra / survey number and acreage.");
     }
     if (!form.bankName || !form.accountNumber || !form.ifsc) {
+      submittingKYCRef.current = false;
       return notify("Please enter your bank account details for direct payments.");
     }
-    const updated = {
-      ...farmerVerification,
-      ...form,
-      status: "under_review",
-      id: farmerVerification?.id || `KYC-RJ-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-      submittedAt: new Date().toISOString(),
-    };
-    setFarmerVerification(updated);
-    setIsEditing(false);
-    notify("Verification submitted! Your KYC documents are under review by the FarmLink administrator.");
+    setSubmittingKYC(true);
+    try {
+      const updated = {
+        ...farmerVerification,
+        ...form,
+        status: "under_review",
+        id: farmerVerification?.id || `KYC-RJ-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+        submittedAt: new Date().toISOString(),
+      };
+      setFarmerVerification(updated);
+      setIsEditing(false);
+      notify("Verification submitted! Your KYC documents are under review by the FarmLink administrator.");
+    } finally {
+      setSubmittingKYC(false);
+      setTimeout(() => {
+        submittingKYCRef.current = false;
+      }, 1000);
+    }
   };
 
   const status = farmerVerification?.status || "unverified";
@@ -3364,7 +3476,12 @@ function FarmerVerificationWorkflow({ farmerVerification, setFarmerVerification,
           {status === "under_review" && !isEditing && (
             <button
               className="primary"
+              disabled={submittingKYC}
               onClick={() => {
+                const now = Date.now();
+                if (submittingKYCRef.current || now - lastKYCSubmitRef.current < 1500) return;
+                submittingKYCRef.current = true;
+                lastKYCSubmitRef.current = now;
                 setFarmerVerification((curr) => ({
                   ...curr,
                   status: "verified",
@@ -3372,6 +3489,7 @@ function FarmerVerificationWorkflow({ farmerVerification, setFarmerVerification,
                   reviewerNote: "Verified with State Agriculture Department land records.",
                 }));
                 notify("✓ Approved! You are now an officially verified FarmLink Producer.");
+                setTimeout(() => { submittingKYCRef.current = false; }, 1000);
               }}
             >
               Simulate Instant Admin Approval
@@ -3627,8 +3745,8 @@ function FarmerVerificationWorkflow({ farmerVerification, setFarmerVerification,
                   <button type="button" className="secondary" onClick={() => setIsEditing(false)}>
                     Cancel
                   </button>
-                  <button type="submit" className="primary">
-                    <Check size={16} /> Submit Official Verification
+                  <button type="submit" className="primary" disabled={submittingKYC}>
+                    <Check size={16} /> {submittingKYC ? "Submitting…" : "Submit Official Verification"}
                   </button>
                 </div>
               </div>
@@ -3678,6 +3796,8 @@ function FarmerOperations({ notify, session, liveTick, listingPrefill, farmerVer
     [previews, setPreviews] = useState([]),
     [saving, setSaving] = useState(false),
     [published, setPublished] = useState(null),
+    submittingRef = useRef(false),
+    lastSubmitTimeRef = useRef(0),
     [quotes, setQuotes] = useState([]),
     [counterOffers, setCounterOffers] = useState({}),
     [counterNotes, setCounterNotes] = useState({}),
@@ -3788,18 +3908,55 @@ function FarmerOperations({ notify, session, liveTick, listingPrefill, farmerVer
   };
   const submitListing = async (event) => {
     event.preventDefault();
+    const now = Date.now();
+    // Coalesce multiple rapid spam clicks into a single execution
+    if (submittingRef.current || saving || now - lastSubmitTimeRef.current < 2000) {
+      return;
+    }
+    submittingRef.current = true;
+    lastSubmitTimeRef.current = now;
+
     if (!images.length) {
+      submittingRef.current = false;
       notify("Attach at least one produce photo before publishing.");
       return;
     }
-    if (!session?.userId || !isSupabaseConfigured) {
+    if (!session?.userId && !session?.name) {
+      submittingRef.current = false;
       notify("Sign in as a farmer to publish a listing.");
       return;
     }
-    if (listingFloor?.price > 0 && Number(listing.price) < listingFloor.price) return notify(`Your listing price cannot be below the official MSP of ₹${listingFloor.price.toFixed(2)}/kg.`);
+    if (listingFloor?.price > 0 && Number(listing.price) < listingFloor.price) {
+      submittingRef.current = false;
+      return notify(`Your listing price cannot be below the official MSP of ₹${listingFloor.price.toFixed(2)}/kg.`);
+    }
+
     setSaving(true);
     try {
       const cropMeta = INDIA_CROPS.find((item) => item.name === listing.crop);
+      if (!isSupabaseConfigured) {
+        const demoListing = {
+          id: `demo-listing-${Date.now()}`,
+          farmer_id: session?.userId || "demo-farmer",
+          crop: listing.crop,
+          category: cropMeta?.category || "Other",
+          description: listing.description,
+          quantity_kg: Number(listing.quantity),
+          price_per_kg: Number(listing.price),
+          harvest_date: listing.harvestDate,
+          image_url: previews[0] || "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80",
+          image_urls: previews.length ? previews : ["https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80"],
+          status: "pending",
+          created_at: new Date().toISOString(),
+          profiles: { full_name: session?.name || "Ramesh Kumar" }
+        };
+        setFarmerListings((prev) => [demoListing, ...prev]);
+        setPublished(demoListing);
+        notify("Photo listing submitted to the admin for verification. It will appear to consumers only after approval.");
+        setImages([]);
+        setPreviews([]);
+        return;
+      }
       const urls = await Promise.all(images.map(async (image) => {
         const extension = (image.name.split(".").pop() || "jpg").replace(/[^a-z0-9]/gi, "");
         const path = `${session.userId}/${crypto.randomUUID()}.${extension}`;
@@ -3833,6 +3990,9 @@ function FarmerOperations({ notify, session, liveTick, listingPrefill, farmerVer
       notify(error.message || "Photo listing could not be published.");
     } finally {
       setSaving(false);
+      setTimeout(() => {
+        submittingRef.current = false;
+      }, 1000);
     }
   };
   return (
@@ -4694,6 +4854,9 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
   const [tab, setTab] = useState("action");
   const [listings, setListings] = useState([]);
   const [listingCategory, setListingCategory] = useState("pending");
+  const [actionBusy, setActionBusy] = useState({});
+  const actionLockRef = useRef(new Set());
+  const lastActionTimeRef = useRef({});
   const [farmers, setFarmers] = useState([]);
   const [assignments, setAssignments] = useState({});
   const [clusterSelections, setClusterSelections] = useState({});
@@ -4794,42 +4957,94 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
     refresh(); notify(message);
   };
   const reviewListing = async (id, status) => {
-    if (String(id).startsWith("demo-")) {
-      setListings((current) => (current.length ? current : demoListings).map(item => item.id === id ? { ...item, status } : item));
-      notify(status === "published" ? "Listing verified and published with the farmer photo." : "Listing rejected; the farmer can correct it and resubmit.");
+    const now = Date.now();
+    const actionKey = `review-${id}`;
+    if (actionLockRef.current.has(actionKey) || (lastActionTimeRef.current[actionKey] && now - lastActionTimeRef.current[actionKey] < 2000)) {
       return;
     }
-    const { error } = await supabase.from("farmer_listings").update({ status, reviewed_at: new Date().toISOString() }).eq("id", id);
-    if (error) return notify(error.message);
-    notify(status === "published" ? "Listing verified and published with the farmer photo." : "Listing rejected; the farmer can correct it and resubmit."); refresh();
+    actionLockRef.current.add(actionKey);
+    lastActionTimeRef.current[actionKey] = now;
+    setActionBusy((prev) => ({ ...prev, [id]: true }));
+
+    try {
+      if (String(id).startsWith("demo-")) {
+        setListings((current) => (current.length ? current : demoListings).map(item => item.id === id ? { ...item, status } : item));
+        notify(status === "published" ? "Listing verified and published with the farmer photo." : "Listing rejected; the farmer can correct it and resubmit.");
+        return;
+      }
+      const { error } = await supabase.from("farmer_listings").update({ status, reviewed_at: new Date().toISOString() }).eq("id", id);
+      if (error) return notify(error.message);
+      notify(status === "published" ? "Listing verified and published with the farmer photo." : "Listing rejected; the farmer can correct it and resubmit.");
+      refresh();
+    } finally {
+      setTimeout(() => {
+        actionLockRef.current.delete(actionKey);
+        setActionBusy((prev) => ({ ...prev, [id]: false }));
+      }, 800);
+    }
   };
   const removeMarketplaceListing = async (listing) => {
-    if (!window.confirm(`Remove ${listing.crop} from the marketplace? The traceable intake record will be retained.`)) return;
-    if (String(listing.id).startsWith("demo-")) {
-      setListings((current) => (current.length ? current : demoListings).filter(item => item.id !== listing.id));
-      notify(`${listing.crop} has been removed from the marketplace. The underlying traceability record was retained.`);
+    const id = listing.id;
+    const now = Date.now();
+    const actionKey = `remove-${id}`;
+    if (actionLockRef.current.has(actionKey) || (lastActionTimeRef.current[actionKey] && now - lastActionTimeRef.current[actionKey] < 2000)) {
       return;
     }
-    const { error } = await supabase.rpc("remove_marketplace_listing", { p_listing_id: listing.id });
-    if (error) return notify(error.message);
-    notify(`${listing.crop} has been removed from the marketplace. The underlying traceability record was retained.`);
-    refresh();
+    if (!window.confirm(`Remove ${listing.crop} from the marketplace? The traceable intake record will be retained.`)) return;
+    actionLockRef.current.add(actionKey);
+    lastActionTimeRef.current[actionKey] = now;
+    setActionBusy((prev) => ({ ...prev, [id]: true }));
+
+    try {
+      if (String(listing.id).startsWith("demo-")) {
+        setListings((current) => (current.length ? current : demoListings).filter(item => item.id !== listing.id));
+        notify(`${listing.crop} has been removed from the marketplace. The underlying traceability record was retained.`);
+        return;
+      }
+      const { error } = await supabase.rpc("remove_marketplace_listing", { p_listing_id: listing.id });
+      if (error) return notify(error.message);
+      notify(`${listing.crop} has been removed from the marketplace. The underlying traceability record was retained.`);
+      refresh();
+    } finally {
+      setTimeout(() => {
+        actionLockRef.current.delete(actionKey);
+        setActionBusy((prev) => ({ ...prev, [id]: false }));
+      }, 800);
+    }
   };
   const scheduleListing = async (listing) => {
+    const id = listing.id;
+    const now = Date.now();
+    const actionKey = `schedule-${id}`;
+    if (actionLockRef.current.has(actionKey) || (lastActionTimeRef.current[actionKey] && now - lastActionTimeRef.current[actionKey] < 2000)) {
+      return;
+    }
     const warehouseId = listingWarehouses[listing.id] || warehouses[0]?.id || warehouses[0]?.name;
     const warehouse = warehouses.find((item) => item.id === warehouseId || item.name === warehouseId) || warehouses[0];
     if (!warehouse) return notify("Choose a warehouse before scheduling this listing.");
-    if (String(listing.id).startsWith("demo-")) {
-      setListings((current) => (current.length ? current : demoListings).map(item => item.id === listing.id ? { ...item, status: "scheduled", warehouses: { name: warehouse.name } } : item));
-      notify(`Listing scheduled to ${warehouse.name}. It is now visible in warehouse intake.`);
-      return;
+
+    actionLockRef.current.add(actionKey);
+    lastActionTimeRef.current[actionKey] = now;
+    setActionBusy((prev) => ({ ...prev, [id]: true }));
+
+    try {
+      if (String(listing.id).startsWith("demo-")) {
+        setListings((current) => (current.length ? current : demoListings).map(item => item.id === listing.id ? { ...item, status: "scheduled", warehouses: { name: warehouse.name } } : item));
+        notify(`Listing scheduled to ${warehouse.name}. It is now visible in warehouse intake.`);
+        return;
+      }
+      const { error } = await supabase.from("farmer_listings").update({ status: "scheduled", intake_warehouse_id: warehouseId, scheduled_at: new Date().toISOString() }).eq("id", listing.id);
+      if (error) return notify(error.message);
+      const { error: jobError } = await supabase.from("logistics_jobs").insert({ requested_by: session?.userId, source_type: "farmer_listing_intake", source_id: listing.id, details: `${listing.crop} · ${listing.quantity_kg} kg → ${warehouse.name}` });
+      if (jobError) notify(`Listing scheduled, but logistics job needs review: ${jobError.message}`);
+      else notify(`Listing scheduled to ${warehouse.name}. It is now visible in warehouse intake.`);
+      refresh();
+    } finally {
+      setTimeout(() => {
+        actionLockRef.current.delete(actionKey);
+        setActionBusy((prev) => ({ ...prev, [id]: false }));
+      }, 800);
     }
-    const { error } = await supabase.from("farmer_listings").update({ status: "scheduled", intake_warehouse_id: warehouseId, scheduled_at: new Date().toISOString() }).eq("id", listing.id);
-    if (error) return notify(error.message);
-    const { error: jobError } = await supabase.from("logistics_jobs").insert({ requested_by: session?.userId, source_type: "farmer_listing_intake", source_id: listing.id, details: `${listing.crop} · ${listing.quantity_kg} kg → ${warehouse.name}` });
-    if (jobError) notify(`Listing scheduled, but logistics job needs review: ${jobError.message}`);
-    else notify(`Listing scheduled to ${warehouse.name}. It is now visible in warehouse intake.`);
-    refresh();
   };
   const scheduleClusterRequest = async (request) => {
     const { error } = await supabase
@@ -4979,11 +5194,11 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
                       </option>
                     ))}
                   </select>
-                  <button className="primary" onClick={() => scheduleListing(item)}>
-                    Schedule warehouse intake
+                  <button className="primary" disabled={Boolean(actionBusy[item.id])} onClick={() => scheduleListing(item)}>
+                    {actionBusy[item.id] ? "Scheduling…" : "Schedule warehouse intake"}
                   </button>
-                  <button className="secondary" onClick={() => reviewListing(item.id, "rejected")}>
-                    Reject
+                  <button className="secondary" disabled={Boolean(actionBusy[item.id])} onClick={() => reviewListing(item.id, "rejected")}>
+                    {actionBusy[item.id] ? "…" : "Reject"}
                   </button>
                 </div>
               </div>
@@ -5014,8 +5229,8 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
                 </small>
                 <p>{item.description}</p>
                 <div style={{ marginTop: "8px" }}>
-                  <button className="danger" onClick={() => removeMarketplaceListing(item)}>
-                    Remove from marketplace
+                  <button className="danger" disabled={Boolean(actionBusy[item.id])} onClick={() => removeMarketplaceListing(item)}>
+                    {actionBusy[item.id] ? "Removing…" : "Remove from marketplace"}
                   </button>
                 </div>
               </div>
