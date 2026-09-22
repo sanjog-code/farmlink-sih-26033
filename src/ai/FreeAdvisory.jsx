@@ -155,6 +155,15 @@ export const CROP_INTELLIGENCE = {
     season: 'Rabi', demandTrend: '+16% (Phulera financial pilot benchmark: ₹82 farm / ₹98.40 retail)',
     notes: 'Core SIH pilot commodity. High oil content (40%+) commands premium. 50% advance available via e-NWR.'
   },
+  'Mustard': {
+    category: 'Oilseeds',
+    baseLow: 82.0, baseHigh: 98.4, msp: 56.50, mspNotified: true,
+    mandi: 'Phulera / Jaitpura Cluster Hub', modalPrice: 86.0,
+    shelfLifeDays: 365, storageType: 'WDRA Accredited Hub',
+    holdingCostPerMonth: 0.25, enwrEligible: true,
+    season: 'Rabi', demandTrend: '+16% (Phulera financial pilot benchmark: ₹82 farm / ₹98.40 retail)',
+    notes: 'Core SIH pilot commodity. High oil content (40%+) commands premium. 50% advance available via e-NWR.'
+  },
   'Groundnut': {
     category: 'Oilseeds',
     baseLow: 64.0, baseHigh: 76.0, msp: 63.77, mspNotified: true,
