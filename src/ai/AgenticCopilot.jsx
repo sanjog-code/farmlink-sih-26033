@@ -51,13 +51,13 @@ export default function AgenticCopilot({
   const [geminiKey, setGeminiKey] = useState(() => {
     return (
       (typeof window !== 'undefined' && localStorage.getItem('farmlink_gemini_api_key')) ||
-      (import.meta.env?.VITE_GEMINI_API_KEY || '')
+      (import.meta.env?.VITE_GEMINI_API_KEY2 || '')
     );
   });
   const [geminiModel, setGeminiModel] = useState('gemini-2.0-flash');
   const [useGemini, setUseGemini] = useState(() => {
     // Auto-enable Gemini if a key is already available
-    const envKey = import.meta.env?.VITE_GEMINI_API_KEY || '';
+    const envKey = import.meta.env?.VITE_GEMINI_API_KEY2 || '';
     const storedKey = (typeof window !== 'undefined' && localStorage.getItem('farmlink_gemini_api_key')) || '';
     return Boolean(envKey || storedKey);
   });
