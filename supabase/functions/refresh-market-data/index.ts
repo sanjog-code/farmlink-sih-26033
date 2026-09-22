@@ -1,74 +1,68 @@
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Content-Type': 'application/json',
+import { database, json, cors } from '../_shared/ai-guard.ts'
+import { normalisePage, isOfficialMspUrl } from './normalise.js'
+
+async function db(path: string, method = 'GET', body?: unknown) {
+  const response = await database(path, { method, ...(body === undefined ? {} : { body: JSON.stringify(body) }), headers: { Prefer: 'resolution=merge-duplicates,return=representation' } })
+  if (!response.ok) throw new Error('Market database request failed (' + response.status + ')')
+  return response.status === 204 ? null : response.json()
 }
-
-const json = (body: Record<string, unknown>, status = 200) => new Response(JSON.stringify(body), { status, headers: corsHeaders })
-const resourceId = '9ef84268-d588-465a-a308-a864a43d0070'
-
-const aliases: Record<string, string> = {
-  paddy: 'Rice', 'paddy(dhan)(common)': 'Rice', rice: 'Rice', maize: 'Maize', wheat: 'Wheat',
-  onion: 'Onion', tomato: 'Tomato', potato: 'Potato', soybean: 'Soybean', groundnut: 'Groundnut',
-  cotton: 'Cotton', jute: 'Jute', bajra: 'Pearl millet (Bajra)', ragi: 'Finger millet (Ragi)',
-  jowar: 'Sorghum (Jowar)', moong: 'Green gram (Moong)', urad: 'Black gram (Urad)',
-  tur: 'Pigeon pea (Arhar/Tur)', arhar: 'Pigeon pea (Arhar/Tur)', sesame: 'Sesame', sunflower: 'Sunflower',
-}
-
-const env = () => ({ url: Deno.env.get('SUPABASE_URL')!, key: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')! })
-const rest = async (path: string, init: RequestInit = {}) => {
-  const { url, key } = env()
-  return fetch(`${url}/rest/v1/${path}`, { ...init, headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(init.headers || {}) } })
-}
-const normalise = (value: unknown) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ')
-const field = (row: Record<string, unknown>, ...names: string[]) => names.map((name) => row[name]).find((value) => value !== undefined && value !== null && String(value).trim() !== '')
-const pricePerKg = (value: unknown) => { const n = Number(String(value || '').replace(/,/g, '')); return Number.isFinite(n) ? n / 100 : null }
-const titleCase = (value: string) => value.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())
-
-Deno.serve(async (request) => {
-  if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
-  const apiKey = Deno.env.get('DATA_GOV_IN_API_KEY')
-  if (!apiKey) return json({ error: 'DATA_GOV_IN_API_KEY is missing. Add your data.gov.in API key as a Supabase secret before enabling daily refresh.' }, 503)
-  // This function is deliberately callable by the database scheduler without a JWT.
-  // Keep it inexpensive if somebody attempts to invoke the public endpoint repeatedly.
-  const recentResponse = await rest('market_sync_runs?select=started_at&order=started_at.desc&limit=1')
-  const [recent] = await recentResponse.json().catch(() => []) as Array<{ started_at: string }>
-  if (recent && Date.now() - new Date(recent.started_at).getTime() < 15 * 60 * 1000) {
-    return json({ skipped: true, message: 'A market refresh was started recently. Try again after 15 minutes.' }, 429)
+async function checkOfficialSources() {
+  const [rates, proposals] = await Promise.all([db('msp_rates?select=source_url'), db('msp_rate_proposals?select=source_url&status=eq.pending')])
+  const urls = [...new Set<string>([...rates, ...proposals].map(row => row.source_url))].filter(isOfficialMspUrl).slice(0, 30)
+  for (const url of urls) {
+    const previous = await db('msp_notification_checks?source_url=eq.' + encodeURIComponent(url) + '&select=content_hash,changed_at')
+    const old = previous[0]
+    let record: Record<string, unknown> = { source_url: url, checked_at: new Date().toISOString(), reachable: false, note: 'Official source unavailable. Existing verified MSP remains unchanged.' }
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(6000), redirect: 'error' })
+      if (response.ok) {
+        const bytes = await response.arrayBuffer()
+        if (bytes.byteLength > 8 * 1024 * 1024) throw new Error('Source too large')
+        const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), n => n.toString(16).padStart(2, '0')).join('')
+        record = { ...record, reachable: true, http_status: response.status, content_hash: hash, previous_hash: old?.content_hash || null,
+          changed_at: old?.content_hash && old.content_hash !== hash ? new Date().toISOString() : old?.changed_at || null,
+          note: 'Source fetched. Verify crop, season and amount against the notification before publishing a rate.' }
+      } else record.http_status = response.status
+    } catch { /* preserve verified MSP on upstream failures */ }
+    await db('msp_notification_checks?on_conflict=source_url', 'POST', record)
   }
-  const runStart = await rest('market_sync_runs', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ source_name: 'data.gov.in / AGMARKNET', status: 'running' }) })
-  const [run] = await runStart.json().catch(() => []) as Array<{ id: string }>
-  if (!run?.id) return json({ error: 'Could not start the market refresh audit run.' }, 500)
+}
+Deno.serve(async request => {
+  if (request.method === 'OPTIONS') return new Response('ok', { headers: cors })
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  let run: { id: string; next_offset: number; records_received: number; records_written: number; records_rejected: number } | null = null
   try {
-    const response = await fetch(`https://api.data.gov.in/resource/${resourceId}?api-key=${encodeURIComponent(apiKey)}&format=json&limit=1000`, { signal: AbortSignal.timeout(20000) })
-    const payload = await response.json().catch(() => ({})) as { records?: Array<Record<string, unknown>>, message?: string }
-    if (!response.ok) throw new Error(payload.message || `Government market-data API returned ${response.status}`)
-    const rows = payload.records || []
-    const snapshots = rows.map((row) => {
-      const commodity = String(field(row, 'commodity', 'Commodity') || '').trim()
-      const crop = aliases[normalise(commodity)] || (commodity ? titleCase(commodity) : '')
-      const modal = pricePerKg(field(row, 'modal_price', 'Modal Price'))
-      const rawDate = String(field(row, 'arrival_date', 'Arrival_Date', 'date') || '')
-      const date = /^\d{2}\/\d{2}\/\d{4}$/.test(rawDate) ? rawDate.split('/').reverse().join('-') : rawDate.slice(0, 10)
-      if (!crop || modal === null || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
-      return {
-        crop, market: String(field(row, 'market', 'Market') || 'Unknown market'), district: String(field(row, 'district', 'District') || ''),
-        state: String(field(row, 'state', 'State') || ''), variety: String(field(row, 'variety', 'Variety') || ''), price_date: date,
-        min_price_per_kg: pricePerKg(field(row, 'min_price', 'Min Price')), modal_price_per_kg: modal,
-        max_price_per_kg: pricePerKg(field(row, 'max_price', 'Max Price')), arrivals_tonnes: Number(field(row, 'arrival_quantity', 'Arrival Quantity') || 0) || null,
-        source_record: row,
-      }
-    }).filter(Boolean)
-    if (snapshots.length) {
-      const upsert = await rest('market_price_snapshots?on_conflict=crop,market,state,price_date', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(snapshots) })
-      if (!upsert.ok) throw new Error(`Could not save market data: ${await upsert.text()}`)
+    const body = await request.json().catch(() => ({}))
+    if (typeof body.ticket !== 'string' || !/^[0-9a-f-]{36}$/i.test(body.ticket)) return json({ error: 'Use the authenticated admin refresh or scheduled refresh.' }, 401)
+    try { run = await db('rpc/claim_market_refresh', 'POST', { p_ticket: body.ticket }) } catch { return json({ error: 'Invalid or expired scheduler ticket.' }, 403) }
+    if (!run?.id) throw new Error('Could not claim the refresh job')
+    if (run.next_offset === 0) await checkOfficialSources()
+    const key = Deno.env.get('DATA_GOV_IN_API_KEY')
+    if (!key) {
+      await db('market_sync_runs?id=eq.' + run.id, 'PATCH', { status: 'failed', completed_at: new Date().toISOString(), details: 'Awaiting DATA_GOV_IN_API_KEY. Official MSP sources were checked; no mandi prices were invented.' })
+      return json({ configured: false, message: 'Official sources checked. Add DATA_GOV_IN_API_KEY to activate daily mandi imports.' })
     }
-    await rest(`market_sync_runs?id=eq.${run.id}`, { method: 'PATCH', body: JSON.stringify({ status: snapshots.length ? 'succeeded' : 'partial', completed_at: new Date().toISOString(), records_received: rows.length, records_written: snapshots.length, details: snapshots.length ? 'Daily government mandi records imported.' : 'No supported FarmLink crop records were returned.' }) })
-    return json({ source: 'data.gov.in / AGMARKNET', received: rows.length, written: snapshots.length, msp: 'MSP remains tied to the verified seasonal Government notification; this daily job imports mandi prices only.' })
+    let offset = run.next_offset || 0, received = run.records_received || 0, written = run.records_written || 0, rejected = run.records_rejected || 0
+    let complete = false, total: number | null = null
+    for (let page = 0; page < 6; page++) {
+      const url = new URL('https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070')
+      url.search = new URLSearchParams({ 'api-key': key, format: 'json', limit: '1000', offset: String(offset) }).toString()
+      const response = await fetch(url, { signal: AbortSignal.timeout(15000) })
+      if (!response.ok) throw new Error('Government market API returned ' + response.status)
+      const payload = await response.json()
+      if (!Array.isArray(payload.records)) throw new Error('Government market API returned an invalid dataset')
+      const normalised = normalisePage(payload.records)
+      if (normalised.rows.length) await db('market_price_snapshots?on_conflict=crop,market,state,district,variety,grade,price_date', 'POST', normalised.rows)
+      received += payload.records.length; written += normalised.rows.length; rejected += normalised.rejected; offset += payload.records.length
+      total = Number.isFinite(Number(payload.total)) ? Number(payload.total) : null
+      complete = payload.records.length < 1000 || (total !== null && offset >= total)
+      await db('market_sync_runs?id=eq.' + run.id, 'PATCH', { next_offset: offset, total_expected: total, records_received: received, records_written: written, records_rejected: rejected, heartbeat_at: new Date().toISOString() })
+      if (complete) break
+    }
+    await db('market_sync_runs?id=eq.' + run.id, 'PATCH', { status: complete ? 'succeeded' : 'partial', completed_at: new Date().toISOString(), details: complete ? 'Government mandi import complete. Observation dates indicate freshness.' : 'Import checkpoint saved; scheduled continuation resumes automatically.' })
+    return json({ received, written, rejected, complete })
   } catch (error) {
-    if (run?.id) await rest(`market_sync_runs?id=eq.${run.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'failed', completed_at: new Date().toISOString(), details: error instanceof Error ? error.message : 'Unknown refresh error' }) })
-    return json({ error: error instanceof Error ? error.message : 'Market refresh failed.' }, 502)
+    if (run?.id) await db('market_sync_runs?id=eq.' + run.id, 'PATCH', { status: 'failed', completed_at: new Date().toISOString(), details: error instanceof Error ? error.message : 'Market import failed' }).catch(() => {})
+    return json({ error: 'Market refresh did not complete. Existing observations remain available; inspect the admin sync log.' }, 502)
   }
 })

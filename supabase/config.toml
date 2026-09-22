@@ -14,3 +14,9 @@ verify_jwt = true
 
 [functions.refresh-market-data]
 verify_jwt = false
+
+[functions.grade-produce]
+verify_jwt = true
+
+[functions.platform-integrations]
+verify_jwt = false
