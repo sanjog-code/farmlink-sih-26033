@@ -152,7 +152,7 @@ export async function transcribeWithSarvam(audioBlob, { apiKey, language = 'hi' 
   return data.transcript || '';
 }
 
-export async function synthesizeWithSarvam(text, { apiKey, language = 'hi', speaker = 'meera' }) {
+export async function synthesizeWithSarvam(text, { apiKey, language = 'hi', speaker = 'aditya' }) {
   if (!apiKey || !apiKey.trim()) throw new Error('Sarvam API key is required.');
 
   const langInfo = resolveSpeechCode(language);
@@ -167,13 +167,13 @@ export async function synthesizeWithSarvam(text, { apiKey, language = 'hi', spea
     body: JSON.stringify({
       inputs: [cleanText],
       target_language_code: langInfo.sarvam || 'hi-IN',
-      speaker: speaker, // 'meera', 'arvind', 'amartya', etc.
+      speaker: speaker || 'aditya',
       pitch: 0,
       pace: 1.0,
       loudness: 1.5,
       speech_sample_rate: 22050,
       enable_preprocessing: true,
-      model: 'bulbul:v1'
+      model: 'bulbul:v3'
     })
   });
 
@@ -258,6 +258,7 @@ export async function unifiedSpeak({
   language = 'hi',
   provider = 'auto',
   sarvamKey = '',
+  speaker = 'aditya',
   onStart = () => {},
   onEnd = () => {},
   onError = () => {}
@@ -271,7 +272,7 @@ export async function unifiedSpeak({
   if (shouldTrySarvam) {
     try {
       onStart({ provider: 'sarvam' });
-      const audioUrl = await synthesizeWithSarvam(text, { apiKey: sarvamKey, language });
+      const audioUrl = await synthesizeWithSarvam(text, { apiKey: sarvamKey, language, speaker });
       const audio = new Audio(audioUrl);
       currentAudioInstance = audio;
       audio.onended = () => {

@@ -77,7 +77,10 @@ export default function AgenticCopilot({
     return (typeof window !== 'undefined' && localStorage.getItem('farmlink_voice_provider')) || 'auto';
   });
   const [sarvamKey, setSarvamKey] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('farmlink_sarvam_api_key')) || (import.meta.env?.VITE_SARVAM_API_KEY || '');
+    return (typeof window !== 'undefined' && localStorage.getItem('farmlink_sarvam_api_key')) || (import.meta.env?.VITE_SARVAM_API_KEY || '') || 'sk_v9yrxpg0_ZzIdidU18EjUTGEFfkajp7OZ';
+  });
+  const [sarvamSpeaker, setSarvamSpeaker] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('farmlink_sarvam_speaker')) || 'aditya';
   });
   const [whisperKey, setWhisperKey] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('farmlink_whisper_api_key')) || (import.meta.env?.VITE_GROQ_API_KEY || import.meta.env?.VITE_WHISPER_API_KEY || '');
@@ -113,6 +116,7 @@ export default function AgenticCopilot({
       language,
       provider: voiceProvider,
       sarvamKey,
+      speaker: sarvamSpeaker,
       onStart: ({ provider }) => {
         setSpeaking(true);
         setActiveTTSProvider(provider);
@@ -180,7 +184,8 @@ export default function AgenticCopilot({
     // Determine recording strategy:
     const useCloudAudioCapture =
       (voiceProvider === 'whisper' && Boolean(whisperKey)) ||
-      (voiceProvider === 'sarvam' && Boolean(sarvamKey));
+      (voiceProvider === 'sarvam' && Boolean(sarvamKey)) ||
+      (voiceProvider === 'auto' && (Boolean(sarvamKey) || Boolean(whisperKey)));
 
     if (useCloudAudioCapture) {
       try {
@@ -188,7 +193,7 @@ export default function AgenticCopilot({
         await recorder.start();
         audioRecorderRef.current = recorder;
         setRecording(true);
-        const provName = voiceProvider === 'whisper' ? 'Groq Whisper' : 'Sarvam Saaras ASR';
+        const provName = (voiceProvider === 'sarvam' || (voiceProvider === 'auto' && sarvamKey)) ? 'Sarvam Saaras ASR' : 'Groq Whisper';
         notify(`🎙️ Recording with ${provName} (${resolveSpeechCode(language).name}). Click mic when finished.`);
       } catch (err) {
         console.warn('Microphone stream error, falling back to Browser Web Speech:', err);
@@ -490,6 +495,29 @@ export default function AgenticCopilot({
                     />
                   </div>
 
+                  {/* Sarvam Speaker Selection Row */}
+                  <div style={{ display: 'grid', gap: '4px', marginTop: '4px', fontSize: '0.78rem' }}>
+                    <label style={{ fontWeight: 600, color: '#17372c' }}>Sarvam Bulbul Speaker Voice:</label>
+                    <select
+                      value={sarvamSpeaker}
+                      onChange={(e) => {
+                        setSarvamSpeaker(e.target.value);
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('farmlink_sarvam_speaker', e.target.value);
+                        }
+                      }}
+                      style={{ padding: '6px 8px', fontSize: '0.78rem', borderRadius: '6px', border: '1px solid #bdd7bc' }}
+                    >
+                      <option value="aditya">Aditya (Natural Indian Male · Recommended)</option>
+                      <option value="priya">Priya (Clear Female · Studio Quality)</option>
+                      <option value="ritu">Ritu (Melodic Female)</option>
+                      <option value="rohan">Rohan (Deep Expressive Male)</option>
+                      <option value="simran">Simran (Warm Friendly Female)</option>
+                      <option value="kavya">Kavya (Soft Female)</option>
+                      <option value="ratan">Ratan (Mature Authoritative Male)</option>
+                    </select>
+                  </div>
+
                   {/* Whisper Key Row */}
                   <div style={{ display: 'grid', gap: '4px', marginTop: '4px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
@@ -515,6 +543,7 @@ export default function AgenticCopilot({
                       onClick={() => {
                         if (typeof window !== 'undefined') {
                           localStorage.setItem('farmlink_sarvam_api_key', sarvamKey.trim());
+                          localStorage.setItem('farmlink_sarvam_speaker', sarvamSpeaker);
                           localStorage.setItem('farmlink_whisper_api_key', whisperKey.trim());
                           localStorage.setItem('farmlink_voice_provider', voiceProvider);
                         }
