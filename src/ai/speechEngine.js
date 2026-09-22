@@ -124,15 +124,70 @@ export async function transcribeWithWhisper(audioBlob, { apiKey, endpoint = 'gro
   return data.text || '';
 }
 
+// ─── 2.5 AUDIO FORMAT CONVERTER TO 16kHz MONO PCM WAV ─────────────────────────
+
+export async function convertBlobToWav(blob) {
+  if (typeof window === 'undefined') return blob;
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return blob;
+
+  try {
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioCtx = new AudioContextClass({ sampleRate: 16000 });
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+    const numChannels = 1;
+    const sampleRate = 16000;
+    const samples = audioBuffer.getChannelData(0);
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+
+    function writeString(offset, str) {
+      for (let i = 0; i < str.length; i++) {
+        view.setUint8(offset + i, str.charCodeAt(i));
+      }
+    }
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM format
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numChannels * 2, true);
+    view.setUint16(32, numChannels * 2, true);
+    view.setUint16(34, 16, true); // 16 bits per sample
+    writeString(36, 'data');
+    view.setUint32(40, samples.length * 2, true);
+
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++, offset += 2) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    }
+
+    audioCtx.close().catch(() => {});
+    return new Blob([view], { type: 'audio/wav' });
+  } catch (err) {
+    console.warn('WAV transcoding error, using raw audio blob:', err);
+    return blob;
+  }
+}
+
 // ─── 3. SARVAM AI SAARAS ASR & BULBUL TTS ───────────────────────────────────
 
 export async function transcribeWithSarvam(audioBlob, { apiKey, language = 'hi' }) {
   if (!apiKey || !apiKey.trim()) throw new Error('Sarvam API key is required.');
 
+  // Transcode to 16kHz PCM WAV for Sarvam Saaras
+  const wavBlob = await convertBlobToWav(audioBlob);
+
   const langInfo = resolveSpeechCode(language);
   const formData = new FormData();
-  formData.append('file', audioBlob, 'audio.wav');
-  formData.append('model', 'saaras:v1');
+  formData.append('file', wavBlob, 'audio.wav');
+  formData.append('model', 'saaras:v3');
   formData.append('language_code', langInfo.sarvam || 'hi-IN');
 
   const res = await fetch('https://api.sarvam.ai/speech-to-text', {
@@ -284,7 +339,14 @@ export async function unifiedSpeak({
         // Fall back to WebSpeech
         speakWithBrowserNative(text, language, onStart, onEnd, onError);
       };
-      await audio.play();
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        await playPromise.catch((playErr) => {
+          console.warn('Sarvam audio play prevented by browser autoplay policy, falling back to Web Speech:', playErr);
+          currentAudioInstance = null;
+          speakWithBrowserNative(text, language, onStart, onEnd, onError);
+        });
+      }
       return;
     } catch (err) {
       console.warn('Sarvam TTS failed, falling back to Web Speech:', err.message);
@@ -301,6 +363,11 @@ function speakWithBrowserNative(text, language, onStart, onEnd, onError) {
     return;
   }
 
+  window.speechSynthesis.cancel();
+  if (window.speechSynthesis.paused) {
+    window.speechSynthesis.resume();
+  }
+
   onStart({ provider: 'webspeech' });
   const cleanText = (text || '').replace(/[#*`_~]/g, '').slice(0, 320);
   const utterance = new SpeechSynthesisUtterance(cleanText);
@@ -309,7 +376,12 @@ function speakWithBrowserNative(text, language, onStart, onEnd, onError) {
   utterance.rate = 0.95;
 
   utterance.onend = () => onEnd();
-  utterance.onerror = (e) => onError(e.error || 'TTS error');
+  utterance.onerror = (e) => {
+    if (e.error !== 'canceled' && e.error !== 'interrupted') {
+      onError(e.error || 'TTS error');
+    }
+    onEnd();
+  };
 
   window.speechSynthesis.speak(utterance);
 }

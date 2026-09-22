@@ -157,20 +157,28 @@ export default function AgenticCopilot({
               try {
                 transcript = await transcribeWithSarvam(audioBlob, { apiKey: sarvamKey, language });
               } catch (err) {
-                console.warn('Sarvam ASR notice, attempting Whisper/WebSpeech fallback:', err);
+                console.warn('Sarvam ASR notice, attempting Whisper fallback:', err);
                 if (whisperKey) {
-                  transcript = await transcribeWithWhisper(audioBlob, { apiKey: whisperKey, language });
+                  try {
+                    transcript = await transcribeWithWhisper(audioBlob, { apiKey: whisperKey, language });
+                  } catch (wErr) {
+                    console.warn('Whisper ASR error:', wErr);
+                  }
                 }
               }
             } else if (voiceProvider === 'whisper' || (voiceProvider === 'auto' && whisperKey)) {
-              transcript = await transcribeWithWhisper(audioBlob, { apiKey: whisperKey, language });
+              try {
+                transcript = await transcribeWithWhisper(audioBlob, { apiKey: whisperKey, language });
+              } catch (wErr) {
+                console.warn('Whisper ASR error:', wErr);
+              }
             }
 
             if (transcript && transcript.trim()) {
               setGoal(transcript.trim());
               handleExecute(transcript.trim());
             } else {
-              notify('No clear speech captured. You can speak again or type directly.');
+              notify('Speech recognition did not catch words. Tip: Browser Web Speech is active and can be used directly.');
             }
           }
         } catch (err) {
@@ -182,10 +190,11 @@ export default function AgenticCopilot({
     }
 
     // Determine recording strategy:
+    const hasWebSpeech = typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
     const useCloudAudioCapture =
-      (voiceProvider === 'whisper' && Boolean(whisperKey)) ||
       (voiceProvider === 'sarvam' && Boolean(sarvamKey)) ||
-      (voiceProvider === 'auto' && (Boolean(sarvamKey) || Boolean(whisperKey)));
+      (voiceProvider === 'whisper' && Boolean(whisperKey)) ||
+      (!hasWebSpeech && (Boolean(sarvamKey) || Boolean(whisperKey)));
 
     if (useCloudAudioCapture) {
       try {
@@ -193,7 +202,7 @@ export default function AgenticCopilot({
         await recorder.start();
         audioRecorderRef.current = recorder;
         setRecording(true);
-        const provName = (voiceProvider === 'sarvam' || (voiceProvider === 'auto' && sarvamKey)) ? 'Sarvam Saaras ASR' : 'Groq Whisper';
+        const provName = voiceProvider === 'whisper' ? 'Groq Whisper' : 'Sarvam Saaras ASR';
         notify(`🎙️ Recording with ${provName} (${resolveSpeechCode(language).name}). Click mic when finished.`);
       } catch (err) {
         console.warn('Microphone stream error, falling back to Browser Web Speech:', err);
