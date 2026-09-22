@@ -328,7 +328,7 @@ export async function executeAutonomousAgent({
   userRole = 'farmer',
   language = 'en',
   apiKey = '',
-  model = 'gemini-1.5-flash',
+  model = 'gemini-2.5-flash',
   useGeminiIfAvailable = true,
   runtimeContext = {},
   onStep = () => {}
