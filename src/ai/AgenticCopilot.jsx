@@ -19,11 +19,22 @@ import {
   ShieldAlert,
   Boxes,
   Truck,
-  FileCheck
+  FileCheck,
+  Square,
+  Radio
 } from 'lucide-react';
 import { executeAutonomousAgent } from './agentCore.js';
 import { testGeminiConnection } from './geminiClient.js';
 import { CONSTITUTIONAL_LANGUAGES } from '../translations/constitutional22.js';
+import {
+  WebSpeechRecognizer,
+  transcribeWithWhisper,
+  transcribeWithSarvam,
+  UnifiedAudioRecorder,
+  unifiedSpeak,
+  stopAllSpeech,
+  resolveSpeechCode
+} from './speechEngine.js';
 import './agentic.css';
 
 export default function AgenticCopilot({
@@ -56,14 +67,29 @@ export default function AgenticCopilot({
   });
   const [geminiModel, setGeminiModel] = useState('gemini-3.6-flash');
   const [useGemini, setUseGemini] = useState(() => {
-    // Auto-enable Gemini if a key is already available
     const envKey = import.meta.env?.VITE_GEMINI_API_KEY2 || '';
     const storedKey = (typeof window !== 'undefined' && localStorage.getItem('farmlink_gemini_api_key')) || '';
     return Boolean(envKey || storedKey);
   });
   const [keyStatus, setKeyStatus] = useState('');
 
-  const recognitionRef = useRef(null);
+  // Speech & Voice AI Configuration (Hybrid WebSpeech + Sarvam + Whisper)
+  const [settingsTab, setSettingsTab] = useState('voice'); // 'voice' | 'llm'
+  const [voiceProvider, setVoiceProvider] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('farmlink_voice_provider')) || 'auto';
+  });
+  const [sarvamKey, setSarvamKey] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('farmlink_sarvam_api_key')) || (import.meta.env?.VITE_SARVAM_API_KEY || '');
+  });
+  const [whisperKey, setWhisperKey] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('farmlink_whisper_api_key')) || (import.meta.env?.VITE_GROQ_API_KEY || import.meta.env?.VITE_WHISPER_API_KEY || '');
+  });
+  const [speaking, setSpeaking] = useState(false);
+  const [activeTTSProvider, setActiveTTSProvider] = useState('');
+  const [voiceStatus, setVoiceStatus] = useState('');
+
+  const speechRecognizerRef = useRef(null);
+  const audioRecorderRef = useRef(null);
   const chatBottomRef = useRef(null);
 
   // Auto-scroll when new step arrives
@@ -73,80 +99,136 @@ export default function AgenticCopilot({
     }
   }, [steps, result]);
 
-  // Clean up speech recognition & synthesis on unmount
+  // Clean up speech recognition, recording & synthesis on unmount
   useEffect(() => {
     return () => {
-      recognitionRef.current?.abort();
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      speechRecognizerRef.current?.abort();
+      audioRecorderRef.current?.abort();
+      stopAllSpeech();
     };
   }, []);
 
-  // Text to speech playback
-  const speakText = (text, langCode) => {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const cleanText = (text || '').replace(/[#*`_~]/g, '').slice(0, 300);
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    const langObj = CONSTITUTIONAL_LANGUAGES.find(l => l.code === langCode);
-    utterance.lang = langObj?.speechCode || (langCode === 'hi' ? 'hi-IN' : 'en-IN');
-    utterance.rate = 0.95;
-    window.speechSynthesis.speak(utterance);
+  // Hybrid Text to Speech playback
+  const handlePlaySpeech = (text) => {
+    unifiedSpeak({
+      text,
+      language,
+      provider: voiceProvider,
+      sarvamKey,
+      onStart: ({ provider }) => {
+        setSpeaking(true);
+        setActiveTTSProvider(provider);
+      },
+      onEnd: () => {
+        setSpeaking(false);
+        setActiveTTSProvider('');
+      },
+      onError: (errMsg) => {
+        setSpeaking(false);
+        setActiveTTSProvider('');
+        console.warn('TTS playback note:', errMsg);
+      }
+    });
   };
 
-  // Start voice recognition in selected 22 constitutional languages
-  const toggleRecording = () => {
+  const handleStopSpeech = () => {
+    stopAllSpeech();
+    setSpeaking(false);
+    setActiveTTSProvider('');
+  };
+
+  // Start hybrid voice recognition (Web Speech / Sarvam Saaras / Groq Whisper)
+  const toggleRecording = async () => {
     if (recording) {
-      recognitionRef.current?.stop();
-      setRecording(false);
-      return;
-    }
+      if (speechRecognizerRef.current) {
+        speechRecognizerRef.current.stop();
+        speechRecognizerRef.current = null;
+      }
+      if (audioRecorderRef.current) {
+        try {
+          notify('Processing voice recording with Cloud AI…');
+          const audioBlob = await audioRecorderRef.current.stop();
+          audioRecorderRef.current = null;
+          if (audioBlob && audioBlob.size > 0) {
+            let transcript = '';
+            if (voiceProvider === 'sarvam' || (voiceProvider === 'auto' && sarvamKey)) {
+              try {
+                transcript = await transcribeWithSarvam(audioBlob, { apiKey: sarvamKey, language });
+              } catch (err) {
+                console.warn('Sarvam ASR notice, attempting Whisper/WebSpeech fallback:', err);
+                if (whisperKey) {
+                  transcript = await transcribeWithWhisper(audioBlob, { apiKey: whisperKey, language });
+                }
+              }
+            } else if (voiceProvider === 'whisper' || (voiceProvider === 'auto' && whisperKey)) {
+              transcript = await transcribeWithWhisper(audioBlob, { apiKey: whisperKey, language });
+            }
 
-    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) {
-      notify('Voice recognition is not supported in this browser. Please type your query.');
-      return;
-    }
-
-    const recognition = new Recognition();
-    recognitionRef.current = recognition;
-    const langObj = CONSTITUTIONAL_LANGUAGES.find(l => l.code === language);
-    recognition.lang = langObj?.speechCode || (language === 'hi' ? 'hi-IN' : 'en-IN');
-    recognition.continuous = false;
-    recognition.interimResults = true;
-
-    recognition.onstart = () => {
-      setRecording(true);
-      notify(`Listening in ${langObj?.name || 'selected language'}… Speak your goal.`);
-    };
-
-    recognition.onresult = (event) => {
-      let finalTranscript = '';
-      for (let i = 0; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
-        } else {
-          setGoal(event.results[i][0].transcript);
+            if (transcript && transcript.trim()) {
+              setGoal(transcript.trim());
+              handleExecute(transcript.trim());
+            } else {
+              notify('No clear speech captured. You can speak again or type directly.');
+            }
+          }
+        } catch (err) {
+          notify(`Voice notice: ${err.message}. You can also type directly.`);
         }
       }
-      if (finalTranscript) {
-        setGoal(finalTranscript);
-        handleExecute(finalTranscript);
-      }
-    };
-
-    recognition.onerror = (event) => {
-      console.warn('Speech recognition notice:', event.error);
       setRecording(false);
-      if (event.error !== 'no-speech') {
-        notify(`Microphone: ${event.error}. You can also type directly.`);
+      return;
+    }
+
+    // Determine recording strategy:
+    const useCloudAudioCapture =
+      (voiceProvider === 'whisper' && Boolean(whisperKey)) ||
+      (voiceProvider === 'sarvam' && Boolean(sarvamKey));
+
+    if (useCloudAudioCapture) {
+      try {
+        const recorder = new UnifiedAudioRecorder();
+        await recorder.start();
+        audioRecorderRef.current = recorder;
+        setRecording(true);
+        const provName = voiceProvider === 'whisper' ? 'Groq Whisper' : 'Sarvam Saaras ASR';
+        notify(`🎙️ Recording with ${provName} (${resolveSpeechCode(language).name}). Click mic when finished.`);
+      } catch (err) {
+        console.warn('Microphone stream error, falling back to Browser Web Speech:', err);
+        startWebSpeechFallback();
       }
-    };
+    } else {
+      startWebSpeechFallback();
+    }
+  };
 
-    recognition.onend = () => setRecording(false);
-
+  const startWebSpeechFallback = () => {
     try {
-      recognition.start();
-    } catch {
+      const recognizer = new WebSpeechRecognizer({
+        lang: language,
+        onInterim: (interim) => {
+          setGoal(interim);
+        },
+        onFinal: (finalText) => {
+          setGoal(finalText);
+          handleExecute(finalText);
+        },
+        onError: (errCode) => {
+          console.warn('Web Speech note:', errCode);
+          setRecording(false);
+          if (errCode !== 'no-speech') {
+            notify(`Microphone: ${errCode}. You can type directly.`);
+          }
+        },
+        onEnd: () => {
+          setRecording(false);
+        }
+      });
+      recognizer.start();
+      speechRecognizerRef.current = recognizer;
+      setRecording(true);
+      notify(`🎙️ Listening via Browser Web Speech (${resolveSpeechCode(language).name})…`);
+    } catch (err) {
+      notify(`Microphone: ${err.message}. Please type your query.`);
       setRecording(false);
     }
   };
@@ -197,7 +279,7 @@ export default function AgenticCopilot({
 
       setResult(res);
       if (res.text) {
-        speakText(res.text, language);
+        handlePlaySpeech(res.text);
       }
     } catch (err) {
       notify(`Agent notice: ${err.message}`);
@@ -343,58 +425,164 @@ export default function AgenticCopilot({
 
         {/* Scrollable Body */}
         <div className="agentic-body">
-          {/* Gemini LLM Settings Drawer */}
+          {/* Settings Drawer (Voice AI & Gemini Cloud Tabs) */}
           {showSettings && (
             <div className="agentic-settings-drawer">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <strong style={{ fontSize: '0.85rem', color: '#17372c' }}>
-                  ⚡ Google Gemini LLM API Configuration
-                </strong>
-                <a
-                  href="https://aistudio.google.com/app/apikey"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ fontSize: '0.75rem', color: '#176b49', textDecoration: 'underline' }}
-                >
-                  Get Free Gemini API Key ↗
-                </a>
-              </div>
-              <div className="agentic-settings-row">
-                <input
-                  type="password"
-                  placeholder="Paste your Gemini API key (AIzaSy...)"
-                  value={geminiKey}
-                  onChange={(e) => setGeminiKey(e.target.value)}
-                />
+              <div className="settings-tabs">
                 <button
                   type="button"
-                  className="secondary"
-                  style={{ padding: '8px 12px', fontSize: '0.8rem' }}
-                  onClick={handleTestGemini}
+                  className={`settings-tab-btn ${settingsTab === 'voice' ? 'active' : ''}`}
+                  onClick={() => setSettingsTab('voice')}
                 >
-                  Test & Save
+                  🎙️ Voice AI (Sarvam / Whisper / WebSpeech)
+                </button>
+                <button
+                  type="button"
+                  className={`settings-tab-btn ${settingsTab === 'llm' ? 'active' : ''}`}
+                  onClick={() => setSettingsTab('llm')}
+                >
+                  ⚡ Gemini Cloud LLM
                 </button>
               </div>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '0.78rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={useGemini}
-                    onChange={(e) => setUseGemini(e.target.checked)}
-                  />
-                  Enable Cloud Gemini Model
-                </label>
-                <select
-                  value={geminiModel}
-                  onChange={(e) => setGeminiModel(e.target.value)}
-                  style={{ padding: '2px 6px', fontSize: '0.75rem' }}
-                >
-                  <option value="gemini-3.6-flash">Gemini 3.6 Flash (Recommended)</option>
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                  <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                </select>
-              </div>
-              {keyStatus && <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: '#203929' }}>{keyStatus}</p>}
+
+              {settingsTab === 'voice' && (
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <strong style={{ fontSize: '0.82rem', color: '#17372c' }}>
+                      Hybrid Voice Engine Architecture
+                    </strong>
+                    <span style={{ fontSize: '0.72rem', color: '#2e7d32', fontWeight: 600 }}>
+                      Auto-failover enabled
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gap: '4px', fontSize: '0.78rem' }}>
+                    <label style={{ fontWeight: 600, color: '#17372c' }}>Primary Speech Provider:</label>
+                    <select
+                      value={voiceProvider}
+                      onChange={(e) => {
+                        setVoiceProvider(e.target.value);
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('farmlink_voice_provider', e.target.value);
+                        }
+                      }}
+                      style={{ padding: '6px 8px', fontSize: '0.78rem', borderRadius: '6px', border: '1px solid #bdd7bc' }}
+                    >
+                      <option value="auto">Auto (Smart Hybrid · WebSpeech + Sarvam/Whisper)</option>
+                      <option value="webspeech">Browser Web Speech (100% Free, Zero Key, 0ms Latency)</option>
+                      <option value="sarvam">Sarvam AI (Indian Rural Dialects & Natural Bulbul Voice)</option>
+                      <option value="whisper">Groq / OpenAI Whisper (Field Noise Tolerant STT)</option>
+                    </select>
+                  </div>
+
+                  {/* Sarvam AI Key Row */}
+                  <div style={{ display: 'grid', gap: '4px', marginTop: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                      <span style={{ fontWeight: 600 }}>🇮🇳 Sarvam AI Subscription Key (Optional):</span>
+                      <a href="https://www.sarvam.ai/" target="_blank" rel="noreferrer" style={{ color: '#176b49', textDecoration: 'underline' }}>
+                        Get Sarvam Key ↗
+                      </a>
+                    </div>
+                    <input
+                      type="password"
+                      placeholder="Paste your Sarvam API subscription key..."
+                      value={sarvamKey}
+                      onChange={(e) => setSarvamKey(e.target.value)}
+                      style={{ fontSize: '0.78rem' }}
+                    />
+                  </div>
+
+                  {/* Whisper Key Row */}
+                  <div style={{ display: 'grid', gap: '4px', marginTop: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                      <span style={{ fontWeight: 600 }}>⚡ Groq / OpenAI Whisper Key (Optional):</span>
+                      <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" style={{ color: '#176b49', textDecoration: 'underline' }}>
+                        Get Free Groq Key ↗
+                      </a>
+                    </div>
+                    <input
+                      type="password"
+                      placeholder="Paste your Groq / Whisper API key (gsk_...)"
+                      value={whisperKey}
+                      onChange={(e) => setWhisperKey(e.target.value)}
+                      style={{ fontSize: '0.78rem' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                    <button
+                      type="button"
+                      className="secondary"
+                      style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('farmlink_sarvam_api_key', sarvamKey.trim());
+                          localStorage.setItem('farmlink_whisper_api_key', whisperKey.trim());
+                          localStorage.setItem('farmlink_voice_provider', voiceProvider);
+                        }
+                        setVoiceStatus('✅ Voice settings saved! Ready for high-accuracy Indian speech.');
+                      }}
+                    >
+                      Save Voice Configuration
+                    </button>
+                    {voiceStatus && <span style={{ fontSize: '0.74rem', color: '#176b49' }}>{voiceStatus}</span>}
+                  </div>
+                </div>
+              )}
+
+              {settingsTab === 'llm' && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <strong style={{ fontSize: '0.85rem', color: '#17372c' }}>
+                      ⚡ Google Gemini LLM API Configuration
+                    </strong>
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ fontSize: '0.75rem', color: '#176b49', textDecoration: 'underline' }}
+                    >
+                      Get Free Gemini API Key ↗
+                    </a>
+                  </div>
+                  <div className="agentic-settings-row">
+                    <input
+                      type="password"
+                      placeholder="Paste your Gemini API key (AIzaSy...)"
+                      value={geminiKey}
+                      onChange={(e) => setGeminiKey(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="secondary"
+                      style={{ padding: '8px 12px', fontSize: '0.8rem' }}
+                      onClick={handleTestGemini}
+                    >
+                      Test & Save
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '0.78rem', marginTop: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={useGemini}
+                        onChange={(e) => setUseGemini(e.target.checked)}
+                      />
+                      Enable Cloud Gemini Model
+                    </label>
+                    <select
+                      value={geminiModel}
+                      onChange={(e) => setGeminiModel(e.target.value)}
+                      style={{ padding: '2px 6px', fontSize: '0.75rem' }}
+                    >
+                      <option value="gemini-3.6-flash">Gemini 3.6 Flash (Recommended)</option>
+                      <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                      <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                    </select>
+                  </div>
+                  {keyStatus && <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: '#203929' }}>{keyStatus}</p>}
+                </div>
+              )}
             </div>
           )}
 
@@ -491,14 +679,25 @@ export default function AgenticCopilot({
                   <CheckCircle2 size={18} color="#176b49" />
                   FarmLink Autonomous Strategy
                 </h4>
-                <button
-                  type="button"
-                  className="secondary"
-                  style={{ fontSize: '0.75rem', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
-                  onClick={() => speakText(result.text, language)}
-                >
-                  <Volume2 size={14} /> Listen Audio
-                </button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  {speaking ? (
+                    <button
+                      type="button"
+                      className="agentic-audio-btn playing"
+                      onClick={handleStopSpeech}
+                    >
+                      <Square size={13} /> Stop Audio ({activeTTSProvider === 'sarvam' ? 'Sarvam Bulbul' : 'Web Speech'})
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="agentic-audio-btn"
+                      onClick={() => handlePlaySpeech(result.text)}
+                    >
+                      <Volume2 size={14} /> Listen Audio
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="strategic-text">
                 {result.text}
@@ -540,6 +739,26 @@ export default function AgenticCopilot({
 
         {/* Footer & Input Bar */}
         <div className="agentic-footer">
+          {/* Animated Audio Waveform Visualizer when Recording */}
+          {recording && (
+            <div className="agentic-recording-banner">
+              <div className="audio-wave-container">
+                <span className="audio-wave-bar"></span>
+                <span className="audio-wave-bar"></span>
+                <span className="audio-wave-bar"></span>
+                <span className="audio-wave-bar"></span>
+                <span className="audio-wave-bar"></span>
+              </div>
+              <span>
+                {voiceProvider === 'whisper' && whisperKey
+                  ? '🎙️ Groq Whisper Recording… Click Mic to Transcribe & Execute'
+                  : voiceProvider === 'sarvam' && sarvamKey
+                  ? '🎙️ Sarvam Indic ASR Recording… Click Mic to Transcribe & Execute'
+                  : `🎙️ Listening via Browser Web Speech (${resolveSpeechCode(language).name})… Speak now`}
+              </span>
+            </div>
+          )}
+
           <div className="agentic-input-row">
             <input
               type="text"

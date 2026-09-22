@@ -491,4 +491,98 @@ nav button:hover {
   border: 1px solid #a5d6a7 !important;
 }
 
+/* Settings Tabs */
+.settings-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #d4e8d3;
+  padding-bottom: 6px;
+}
+.settings-tab-btn {
+  background: none;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #557264;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.settings-tab-btn.active {
+  background: #176b49;
+  color: #ffffff;
+}
+
+/* Audio Recording Waveform Visualizer */
+.agentic-recording-banner {
+  background: linear-gradient(135deg, #ffebee, #ffcdd2);
+  border: 1px solid #ef9a9a;
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #c62828;
+  font-size: 0.82rem;
+  font-weight: 600;
+  animation: pulseBg 2s infinite ease-in-out;
+}
+@keyframes pulseBg {
+  0%, 100% { opacity: 0.95; }
+  50% { opacity: 0.8; }
+}
+.audio-wave-container {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+}
+.audio-wave-bar {
+  display: block;
+  width: 3.5px;
+  background-color: #d32f2f;
+  border-radius: 2px;
+  animation: wavePulse 1s ease-in-out infinite alternate;
+}
+.audio-wave-bar:nth-child(1) { height: 6px; animation-delay: 0.1s; }
+.audio-wave-bar:nth-child(2) { height: 14px; animation-delay: 0.25s; }
+.audio-wave-bar:nth-child(3) { height: 20px; animation-delay: 0.4s; }
+.audio-wave-bar:nth-child(4) { height: 12px; animation-delay: 0.15s; }
+.audio-wave-bar:nth-child(5) { height: 8px; animation-delay: 0.3s; }
+
+@keyframes wavePulse {
+  0% { transform: scaleY(0.4); }
+  100% { transform: scaleY(1.3); }
+}
+
+/* Audio Player Button on Strategy Response */
+.agentic-audio-btn {
+  background: #eaf5ea;
+  color: #176b49;
+  border: 1px solid #bcd8bb;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.agentic-audio-btn:hover {
+  background: #d5ebd4;
+  border-color: #176b49;
+  transform: translateY(-1px);
+}
+.agentic-audio-btn.playing {
+  background: #fff3e0;
+  color: #e65100;
+  border-color: #ffb74d;
+  animation: pulse-ring 1.5s infinite;
+}
+
 
