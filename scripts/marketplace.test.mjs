@@ -21,3 +21,18 @@ test('market filters real organic flags, stock, text, crop, grade and price',()=
   assert.deepEqual(rankAndFilter(lots,{query:'south',maxPrice:25}).map(x=>x.id),['B']);
   assert.deepEqual(rankAndFilter(lots,{crop:'Tomato',grade:'A'}).map(x=>x.id),['A']);
 });
+test('market rankAndFilter handles numeric IDs, nulls, and missing fields safely without throwing', () => {
+  const edgeLots = [
+    null,
+    undefined,
+    { id: 101, crop: 'Wheat', qty: 50, price: 25 },
+    { id: 102, crop: 'Wheat', qty: 30, price: 24, grade: 'Grade A' },
+    { id: 'STR-1', crop: 'Rice', qty: 10 },
+  ];
+  assert.doesNotThrow(() => rankAndFilter(edgeLots));
+  assert.deepEqual(rankAndFilter(null), []);
+  assert.deepEqual(rankAndFilter(undefined), []);
+  const ranked = rankAndFilter(edgeLots);
+  assert.equal(ranked.length, 3);
+});
+

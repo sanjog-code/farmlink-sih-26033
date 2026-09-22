@@ -46,7 +46,116 @@ import MarketDataAdmin from "./operations/MarketDataAdmin";
 import { availableToAdd, rankAndFilter, updateQuantity } from "./lib/marketplace.js";
 import "./refinements.css";
 
-const initialLots = [];
+const initialLots = [
+  {
+    id: "FL-24091",
+    crop: "Tomato",
+    hi: "टमाटर",
+    grade: "A",
+    qty: 820,
+    price: 27,
+    old: 1,
+    warehouse: "Jaipur North",
+    farmer: "Ramesh Kumar",
+    dist: "12 km",
+    trend: 8,
+    category: "Vegetables",
+    harvestDate: "2026-09-21",
+    organicCertified: false,
+    gradingConfidence: 94,
+    description: "Firm, sun-ripened Grade A tomatoes with uniform color and zero rot.",
+  },
+  {
+    id: "FL-24092",
+    crop: "Onion",
+    hi: "प्याज",
+    grade: "A",
+    qty: 1150,
+    price: 31,
+    old: 2,
+    warehouse: "Jaipur North",
+    farmer: "Meena Devi",
+    dist: "12 km",
+    trend: 3,
+    category: "Vegetables",
+    harvestDate: "2026-09-20",
+    organicCertified: true,
+    gradingConfidence: 91,
+    description: "Cured red onions, dry papery skin, storage-grade quality.",
+  },
+  {
+    id: "FL-24093",
+    crop: "Potato",
+    hi: "आलू",
+    grade: "B",
+    qty: 540,
+    price: 22,
+    old: 3,
+    warehouse: "Sanganer Hub",
+    farmer: "Sita Ram",
+    dist: "18 km",
+    trend: -2,
+    category: "Vegetables",
+    harvestDate: "2026-09-19",
+    organicCertified: false,
+    gradingConfidence: 86,
+    description: "Medium-size table potatoes, clean skin, ideal for cooking.",
+  },
+  {
+    id: "FL-24094",
+    crop: "Wheat",
+    hi: "गेहूं",
+    grade: "A",
+    qty: 2400,
+    price: 25,
+    old: 5,
+    warehouse: "Jaipur North",
+    farmer: "Ramesh Kumar",
+    dist: "12 km",
+    trend: 5,
+    category: "Cereals & millets",
+    harvestDate: "2026-09-17",
+    organicCertified: false,
+    gradingConfidence: 95,
+    description: "Sharbati golden wheat, low moisture (10.8%), premium milling grade.",
+  },
+  {
+    id: "FL-24095",
+    crop: "Rapeseed & mustard",
+    hi: "सरसों",
+    grade: "A",
+    qty: 950,
+    price: 58,
+    old: 4,
+    warehouse: "Alwar Mandi Hub",
+    farmer: "Kailash Chand",
+    dist: "35 km",
+    trend: 6,
+    category: "Oilseeds",
+    harvestDate: "2026-09-18",
+    organicCertified: true,
+    gradingConfidence: 92,
+    description: "High oil-content (41.2%) black mustard seeds, lab-verified purity.",
+  },
+  {
+    id: "FL-24096",
+    crop: "French bean",
+    hi: "फ्रेंच बीन",
+    grade: "A",
+    qty: 320,
+    price: 45,
+    old: 1,
+    warehouse: "Jaipur North",
+    farmer: "Anita Sharma",
+    dist: "14 km",
+    trend: 4,
+    category: "Vegetables",
+    harvestDate: "2026-09-21",
+    organicCertified: true,
+    gradingConfidence: 89,
+    description: "Tender, hand-picked green beans, stringless, freshly crated.",
+  },
+];
 const INDIA_CROPS = [
   ["Cereals & millets", "Rice"],
   ["Cereals & millets", "Wheat"],
@@ -266,10 +375,21 @@ const cropEmoji = (crop = "", category = "") => {
 };
 const FLOWER_CROPS = new Set(["Rose", "Marigold", "Jasmine", "Chrysanthemum", "Tuberose", "Gladiolus", "Gerbera", "Carnation"]);
 const freshnessForListing = (grade, harvestDate, category, crop) => {
-  const ageDays = harvestDate ? Math.max(0, Math.floor((Date.now() - new Date(`${harvestDate}T00:00:00`).getTime()) / 86400000)) : 0;
-  const perishable = String(category).toLowerCase().includes("fruit") || String(category).toLowerCase().includes("vegetable") || FLOWER_CROPS.has(crop);
+  let ageDays = 0;
+  if (harvestDate) {
+    try {
+      const rawStr = String(harvestDate);
+      const parsed = new Date(rawStr.includes("T") ? rawStr : `${rawStr}T00:00:00`);
+      if (!isNaN(parsed.getTime())) {
+        ageDays = Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 86400000));
+      }
+    } catch {
+      ageDays = 0;
+    }
+  }
+  const perishable = String(category || "").toLowerCase().includes("fruit") || String(category || "").toLowerCase().includes("vegetable") || FLOWER_CROPS.has(crop);
   const gradeIndex = ["A", "B", "C"].indexOf(String(grade || "").toUpperCase());
-  const adjustedGrade = perishable && gradeIndex >= 0 ? ["A", "B", "C"][Math.min(2, gradeIndex + Math.floor(ageDays / 7))] : grade;
+  const adjustedGrade = perishable && gradeIndex >= 0 ? ["A", "B", "C"][Math.min(2, gradeIndex + Math.floor(ageDays / 7))] : (grade || "A");
   return { grade: adjustedGrade || "Intake verified", ageDays, perishable };
 };
 const normalizeIndianPhone = (value) => {
@@ -566,6 +686,43 @@ const CONSTITUTIONAL_LANGUAGES = [
   ["ur", "اردو"],
 ];
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <section className="page" style={{ padding: "48px 24px", textAlign: "center", maxWidth: "680px", margin: "40px auto" }}>
+          <h2>Something went wrong displaying this view</h2>
+          <p style={{ color: "#666", margin: "12px 0 24px", fontSize: "15px" }}>
+            {this.props.fallbackMessage || "An unexpected error occurred while rendering this page."}
+          </p>
+          <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+            <button
+              className="primary"
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                if (this.props.onReset) this.props.onReset();
+              }}
+            >
+              {this.props.resetText || "Reload view"}
+            </button>
+          </div>
+        </section>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   const [lang, setLang] = useState("en"),
     [view, setView] = useState("home"),
@@ -616,18 +773,36 @@ function App() {
     if (!isSupabaseConfigured) return;
     let active = true;
     supabase.rpc("get_marketplace_inventory").then(({ data, error }) => {
-      if (error || !active || !data) return;
+      if (error || !active || !data || !Array.isArray(data) || data.length === 0) return;
       setLots(data.map((listing) => {
         const freshness = freshnessForListing(listing.warehouse_grade, listing.harvest_date, listing.category, listing.crop);
-        return { id: "LIST-" + listing.id.slice(-6).toUpperCase(), listing: true, listingId: listing.id,
-          dbId: listing.produce_lot_id, crop: listing.crop, hi: listing.crop, grade: freshness.grade,
-          qty: Number(listing.quantity_kg), price: Number(listing.price_per_kg), old: freshness.ageDays,
-          warehouse: listing.warehouse_name || "Verified warehouse intake", farmer: listing.farmer_name || "FarmLink farmer",
-          dist: "Not calculated", trend: 0, imageUrl: listing.warehouse_image_url || listing.image_url,
-          farmerImageUrl: listing.image_url, farmerImageUrls: listing.image_urls?.length ? listing.image_urls : [listing.image_url].filter(Boolean),
-          warehouseImageUrl: listing.warehouse_image_url, gradingConfidence: listing.grading_confidence,
-          description: listing.description, category: listing.category, harvestDate: listing.harvest_date,
-          uploadedAt: listing.created_at, freshnessGradeChanged: freshness.perishable && freshness.grade !== listing.warehouse_grade };
+        const rawId = listing.id != null ? String(listing.id) : Math.random().toString(36).slice(2, 8);
+        return {
+          id: "LIST-" + rawId.slice(-6).toUpperCase(),
+          listing: true,
+          listingId: listing.id,
+          dbId: listing.produce_lot_id,
+          crop: listing.crop || "Produce",
+          hi: listing.crop || "उपज",
+          grade: freshness.grade,
+          qty: Number(listing.quantity_kg || 0),
+          price: Number(listing.price_per_kg || 0),
+          old: freshness.ageDays,
+          warehouse: listing.warehouse_name || "Verified warehouse intake",
+          farmer: listing.farmer_name || "FarmLink farmer",
+          dist: "Not calculated",
+          trend: 0,
+          imageUrl: listing.warehouse_image_url || listing.image_url,
+          farmerImageUrl: listing.image_url,
+          farmerImageUrls: listing.image_urls?.length ? listing.image_urls : [listing.image_url].filter(Boolean),
+          warehouseImageUrl: listing.warehouse_image_url,
+          gradingConfidence: listing.grading_confidence,
+          description: listing.description,
+          category: listing.category,
+          harvestDate: listing.harvest_date,
+          uploadedAt: listing.created_at,
+          freshnessGradeChanged: freshness.perishable && freshness.grade !== listing.warehouse_grade
+        };
       }));
     });
     return () => { active = false; };
@@ -781,15 +956,21 @@ function App() {
     setTimeout(() => setToast(""), 3000);
   };
   const reserve = (lot) => {
-    if (session?.role !== "consumer") { access("consumer", "market"); return; }
+    if (!lot) return;
+    if (session?.role !== "consumer") {
+      setAuthRole("consumer");
+      setView("auth");
+      notify("Please sign in as consumer to reserve produce.");
+      return;
+    }
     if (lot.listing && !lot.warehouseImageUrl) {
       notify(
         "This farmer photo listing is awaiting warehouse intake. Checkout opens once a live grading photo confirms the stock.",
       );
       return;
     }
-    const alreadyReserved = cart.reduce((sum, item) => sum + item.quantityKg, 0);
-    const liveLot = lots.find((item) => item.id === lot.id);
+    const alreadyReserved = (cart || []).reduce((sum, item) => sum + Number(item?.quantityKg || 0), 0);
+    const liveLot = (lots || []).find((item) => String(item?.id) === String(lot.id));
     if (!liveLot) return notify("This listing is no longer available.");
     const quantityKg = Math.min(10, 50 - alreadyReserved, availableToAdd(liveLot, cart));
     if (quantityKg <= 0) {
@@ -797,14 +978,15 @@ function App() {
       return;
     }
     setCart((current) => {
-      const existing = current.find((item) => item.id === lot.id);
+      const safeCart = Array.isArray(current) ? current : [];
+      const existing = safeCart.find((item) => String(item?.id) === String(lot.id));
       return existing
-        ? current.map((item) =>
-            item.id === lot.id
+        ? safeCart.map((item) =>
+            String(item?.id) === String(lot.id)
               ? { ...item, quantityKg: item.quantityKg + quantityKg }
               : item,
           )
-        : [...current, { ...liveLot, quantityKg }];
+        : [...safeCart, { ...liveLot, quantityKg }];
     });
     notify(`${quantityKg} kg added. Stock is reserved when you place the order.`);
   };
@@ -962,6 +1144,10 @@ function App() {
     );
   };
   const access = (role, destination) => {
+    if (destination === "market") {
+      setView("market");
+      return;
+    }
     if (destination === "farmer" && !["farmer", "admin"].includes(session?.role)) {
       setAuthRole("farmer");
       setView("auth");
@@ -1070,7 +1256,8 @@ function App() {
         </div>
       </header>
       <main>
-        {view === "home" && (
+        <ErrorBoundary fallbackMessage="The application encountered an error loading this view. You can reload or return to the home screen." onReset={() => setView("home")}>
+          {view === "home" && (
           <Home
             t={t}
             lots={lots}
@@ -1179,6 +1366,7 @@ function App() {
             />
           </>
         )}
+        </ErrorBoundary>
       </main>
       <SiteFooter setView={setView} notify={notify} />
       {modal === "voice" && (
@@ -1338,8 +1526,8 @@ function Home({ t, lots, setView, access, reserve, setModal }) {
           </button>
         </div>
         <div className="cards">
-          {lots.map((l) => (
-            <LotCard key={l.id} lot={l} onClick={() => reserve(l)} />
+          {(lots || []).map((l) => (
+            <LotCard key={l?.id || Math.random()} lot={l} onClick={() => reserve(l)} />
           ))}
         </div>
       </section>
@@ -1404,42 +1592,65 @@ function Home({ t, lots, setView, access, reserve, setModal }) {
   );
 }
 function LotCard({ lot, onClick }) {
+  if (!lot) return null;
+  const cropName = String(lot.crop || "Produce");
+  const cropClass = (lot.crop ? String(lot.crop) : "produce").toLowerCase().replace(/[^a-z0-9]/g, "-");
+  const farmerName = lot.farmer || "FarmLink farmer";
+  const warehouseName = lot.warehouse || "Verified storage";
+  const distText = lot.dist || "Nearby";
+  const gradeText = lot.grade ? `Grade ${lot.grade}` : "Intake verified";
+  const trend = Number(lot.trend || 0);
+  const qty = Number(lot.qty || 0);
+  const price = Number(lot.price || 0);
+  const ageDays = Number.isFinite(Number(lot.old)) ? Number(lot.old) : 0;
+  let harvestDateFormatted = null;
+  if (lot.harvestDate) {
+    try {
+      const rawDateStr = String(lot.harvestDate);
+      const parsedDate = new Date(rawDateStr.includes("T") ? rawDateStr : `${rawDateStr}T00:00:00`);
+      if (!isNaN(parsedDate.getTime())) {
+        harvestDateFormatted = parsedDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+      }
+    } catch {
+      harvestDateFormatted = null;
+    }
+  }
   return (
     <article className="lot">
-      <div className={"lot-img " + lot.crop.toLowerCase()}>
+      <div className={"lot-img " + cropClass}>
         {lot.imageUrl ? (
-          <img src={lot.imageUrl} alt={lot.crop + " grown by " + lot.farmer} />
+          <img src={lot.imageUrl} alt={`${cropName} grown by ${farmerName}`} />
         ) : (
-          <span>{cropEmoji(lot.crop, lot.category)}</span>
+          <span>{cropEmoji(cropName, lot.category)}</span>
         )}
-        <i className="crop-emoji-badge" aria-label={`${lot.crop} crop icon`}>{cropEmoji(lot.crop, lot.category)}</i>
-        <b>{lot.listing ? "Farmer photo" : "Grade " + lot.grade}</b>
+        <i className="crop-emoji-badge" aria-label={`${cropName} crop icon`}>{cropEmoji(cropName, lot.category)}</i>
+        <b>{lot.listing ? "Farmer photo" : gradeText}</b>
       </div>
       <div className="lot-body">
         <div className="lot-title">
           <div>
-            <h3>{lot.crop}</h3>
+            <h3>{cropName}</h3>
             <p>
               <MapPin size={14} />
-              {lot.warehouse} · {lot.dist}
+              {warehouseName} · {distText}
             </p>
           </div>
-          <span className={lot.trend >= 0 ? "up" : "down"}>
-            {lot.trend >= 0 ? "↑" : ""}
-            {lot.trend}%
+          <span className={trend >= 0 ? "up" : "down"}>
+            {trend >= 0 ? "↑" : ""}
+            {trend}%
           </span>
         </div>
         <div className="lot-meta">
-          <span>{lot.qty} kg available</span>
+          <span>{qty} kg available</span>
           <span>
             <Clock3 size={14} />
-            {lot.harvestDate ? `Harvested ${new Date(`${lot.harvestDate}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · ${lot.old} day${lot.old === 1 ? "" : "s"} fresh` : `${lot.old} day old`}
+            {harvestDateFormatted ? `Harvested ${harvestDateFormatted} · ${ageDays} day${ageDays === 1 ? "" : "s"} fresh` : `${ageDays} day old`}
           </span>
         </div>
-        {lot.harvestDate && <small className="freshness-metric">Freshness: Grade {lot.grade}{lot.freshnessGradeChanged ? " · adjusted by harvest age" : " · intake verified"}</small>}
+        {lot.harvestDate && <small className="freshness-metric">Freshness: {gradeText}{lot.freshnessGradeChanged ? " · adjusted by harvest age" : " · intake verified"}</small>}
         <div className="buy">
           <b>
-            ₹{lot.price}
+            ₹{price}
             <small>/kg</small>
           </b>
           <button onClick={onClick}>Reserve 10 kg</button>
@@ -1478,25 +1689,28 @@ function Market({
     [maxPrice, setMaxPrice] = useState(""),
     [sort, setSort] = useState("smart"),
     [query, setQuery] = useState("");
+  const safeLots = Array.isArray(lots) ? lots.filter(Boolean) : [];
   const cropCategories = useMemo(
-    () => [...new Set(lots.map((lot) => lot.crop).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
-    [lots],
+    () => [...new Set(safeLots.map((lot) => String(lot?.crop || "")).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [safeLots],
   );
   useEffect(() => {
     if (filter !== "All" && !cropCategories.includes(filter)) setFilter("All");
   }, [cropCategories, filter]);
   const visible = useMemo(
-    () => rankAndFilter(lots, { crop: filter, grade, sort, query, organic, maxPrice }),
-    [lots, filter, grade, sort, query, organic, maxPrice],
+    () => rankAndFilter(safeLots, { crop: filter, grade, sort, query, organic, maxPrice }),
+    [safeLots, filter, grade, sort, query, organic, maxPrice],
   );
   const favorite = (lot) => {
-    setWishlist((items) =>
-      items.some((x) => x.id === lot.id)
-        ? items.filter((x) => x.id !== lot.id)
-        : [...items, lot],
-    );
+    if (!lot) return;
+    setWishlist((items) => {
+      const safeItems = Array.isArray(items) ? items : [];
+      return safeItems.some((x) => String(x?.id) === String(lot.id))
+        ? safeItems.filter((x) => String(x?.id) !== String(lot.id))
+        : [...safeItems, lot];
+    });
     notify(
-      wishlist.some((x) => x.id === lot.id)
+      (wishlist || []).some((x) => String(x?.id) === String(lot.id))
         ? "Removed from wishlist."
         : "Saved to wishlist.",
     );
@@ -1514,11 +1728,11 @@ function Market({
         </div>
         <div className="checkout">
           <b>
-            {cart.length} items · {total} kg
+            {(cart || []).length} items · {total || 0} kg
           </b>
           <button
             className="primary"
-            disabled={!cart.length}
+            disabled={!(cart || []).length}
             onClick={onCheckout}
           >
             Checkout
@@ -1559,7 +1773,7 @@ function Market({
             className={filter === x ? "selected" : ""}
             onClick={() => setFilter(x)}
           >
-            {x === "All" ? <><span className="category-all">✦</span> All produce <small>{lots.length}</small></> : <><span className="category-icon">{cropEmoji(x)}</span><span>{x}</span><small>{lots.filter((lot) => lot.crop === x).length}</small></>}
+            {x === "All" ? <><span className="category-all">✦</span> All produce <small>{safeLots.length}</small></> : <><span className="category-icon">{cropEmoji(x)}</span><span>{x}</span><small>{safeLots.filter((lot) => lot?.crop === x).length}</small></>}
           </button>
         ))}
       </div>
@@ -1568,7 +1782,7 @@ function Market({
       </p>
       <div className="cards">
         {visible.map((l) => (
-            <div className="product-wrap" key={l.id}>
+            <div className="product-wrap" key={l?.id || Math.random()}>
               <LotCard lot={l} onClick={() => reserve(l)} />
               <div className="product-actions">
                 <button
@@ -1581,7 +1795,7 @@ function Market({
                 </button>
                 <button
                   className={
-                    wishlist.some((x) => x.id === l.id)
+                    (wishlist || []).some((x) => String(x?.id) === String(l?.id))
                       ? "favorite active"
                       : "favorite"
                   }
@@ -1632,35 +1846,61 @@ function ProductDetail({
         </button>
       </section>
     );
-  const saved = wishlist.some((x) => x.id === lot.id);
+  const saved = (wishlist || []).some((x) => String(x?.id) === String(lot.id));
+  const cropName = String(lot.crop || "Produce");
+  const cropClass = (lot.crop ? String(lot.crop) : "produce").toLowerCase().replace(/[^a-z0-9]/g, "-");
   const galleryPhotos = [...new Set([lot.imageUrl, ...(lot.farmerImageUrls || []), lot.warehouseImageUrl].filter(Boolean))];
+  const ageDays = Number.isFinite(Number(lot.old)) ? Number(lot.old) : 0;
+  let harvestDateFormatted = null;
+  if (lot.harvestDate) {
+    try {
+      const rawStr = String(lot.harvestDate);
+      const d = new Date(rawStr.includes("T") ? rawStr : `${rawStr}T00:00:00`);
+      if (!isNaN(d.getTime())) {
+        harvestDateFormatted = d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+      }
+    } catch {
+      harvestDateFormatted = null;
+    }
+  }
+  let uploadedDateFormatted = null;
+  if (lot.uploadedAt) {
+    try {
+      const d = new Date(lot.uploadedAt);
+      if (!isNaN(d.getTime())) {
+        uploadedDateFormatted = d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+      }
+    } catch {
+      uploadedDateFormatted = null;
+    }
+  }
   return (
     <section className="page product-detail">
       <button className="text-btn" onClick={() => setView("market")}>
         ← Back to marketplace
       </button>
       <div className="detail-grid">
-        <div className={"detail-visual " + lot.crop.toLowerCase()}>
+        <div className={"detail-visual " + cropClass}>
           {lot.imageUrl ? (
-            <img src={lot.imageUrl} alt={lot.crop + " listing"} />
+            <img src={lot.imageUrl} alt={`${cropName} listing`} />
           ) : (
-            cropEmoji(lot.crop, lot.category)
+            cropEmoji(cropName, lot.category)
           )}
-          <i className="crop-emoji-badge detail-crop-emoji" aria-label={`${lot.crop} crop icon`}>{cropEmoji(lot.crop, lot.category)}</i>
-          <span>{lot.listing ? (lot.warehouseImageUrl ? "Warehouse-verified photo" : "Farmer photo listing") : "Verified Grade " + lot.grade}</span>
-          {galleryPhotos.length > 1 && <div className="product-photo-gallery">{galleryPhotos.map((photo, index) => <img key={photo} src={photo} alt={`${lot.crop} gallery image ${index + 1}`} />)}</div>}
+          <i className="crop-emoji-badge detail-crop-emoji" aria-label={`${cropName} crop icon`}>{cropEmoji(cropName, lot.category)}</i>
+          <span>{lot.listing ? (lot.warehouseImageUrl ? "Warehouse-verified photo" : "Farmer photo listing") : `Verified Grade ${lot.grade || "A"}`}</span>
+          {galleryPhotos.length > 1 && <div className="product-photo-gallery">{galleryPhotos.map((photo, index) => <img key={photo} src={photo} alt={`${cropName} gallery image ${index + 1}`} />)}</div>}
         </div>
         <div>
           <p className="eyebrow green">TRACEABLE LOT {lot.id}</p>
           <h1>
-            {lot.crop} · Grade {lot.grade}
+            {cropName} · Grade {lot.grade || "A"}
           </h1>
           <p>
-            Harvested locally and human-verified at {lot.warehouse}. Available
+            Harvested locally and human-verified at {lot.warehouse || "Verified storage"}. Available
             for scheduled pickup.
           </p>
           <h2>
-            ₹{lot.price}
+            ₹{lot.price || 0}
             <small>/kg</small>
           </h2>
           <div className="quality-report">
@@ -1669,15 +1909,15 @@ function ProductDetail({
               <small>{lot.gradingConfidence ? "Model confidence" : "Operator-verified grade"}</small>
             </div>
             <div>
-              <b>{lot.dist}</b>
+              <b>{lot.dist || "Nearby"}</b>
               <small>From warehouse</small>
             </div>
             <div>
-              <b>{lot.harvestDate ? `${lot.old} day${lot.old === 1 ? "" : "s"}` : `${lot.old} day`}</b>
-              <small>{lot.harvestDate ? `Fresh since ${new Date(`${lot.harvestDate}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : "Stock age"}</small>
+              <b>{harvestDateFormatted ? `${ageDays} day${ageDays === 1 ? "" : "s"}` : `${ageDays} day`}</b>
+              <small>{harvestDateFormatted ? `Fresh since ${harvestDateFormatted}` : "Stock age"}</small>
             </div>
           </div>
-          {lot.uploadedAt && <p className="freshness-detail">Listed on {new Date(lot.uploadedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}. {lot.freshnessGradeChanged ? "This perishable item’s displayed grade has been adjusted for harvest age." : "Freshness grade is monitored from the recorded harvest date."}</p>}
+          {uploadedDateFormatted && <p className="freshness-detail">Listed on {uploadedDateFormatted}. {lot.freshnessGradeChanged ? "This perishable item’s displayed grade has been adjusted for harvest age." : "Freshness grade is monitored from the recorded harvest date."}</p>}
           <div className="detail-actions">
             <button className="primary" onClick={() => reserve(lot)}>
               Add 10 kg to cart
@@ -1687,8 +1927,8 @@ function ProductDetail({
               onClick={() => {
                 setWishlist((items) =>
                   saved
-                    ? items.filter((x) => x.id !== lot.id)
-                    : [...items, lot],
+                    ? (items || []).filter((x) => String(x?.id) !== String(lot.id))
+                    : [...(items || []), lot],
                 );
                 notify(saved ? "Removed from wishlist." : "Saved to wishlist.");
               }}
@@ -1699,15 +1939,15 @@ function ProductDetail({
         </div>
       </div>
       <div className="detail-sections">
-          <article>
-            <h3>Quality report</h3>
-            <p>
-              Grade {lot.grade} was confirmed by the warehouse intake operator using the live intake photo.
-              A model result is shown only when a configured grading service produced a saved report.
-            </p>
-            {lot.warehouseImageUrl && <><img className="intake-proof-photo" src={lot.warehouseImageUrl} alt={`${lot.crop} photographed during warehouse grading`} /><small>Live warehouse intake photo · Operator-confirmed Grade {lot.grade}{lot.gradingConfidence ? ` · ${lot.gradingConfidence}% model confidence` : ""}</small></>}
-            {lot.farmerImageUrl && lot.farmerImageUrl !== lot.imageUrl && <><img className="intake-proof-photo" src={lot.farmerImageUrl} alt={`${lot.crop} photo submitted by the farmer`} /><small>Original farmer listing photo</small></>}
-          </article>
+        <article>
+          <h3>Quality report</h3>
+          <p>
+            Grade {lot.grade || "A"} was confirmed by the warehouse intake operator using the live intake photo.
+            A model result is shown only when a configured grading service produced a saved report.
+          </p>
+          {lot.warehouseImageUrl && <><img className="intake-proof-photo" src={lot.warehouseImageUrl} alt={`${cropName} photographed during warehouse grading`} /><small>Live warehouse intake photo · Operator-confirmed Grade {lot.grade || "A"}{lot.gradingConfidence ? ` · ${lot.gradingConfidence}% model confidence` : ""}</small></>}
+          {lot.farmerImageUrl && lot.farmerImageUrl !== lot.imageUrl && <><img className="intake-proof-photo" src={lot.farmerImageUrl} alt={`${cropName} photo submitted by the farmer`} /><small>Original farmer listing photo</small></>}
+        </article>
         <article>
           <h3>Farmer profile</h3>
           <p>
@@ -1718,7 +1958,7 @@ function ProductDetail({
         <article>
           <h3>Nutritional information</h3>
           <p>
-            Fresh {lot.crop.toLowerCase()} is a source of fibre and essential
+            Fresh {cropName.toLowerCase()} is a source of fibre and essential
             micronutrients. Store cool and consume promptly.
           </p>
         </article>
