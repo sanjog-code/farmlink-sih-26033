@@ -46,6 +46,7 @@ import MarketDataAdmin from "./operations/MarketDataAdmin";
 import { availableToAdd, rankAndFilter, updateQuantity } from "./lib/marketplace.js";
 import { CONSTITUTIONAL_LANGUAGES, translateText } from "./translations/constitutional22.js";
 import "./refinements.css";
+import AgenticCopilot, { AgenticDockLauncher } from "./ai/AgenticCopilot.jsx";
 
 const initialLots = [
   {
@@ -1385,6 +1386,7 @@ function App() {
             <ShoppingCart size={18} />
             {cart.length || ""}
           </button>
+          <AgenticDockLauncher onOpen={() => setModal("agentic")} />
         </div>
       </header>
       <main>
@@ -1550,6 +1552,19 @@ function App() {
             close={() => setModal(null)}
           placeOrder={placeOrder}
           placingOrder={placingOrder}
+        />
+      )}{" "}
+      {modal === "agentic" && (
+        <AgenticCopilot
+          isOpen={true}
+          onClose={() => setModal(null)}
+          session={session}
+          lots={lots}
+          cart={cart}
+          updateCartQuantity={updateCartQuantity}
+          setFarmerListingPrefill={setFarmerListingPrefill}
+          setView={setView}
+          notify={notify}
         />
       )}{" "}
       {toast && (
