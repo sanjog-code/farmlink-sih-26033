@@ -2,7 +2,7 @@
 // Dual-Engine: Google Gemini Function-Calling ReAct + Built-in Autonomous Edge ReAct Engine
 import * as tools from './agentTools.js';
 import { runGeminiAgent, executeToolByName } from './geminiClient.js';
-import { CROP_INTELLIGENCE } from './FreeAdvisory.jsx';
+import { CROP_INTELLIGENCE } from './cropIntelligence.js';
 
 // Identify agricultural entities from natural language
 export function parseGoalEntities(text = '') {

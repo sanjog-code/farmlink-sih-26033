@@ -5,9 +5,10 @@ import { AGENT_TOOLS_SPECS } from './agentTools.js';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-export async function testGeminiConnection(apiKey, model = 'gemini-2.5-flash') {
+export async function testGeminiConnection(apiKey, model = 'gemini-3.6-flash') {
   if (!apiKey || !apiKey.trim()) throw new Error('Gemini API key is required.');
-  const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey.trim()}`;
+  const targetModel = (model === 'gemini-2.5-flash' || !model) ? 'gemini-3.6-flash' : model;
+  const url = `${GEMINI_API_BASE}/${targetModel}:generateContent?key=${apiKey.trim()}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -93,7 +94,8 @@ Guidelines:
   };
 
   const geminiTools = getGeminiToolsDeclaration();
-  const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey.trim()}`;
+  const targetModel = (!model || model === 'gemini-2.5-flash' || model === 'gemini-1.5-flash') ? 'gemini-3.6-flash' : model;
+  const url = `${GEMINI_API_BASE}/${targetModel}:generateContent?key=${apiKey.trim()}`;
 
   const contents = [
     {
@@ -119,11 +121,21 @@ Guidelines:
       tools: geminiTools
     };
 
-    const res = await fetch(url, {
+    let res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+
+    if (!res.ok && (res.status === 429 || res.status === 503)) {
+      // Temporary demand spike - wait 1200ms and retry once
+      await new Promise(r => setTimeout(r, 1200));
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
 
     if (!res.ok) {
       const errJson = await res.json().catch(() => ({}));

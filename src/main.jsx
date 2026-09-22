@@ -28,6 +28,7 @@ import {
   LogOut,
   ClipboardList,
   ArrowUp,
+  Sparkles,
 } from "lucide-react";
 import "./styles.css";
 import "./auth.css";

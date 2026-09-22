@@ -1,6 +1,6 @@
 // FarmLink Agentic AI - Tool Registry (SIH PS 26033)
 // Deterministic, domain-calibrated tools for Indian Agricultural Supply Chain
-import { CROP_INTELLIGENCE } from './FreeAdvisory.jsx';
+import { CROP_INTELLIGENCE } from './cropIntelligence.js';
 import { fitTrend } from './forecast.js';
 import { rankAndFilter } from '../lib/marketplace.js';
 

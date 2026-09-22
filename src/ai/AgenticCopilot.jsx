@@ -54,7 +54,7 @@ export default function AgenticCopilot({
       (import.meta.env?.VITE_GEMINI_API_KEY2 || '')
     );
   });
-  const [geminiModel, setGeminiModel] = useState('gemini-2.5-flash');
+  const [geminiModel, setGeminiModel] = useState('gemini-3.6-flash');
   const [useGemini, setUseGemini] = useState(() => {
     // Auto-enable Gemini if a key is already available
     const envKey = import.meta.env?.VITE_GEMINI_API_KEY2 || '';
@@ -296,8 +296,8 @@ export default function AgenticCopilot({
             <div className="agentic-title">
               <h3>
                 FarmLink Agentic Copilot
-                <span className="agentic-engine-badge">
-                  {useGemini && geminiKey ? 'Gemini 1.5 Flash' : 'Autonomous Edge ReAct'}
+                <span className={`agentic-engine-badge ${useGemini && geminiKey ? 'cloud' : 'edge'}`}>
+                  {useGemini && geminiKey ? '☁️ Gemini 3.6 Flash' : '⚡ Autonomous Edge AI'}
                 </span>
               </h3>
               <p>
@@ -307,6 +307,21 @@ export default function AgenticCopilot({
           </div>
 
           <div className="agentic-controls">
+            <button
+              type="button"
+              className="agentic-mode-pill-btn"
+              title={useGemini && geminiKey ? 'Switch to Offline/Edge ReAct AI' : 'Switch to Gemini 3.6 Cloud AI'}
+              onClick={() => {
+                if (!geminiKey && !useGemini) {
+                  setShowSettings(true);
+                  setKeyStatus('Please enter your Gemini API key below to activate Cloud AI.');
+                } else {
+                  setUseGemini(!useGemini);
+                }
+              }}
+            >
+              {useGemini && geminiKey ? '☁️ Cloud LLM' : '⚡ Edge ReAct'}
+            </button>
             <button
               type="button"
               className="agentic-icon-btn"
@@ -374,8 +389,8 @@ export default function AgenticCopilot({
                   onChange={(e) => setGeminiModel(e.target.value)}
                   style={{ padding: '2px 6px', fontSize: '0.75rem' }}
                 >
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</option>
-                  <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+                  <option value="gemini-3.6-flash">Gemini 3.6 Flash (Recommended)</option>
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                   <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                 </select>
               </div>
