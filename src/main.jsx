@@ -44,6 +44,7 @@ import PasswordRecovery from "./components/PasswordRecovery";
 import IntegrationCenter, { FarmerServices } from "./operations/IntegrationCenter";
 import MarketDataAdmin from "./operations/MarketDataAdmin";
 import { availableToAdd, rankAndFilter, updateQuantity } from "./lib/marketplace.js";
+import { CONSTITUTIONAL_LANGUAGES, translateText } from "./translations/constitutional22.js";
 import "./refinements.css";
 
 const initialLots = [
@@ -636,55 +637,112 @@ const hindiUI = {
   "Sanganer Hub": "सांगानेर हब",
 };
 function localizeUI(root, language) {
-  const pairs =
-    language === "hi"
-      ? Object.entries(hindiUI)
-      : Object.entries(hindiUI).map(([en, hi]) => [hi, en]);
-  const replace = (value) =>
-    pairs
-      .sort((a, b) => b[0].length - a[0].length)
-      .reduce((text, [from, to]) => text.split(from).join(to), value);
+  if (!root) return;
+  const isHindi = language === "hi";
+  const hindiPairs = Object.entries(hindiUI).sort((a, b) => b[0].length - a[0].length);
+
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
+
   nodes.forEach((node) => {
-    const next = replace(node.nodeValue);
-    if (next !== node.nodeValue) node.nodeValue = next;
-  });
-  root.querySelectorAll("[placeholder],[aria-label]").forEach((element) =>
-    ["placeholder", "aria-label"].forEach((attribute) => {
-      const value = element.getAttribute(attribute);
-      if (value) {
-        const next = replace(value);
-        if (next !== value) element.setAttribute(attribute, next);
+    // Preserve base English text on the node object to prevent cross-language drift
+    if (node.__origText === undefined) {
+      node.__origText = node.nodeValue;
+    }
+    const baseText = node.__origText;
+    if (!baseText || !baseText.trim()) return;
+
+    if (language === "en") {
+      if (node.nodeValue !== baseText) node.nodeValue = baseText;
+    } else if (isHindi) {
+      let next = baseText;
+      for (const [from, to] of hindiPairs) {
+        if (next.includes(from)) next = next.split(from).join(to);
       }
-    }),
-  );
+      if (next !== node.nodeValue) node.nodeValue = next;
+    } else {
+      const translated = translateText(baseText, language);
+      if (translated !== node.nodeValue) node.nodeValue = translated;
+    }
+  });
+
+  root.querySelectorAll("[placeholder],[aria-label]").forEach((element) => {
+    ["placeholder", "aria-label"].forEach((attribute) => {
+      const origKey = `__orig_${attribute}`;
+      if (element[origKey] === undefined) {
+        element[origKey] = element.getAttribute(attribute);
+      }
+      const baseValue = element[origKey];
+      if (!baseValue) return;
+
+      if (language === "en") {
+        if (element.getAttribute(attribute) !== baseValue) element.setAttribute(attribute, baseValue);
+      } else if (isHindi) {
+        let next = baseValue;
+        for (const [from, to] of hindiPairs) {
+          if (next.includes(from)) next = next.split(from).join(to);
+        }
+        if (next !== element.getAttribute(attribute)) element.setAttribute(attribute, next);
+      } else {
+        const translated = translateText(baseValue, language);
+        if (translated !== element.getAttribute(attribute)) element.setAttribute(attribute, translated);
+      }
+    });
+  });
 }
-const CONSTITUTIONAL_LANGUAGES = [
-  ["as", "অসমীয়া"],
-  ["bn", "বাংলা"],
-  ["brx", "बड़ो"],
-  ["doi", "डोगरी"],
-  ["gu", "ગુજરાતી"],
-  ["hi", "हिन्दी"],
-  ["kn", "ಕನ್ನಡ"],
-  ["ks", "کٲشُر"],
-  ["kok", "कोंकणी"],
-  ["mai", "मैथिली"],
-  ["ml", "മലയാളം"],
-  ["mni", "মেইতেই লোন্"],
-  ["mr", "मराठी"],
-  ["ne", "नेपाली"],
-  ["or", "ଓଡ଼ିଆ"],
-  ["pa", "ਪੰਜਾਬੀ"],
-  ["sa", "संस्कृतम्"],
-  ["sat", "ᱥᱟᱱᱛᱟᱲᱤ"],
-  ["sd", "سنڌي"],
-  ["ta", "தமிழ்"],
-  ["te", "తెలుగు"],
-  ["ur", "اردو"],
-];
+
+function useSpeechDictation(onResult, notify, lang = "hi") {
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  const toggle = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      if (notify) notify("Speech recognition is not active in this browser. Please type directly.");
+      return;
+    }
+    const recognition = new Recognition();
+    recognitionRef.current = recognition;
+    const langEntry = CONSTITUTIONAL_LANGUAGES.find((l) => l.code === lang);
+    recognition.lang = langEntry?.speechCode || "hi-IN";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+
+    recognition.onresult = (event) => {
+      const text = Array.from(event.results)
+        .map((r) => r[0].transcript)
+        .join("");
+      if (text) onResult(text);
+    };
+    recognition.onerror = (event) => {
+      console.warn("Search dictation notice:", event.error);
+      setIsListening(false);
+      if (notify && event.error !== "no-speech") {
+        notify(`Speech notice (${event.error}). You can also type directly.`);
+      }
+    };
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    try {
+      recognition.start();
+      setIsListening(true);
+      if (notify) notify("Listening… बोलिए… Speak your crop name now.");
+    } catch {
+      setIsListening(false);
+    }
+  };
+
+  return { isListening, toggle };
+}
+
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -729,6 +787,34 @@ function App() {
     [authRole, setAuthRole] = useState("consumer"),
     [lots, setLots] = useState(initialLots),
     [selectedLot, setSelectedLot] = useState(null),
+    [farmerVerification, setFarmerVerification] = useState(() => {
+      try {
+        const saved = localStorage.getItem("farmlink_farmer_verification");
+        if (saved) return JSON.parse(saved);
+      } catch {}
+      return {
+        status: "verified",
+        id: "KYC-RJ-2026-9812",
+        farmerName: "Ramesh Kumar",
+        mobile: "+91 98290 14820",
+        idType: "Aadhaar Card",
+        idNumber: "4920-8812-7741",
+        landState: "Rajasthan",
+        landDistrict: "Jaipur",
+        village: "Phulera",
+        landAcres: "4.5",
+        khasraNumber: "412/1 & 412/2",
+        cropsGrown: "Mustard, Tomato, Wheat",
+        bankName: "State Bank of India (Phulera)",
+        accountNumber: "30984920112",
+        ifsc: "SBIN0031129",
+        upiId: "ramesh.kisan@sbi",
+        fpoName: "Kisan Samriddhi FPO",
+        submittedAt: "2026-09-18T10:30:00.000Z",
+        reviewedAt: "2026-09-19T14:15:00.000Z",
+        reviewerNote: "Land survey record and Aadhaar verified with Phulera cluster officer."
+      };
+    }),
     [cart, setCart] = useState([]),
     [wishlist, setWishlist] = useState([]),
     [modal, setModal] = useState(null),
@@ -751,6 +837,11 @@ function App() {
     [placingOrder, setPlacingOrder] = useState(false),
     placingOrderRef = useRef(false);
   const t = translations[lang] || translations.en;
+  useEffect(() => {
+    try {
+      localStorage.setItem("farmlink_farmer_verification", JSON.stringify(farmerVerification));
+    } catch {}
+  }, [farmerVerification]);
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let active = true;
@@ -1222,17 +1313,35 @@ function App() {
           <button onClick={() => access("farmer", "farmer")}>Farmer</button>
         </nav>
         <div className="head-actions">
-          <label className="language">
-            <Languages size={16} />
+          <label className="language language-selector-wrap" title="Translate platform into all 22 official Indian languages">
+            <Languages size={17} />
             <select
               aria-label="Interface language"
               value={lang}
-              onChange={(event) => setLang(event.target.value)}
+              onChange={(event) => {
+                const newLang = event.target.value;
+                setLang(newLang);
+                const selected = CONSTITUTIONAL_LANGUAGES.find((l) => l.code === newLang);
+                if (selected && newLang !== "en") {
+                  notify(`Translated to ${selected.nativeName} (${selected.name})`);
+                }
+              }}
             >
-              <option value="en">English</option>
-              <option value="hi">हिन्दी</option>
+              {CONSTITUTIONAL_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.nativeName} · {l.name}
+                </option>
+              ))}
             </select>
           </label>
+          <button
+            type="button"
+            className="header-voice-btn"
+            onClick={() => setModal("voice")}
+            title="Multilingual Voice AI (All 22 Indian Languages)"
+          >
+            <Mic size={16} /> <span>Voice AI</span>
+          </button>
           {session ? (
             <button
               className="profile-btn"
@@ -1293,6 +1402,7 @@ function App() {
             setWishlist={setWishlist}
             setSelectedLot={setSelectedLot}
             setView={setView}
+            lang={lang}
           />
         )}{" "}
         {view === "detail" && (
@@ -1351,6 +1461,9 @@ function App() {
             setProduceRequests={setProduceRequests}
             liveTick={liveTick}
             notify={notify}
+            farmerVerification={farmerVerification}
+            setFarmerVerification={setFarmerVerification}
+            lang={lang}
           />
         )}{" "}
         {view === "auth" && (
@@ -1373,6 +1486,8 @@ function App() {
               setView={setView}
               logout={logout}
               notify={notify}
+              farmerVerification={farmerVerification}
+              setFarmerVerification={setFarmerVerification}
             />
             <AdminOrderConfirmation
               orders={orders}
@@ -1696,6 +1811,7 @@ function Market({
   setWishlist,
   setSelectedLot,
   setView,
+  lang = "en",
 }) {
   const [filter, setFilter] = useState("All"),
     [grade, setGrade] = useState("Any"),
@@ -1703,6 +1819,7 @@ function Market({
     [maxPrice, setMaxPrice] = useState(""),
     [sort, setSort] = useState("smart"),
     [query, setQuery] = useState("");
+  const { isListening, toggle: toggleDictation } = useSpeechDictation(setQuery, notify, lang);
   const safeLots = Array.isArray(lots) ? lots.filter(Boolean) : [];
   const cropCategories = useMemo(
     () => [...new Set(safeLots.map((lot) => String(lot?.crop || "")).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
@@ -1754,12 +1871,23 @@ function Market({
         </div>
       </div>
       <div className="market-tools">
-        <input
-          aria-label="Search produce"
-          placeholder="Search produce, farmer or location"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        <div className="search-mic-wrap">
+          <input
+            aria-label="Search produce"
+            placeholder="Search produce, farmer or location"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button
+            type="button"
+            className={`search-mic-btn ${isListening ? "listening" : ""}`}
+            onClick={toggleDictation}
+            title={isListening ? "Listening… click to stop" : "Speak to search"}
+            aria-label="Voice search dictation"
+          >
+            <Mic size={16} />
+          </button>
+        </div>
         <input className="price-filter" type="number" min="0" aria-label="Maximum price per kg" placeholder="Max ₹/kg" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)}/>
         <select aria-label="Quality grade" value={grade} onChange={(e) => setGrade(e.target.value)}>
           <option>Any</option>
@@ -2864,6 +2992,9 @@ function FarmerView({
   setProduceRequests,
   liveTick,
   notify,
+  farmerVerification,
+  setFarmerVerification,
+  lang = "hi",
 }) {
   const [form, setForm] = useState({
     crop: "Tomato",
@@ -2872,6 +3003,7 @@ function FarmerView({
     type: "Produce intake",
   });
   const [cropSearch, setCropSearch] = useState("");
+  const { isListening, toggle: toggleDictation } = useSpeechDictation(setCropSearch, notify, lang);
   const matchingCrops = useMemo(
     () =>
       INDIA_CROPS.filter((item) =>
@@ -2923,8 +3055,21 @@ function FarmerView({
     <section className="page farmer-page">
       <div className="farmer-welcome">
         <div>
-          <p className="eyebrow">
-            NAMASTE{session?.name ? `, ${session.name}` : ""}
+          <p className="eyebrow" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            <span>NAMASTE{session?.name ? `, ${session.name}` : ""}</span>
+            {farmerVerification?.status === "verified" ? (
+              <span className="verification-badge verified" title="Government Aadhaar & Land Record Verified">
+                <Check size={13} /> Verified Producer
+              </span>
+            ) : farmerVerification?.status === "under_review" ? (
+              <span className="verification-badge under-review" title="Verification submitted and under review">
+                <Clock3 size={13} /> Verification Under Review
+              </span>
+            ) : (
+              <span className="verification-badge unverified" title="Complete KYC verification to unlock trust perks">
+                <ShieldCheck size={13} /> Unverified Profile
+              </span>
+            )}
           </p>
           <h1>Your produce. Your decision.</h1>
           <p>
@@ -2968,11 +3113,22 @@ function FarmerView({
           </label>
           <label>
             Search India crop
-            <input
-              value={cropSearch}
-              onChange={(e) => setCropSearch(e.target.value)}
-              placeholder="Search crop or category"
-            />
+            <div className="search-mic-wrap">
+              <input
+                value={cropSearch}
+                onChange={(e) => setCropSearch(e.target.value)}
+                placeholder="Search crop or category"
+              />
+              <button
+                type="button"
+                className={`search-mic-btn ${isListening ? "listening" : ""}`}
+                onClick={toggleDictation}
+                title={isListening ? "Listening… click to stop" : "Speak crop name"}
+                aria-label="Voice crop search"
+              >
+                <Mic size={16} />
+              </button>
+            </div>
           </label>
           <label>
             Crop selection
@@ -3086,7 +3242,14 @@ function FarmerView({
           )}
         </div>
       </div>
-      <FarmerOperations notify={notify} session={session} liveTick={liveTick} listingPrefill={listingPrefill} />
+      <FarmerOperations
+        notify={notify}
+        session={session}
+        liveTick={liveTick}
+        listingPrefill={listingPrefill}
+        farmerVerification={farmerVerification}
+        setFarmerVerification={setFarmerVerification}
+      />
       <FarmerServices session={session} />
       <div className="farmer-grid">
         <div className="finance">
@@ -3121,7 +3284,394 @@ function FarmerView({
     </section>
   );
 }
-function FarmerOperations({ notify, session, liveTick, listingPrefill }) {
+
+function FarmerVerificationWorkflow({ farmerVerification, setFarmerVerification, notify, session }) {
+  const [isEditing, setIsEditing] = useState(() => farmerVerification?.status === "unverified");
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState({
+    farmerName: session?.name || farmerVerification?.farmerName || "Ramesh Kumar",
+    mobile: farmerVerification?.mobile || "+91 98290 14820",
+    idType: farmerVerification?.idType || "Aadhaar Card",
+    idNumber: farmerVerification?.idNumber || "4920-8812-7741",
+    landState: farmerVerification?.landState || "Rajasthan",
+    landDistrict: farmerVerification?.landDistrict || "Jaipur",
+    village: farmerVerification?.village || "Phulera",
+    landAcres: farmerVerification?.landAcres || "4.5",
+    khasraNumber: farmerVerification?.khasraNumber || "412/1 & 412/2",
+    cropsGrown: farmerVerification?.cropsGrown || "Mustard, Tomato, Wheat",
+    bankName: farmerVerification?.bankName || "State Bank of India",
+    accountNumber: farmerVerification?.accountNumber || "30984920112",
+    ifsc: farmerVerification?.ifsc || "SBIN0031129",
+    upiId: farmerVerification?.upiId || "ramesh.kisan@sbi",
+    fpoName: farmerVerification?.fpoName || "Kisan Samriddhi FPO",
+    idDocName: "aadhaar_card_ramesh.pdf",
+    landDocName: "khasra_7_12_extract.pdf",
+  });
+
+  const handleSubmit = (e) => {
+    e?.preventDefault();
+    if (!form.farmerName || !form.mobile || !form.idNumber) {
+      return notify("Please complete all required identity and KYC fields.");
+    }
+    if (!form.khasraNumber || !form.landAcres) {
+      return notify("Please enter your land Khasra / survey number and acreage.");
+    }
+    if (!form.bankName || !form.accountNumber || !form.ifsc) {
+      return notify("Please enter your bank account details for direct payments.");
+    }
+    const updated = {
+      ...farmerVerification,
+      ...form,
+      status: "under_review",
+      id: farmerVerification?.id || `KYC-RJ-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      submittedAt: new Date().toISOString(),
+    };
+    setFarmerVerification(updated);
+    setIsEditing(false);
+    notify("Verification submitted! Your KYC documents are under review by the FarmLink administrator.");
+  };
+
+  const status = farmerVerification?.status || "unverified";
+
+  return (
+    <div className="verification-container">
+      <div className="verification-status-banner">
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+            <h3 style={{ margin: 0 }}>Farmer Trust & KYC Verification</h3>
+            {status === "verified" ? (
+              <span className="verification-badge verified"><Check size={14} /> Verified Producer</span>
+            ) : status === "under_review" ? (
+              <span className="verification-badge under-review"><Clock3 size={14} /> Under Review</span>
+            ) : (
+              <span className="verification-badge unverified"><ShieldCheck size={14} /> Verification Required</span>
+            )}
+          </div>
+          <p style={{ margin: 0, color: "#2d4539", fontSize: "0.88rem" }}>
+            {status === "verified"
+              ? `Verification ID: ${farmerVerification?.id || "KYC-RJ-2026-9812"} · Verified on ${farmerVerification?.reviewedAt ? new Date(farmerVerification.reviewedAt).toLocaleDateString("en-IN") : "Sep 19, 2026"}`
+              : status === "under_review"
+                ? `Application ${farmerVerification?.id || "KYC-RJ-2026-9812"} submitted on ${farmerVerification?.submittedAt ? new Date(farmerVerification.submittedAt).toLocaleDateString("en-IN") : "Today"}. Review takes under 24 hours.`
+                : "Submit your government ID, land survey (Khasra) and bank account details to unlock verified seller perks."}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          {!isEditing && (
+            <button className="secondary" onClick={() => setIsEditing(true)}>
+              {status === "verified" ? "Update KYC Details" : "Edit Application"}
+            </button>
+          )}
+          {status === "under_review" && !isEditing && (
+            <button
+              className="primary"
+              onClick={() => {
+                setFarmerVerification((curr) => ({
+                  ...curr,
+                  status: "verified",
+                  reviewedAt: new Date().toISOString(),
+                  reviewerNote: "Verified with State Agriculture Department land records.",
+                }));
+                notify("✓ Approved! You are now an officially verified FarmLink Producer.");
+              }}
+            >
+              Simulate Instant Admin Approval
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="perk-grid">
+        <div className="perk-card">
+          <b>🌟 Verified Badge</b>
+          <small>Green trust badge displayed on all your produce lots in the marketplace for higher consumer trust.</small>
+        </div>
+        <div className="perk-card">
+          <b>💰 Direct Bank Payouts</b>
+          <small>Automated settlements directly to your registered bank account and UPI ID upon order completion.</small>
+        </div>
+        <div className="perk-card">
+          <b>📜 e-NWR Loan Access</b>
+          <small>Eligible for up to 50% working capital pledge finance against warehouse receipts.</small>
+        </div>
+        <div className="perk-card">
+          <b>🚛 Priority Cluster Collection</b>
+          <small>Guaranteed vehicle scheduling for farm gate and village FPO aggregation pickups.</small>
+        </div>
+      </div>
+
+      {isEditing ? (
+        <form className="verification-form-box" onSubmit={handleSubmit}>
+          <div className="verification-stepper">
+            <button
+              type="button"
+              className={`stepper-tab ${step === 1 ? "active" : step > 1 ? "completed" : ""}`}
+              onClick={() => setStep(1)}
+            >
+              <span>1. Identity &amp; KYC</span>
+            </button>
+            <button
+              type="button"
+              className={`stepper-tab ${step === 2 ? "active" : step > 2 ? "completed" : ""}`}
+              onClick={() => setStep(2)}
+            >
+              <span>2. Land &amp; Crops</span>
+            </button>
+            <button
+              type="button"
+              className={`stepper-tab ${step === 3 ? "active" : ""}`}
+              onClick={() => setStep(3)}
+            >
+              <span>3. Bank &amp; Payout</span>
+            </button>
+          </div>
+
+          {step === 1 && (
+            <div>
+              <h4 style={{ margin: "0 0 14px", color: "#143d2c" }}>Personal Identity &amp; Government KYC</h4>
+              <div className="form-row-2">
+                <label>
+                  Full Legal Name (as per Aadhaar / Bank)
+                  <input
+                    required
+                    value={form.farmerName}
+                    onChange={(e) => setForm({ ...form, farmerName: e.target.value })}
+                    placeholder="e.g. Ramesh Kumar"
+                  />
+                </label>
+                <label>
+                  Mobile Number (OTP linked)
+                  <input
+                    required
+                    value={form.mobile}
+                    onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+                    placeholder="+91 98290 14820"
+                  />
+                </label>
+              </div>
+              <div className="form-row-2">
+                <label>
+                  Government ID Type
+                  <select
+                    value={form.idType}
+                    onChange={(e) => setForm({ ...form, idType: e.target.value })}
+                  >
+                    <option>Aadhaar Card</option>
+                    <option>Kisan Credit Card (KCC)</option>
+                    <option>PM-KISAN Registration ID</option>
+                    <option>Voter ID Card</option>
+                  </select>
+                </label>
+                <label>
+                  ID Number
+                  <input
+                    required
+                    value={form.idNumber}
+                    onChange={(e) => setForm({ ...form, idNumber: e.target.value })}
+                    placeholder="e.g. 4920-8812-7741"
+                  />
+                </label>
+              </div>
+              <label>
+                Attach Government ID Proof
+                <div className="doc-upload-zone" onClick={() => notify("Document selected: " + form.idDocName)}>
+                  <ScanLine size={24} style={{ color: "#176b49", margin: "0 auto 6px" }} />
+                  <b>{form.idDocName ? `Attached: ${form.idDocName}` : "Click or tap to upload Aadhaar / KCC photo"}</b>
+                  <small style={{ display: "block", color: "#666" }}>Supported formats: PDF, JPEG, PNG (max 5MB)</small>
+                </div>
+              </label>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
+                <button type="button" className="primary" onClick={() => setStep(2)}>
+                  Next: Land Records →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div>
+              <h4 style={{ margin: "0 0 14px", color: "#143d2c" }}>Farm Land &amp; Cultivation Records</h4>
+              <div className="form-row-3">
+                <label>
+                  State
+                  <input
+                    required
+                    value={form.landState}
+                    onChange={(e) => setForm({ ...form, landState: e.target.value })}
+                    placeholder="e.g. Rajasthan"
+                  />
+                </label>
+                <label>
+                  District
+                  <input
+                    required
+                    value={form.landDistrict}
+                    onChange={(e) => setForm({ ...form, landDistrict: e.target.value })}
+                    placeholder="e.g. Jaipur"
+                  />
+                </label>
+                <label>
+                  Village / Tehsil
+                  <input
+                    required
+                    value={form.village}
+                    onChange={(e) => setForm({ ...form, village: e.target.value })}
+                    placeholder="e.g. Phulera"
+                  />
+                </label>
+              </div>
+              <div className="form-row-2">
+                <label>
+                  Total Land Holding (Acres)
+                  <input
+                    required
+                    type="number"
+                    step="0.1"
+                    value={form.landAcres}
+                    onChange={(e) => setForm({ ...form, landAcres: e.target.value })}
+                    placeholder="e.g. 4.5"
+                  />
+                </label>
+                <label>
+                  Khasra / Land Survey Number
+                  <input
+                    required
+                    value={form.khasraNumber}
+                    onChange={(e) => setForm({ ...form, khasraNumber: e.target.value })}
+                    placeholder="e.g. 412/1 & 412/2"
+                  />
+                </label>
+              </div>
+              <label>
+                Major Crops Cultivated
+                <input
+                  required
+                  value={form.cropsGrown}
+                  onChange={(e) => setForm({ ...form, cropsGrown: e.target.value })}
+                  placeholder="e.g. Mustard, Tomato, Wheat, Bajra"
+                />
+              </label>
+              <label>
+                Land Record Document (7/12 Extract / Khasra Girdawari / Patta)
+                <div className="doc-upload-zone" onClick={() => notify("Document selected: " + form.landDocName)}>
+                  <MapPin size={24} style={{ color: "#176b49", margin: "0 auto 6px" }} />
+                  <b>{form.landDocName ? `Attached: ${form.landDocName}` : "Click or tap to upload Land Passbook / Khasra document"}</b>
+                  <small style={{ display: "block", color: "#666" }}>Supported formats: PDF, JPEG, PNG (max 5MB)</small>
+                </div>
+              </label>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "16px" }}>
+                <button type="button" className="secondary" onClick={() => setStep(1)}>
+                  ← Back
+                </button>
+                <button type="button" className="primary" onClick={() => setStep(3)}>
+                  Next: Bank Details →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div>
+              <h4 style={{ margin: "0 0 14px", color: "#143d2c" }}>Bank Account &amp; Direct Payout Details</h4>
+              <div className="form-row-2">
+                <label>
+                  Bank Name
+                  <input
+                    required
+                    value={form.bankName}
+                    onChange={(e) => setForm({ ...form, bankName: e.target.value })}
+                    placeholder="e.g. State Bank of India"
+                  />
+                </label>
+                <label>
+                  Bank Account Number
+                  <input
+                    required
+                    value={form.accountNumber}
+                    onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
+                    placeholder="e.g. 30984920112"
+                  />
+                </label>
+              </div>
+              <div className="form-row-2">
+                <label>
+                  IFSC Code
+                  <input
+                    required
+                    value={form.ifsc}
+                    onChange={(e) => setForm({ ...form, ifsc: e.target.value.toUpperCase() })}
+                    placeholder="e.g. SBIN0031129"
+                  />
+                </label>
+                <label>
+                  UPI ID (for instant settlement)
+                  <input
+                    value={form.upiId}
+                    onChange={(e) => setForm({ ...form, upiId: e.target.value })}
+                    placeholder="e.g. ramesh.kisan@sbi"
+                  />
+                </label>
+              </div>
+              <label>
+                Associated FPO / Cooperative (Optional)
+                <input
+                  value={form.fpoName}
+                  onChange={(e) => setForm({ ...form, fpoName: e.target.value })}
+                  placeholder="e.g. Kisan Samriddhi FPO"
+                />
+              </label>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "16px" }}>
+                <button type="button" className="secondary" onClick={() => setStep(2)}>
+                  ← Back
+                </button>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button type="button" className="secondary" onClick={() => setIsEditing(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="primary">
+                    <Check size={16} /> Submit Official Verification
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </form>
+      ) : (
+        <div className="verification-form-box">
+          <h4 style={{ margin: "0 0 12px", color: "#143d2c" }}>Verified Profile Information</h4>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
+            <div>
+              <small style={{ color: "#666" }}>Farmer Legal Name</small>
+              <b style={{ display: "block", color: "#133827" }}>{farmerVerification?.farmerName || "Ramesh Kumar"}</b>
+              <small style={{ color: "#666" }}>{farmerVerification?.mobile || "+91 98290 14820"}</small>
+            </div>
+            <div>
+              <small style={{ color: "#666" }}>Identity Record</small>
+              <b style={{ display: "block", color: "#133827" }}>{farmerVerification?.idType || "Aadhaar"}</b>
+              <small style={{ color: "#666" }}>ID: {farmerVerification?.idNumber || "XXXX-XXXX-8812"}</small>
+            </div>
+            <div>
+              <small style={{ color: "#666" }}>Farm Survey (Khasra)</small>
+              <b style={{ display: "block", color: "#133827" }}>Khasra {farmerVerification?.khasraNumber || "412/1 & 412/2"}</b>
+              <small style={{ color: "#666" }}>{farmerVerification?.village || "Phulera"}, {farmerVerification?.landDistrict || "Jaipur"} ({farmerVerification?.landAcres || "4.5"} acres)</small>
+            </div>
+            <div>
+              <small style={{ color: "#666" }}>Bank Payout Destination</small>
+              <b style={{ display: "block", color: "#133827" }}>{farmerVerification?.bankName || "SBI Phulera"}</b>
+              <small style={{ color: "#666" }}>A/C: {farmerVerification?.accountNumber || "XXXXXX4920"} · IFSC: {farmerVerification?.ifsc || "SBIN0031129"}</small>
+            </div>
+          </div>
+          {farmerVerification?.reviewerNote && (
+            <div style={{ marginTop: "14px", padding: "10px 14px", borderRadius: "8px", background: "#f0f8ee", border: "1px solid #d2e7ce", fontSize: "0.84rem", color: "#255738" }}>
+              <b>Admin Verification Note:</b> {farmerVerification.reviewerNote}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FarmerOperations({ notify, session, liveTick, listingPrefill, farmerVerification, setFarmerVerification }) {
   const [tab, setTab] = useState("listings"),
     [cropSearch, setCropSearch] = useState(""),
     [images, setImages] = useState([]),
@@ -3466,21 +4016,12 @@ function FarmerOperations({ notify, session, liveTick, listingPrefill }) {
         </div>
       )}
       {tab === "verification" && (
-        <div className="account-panel">
-          <h3>Farmer profile verification</h3>
-          <p>
-            Identity, farm location, bank account and FPO details are reviewed
-            before trust status is displayed to buyers.
-          </p>
-          <button
-            className="primary"
-            onClick={() =>
-              notify("Verification checklist opened for document upload.")
-            }
-          >
-            Continue verification
-          </button>
-        </div>
+        <FarmerVerificationWorkflow
+          farmerVerification={farmerVerification}
+          setFarmerVerification={setFarmerVerification}
+          notify={notify}
+          session={session}
+        />
       )}
       {tab === "quotes" && (
         <div className="account-panel">
@@ -3831,7 +4372,48 @@ function AuthView({ initialRole = "consumer", setSession, setView, notify }) {
             an administrator-provisioned username.
           </p>
         )}
-        <small className="auth-note">
+        <div style={{ marginTop: "16px", borderTop: "1px solid #e1eee3", paddingTop: "12px" }}>
+          <small style={{ display: "block", color: "#555", marginBottom: "8px", fontWeight: 700 }}>Quick Demo Sign-in:</small>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="secondary"
+              style={{ fontSize: "0.82rem", padding: "5px 10px", display: "flex", alignItems: "center", gap: "5px" }}
+              onClick={() => {
+                setSession({ role: "farmer", label: "Ramesh Kumar", name: "Ramesh Kumar", farmerId: "FLR-98124", userId: "demo-farmer-ramesh" });
+                setView("farmer");
+                notify("Signed in as Farmer Ramesh Kumar.");
+              }}
+            >
+              <Sprout size={14} /> Ramesh Kumar (Farmer)
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              style={{ fontSize: "0.82rem", padding: "5px 10px", display: "flex", alignItems: "center", gap: "5px" }}
+              onClick={() => {
+                setSession({ role: "admin", label: "FarmLink Admin", name: "Admin Officer", userId: "demo-admin" });
+                setView("admin");
+                notify("Signed in as FarmLink Operations Admin.");
+              }}
+            >
+              <ShieldCheck size={14} /> Operations Admin
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              style={{ fontSize: "0.82rem", padding: "5px 10px", display: "flex", alignItems: "center", gap: "5px" }}
+              onClick={() => {
+                setSession({ role: "consumer", label: "Priya Sharma", name: "Priya Sharma", userId: "demo-consumer" });
+                setView("market");
+                notify("Signed in as Consumer Priya Sharma.");
+              }}
+            >
+              <ShoppingCart size={14} /> Consumer Buyer
+            </button>
+          </div>
+        </div>
+        <small className="auth-note" style={{ marginTop: "10px", display: "block" }}>
           {isSupabaseConfigured
             ? "Supabase Auth is active."
             : "Demo mode: configure Supabase environment variables to enable secure account storage."}
@@ -4108,7 +4690,7 @@ function LegacyAdminView({ lots, orders, produceRequests, setView, logout, notif
     </section>
   );
 }
-function AdminView({ session, lots, orders, produceRequests, bulkRequests, logisticsJobs, warehouses, setOrderStatus, liveTick, setLiveTick, setView, logout, notify }) {
+function AdminView({ session, lots, orders, produceRequests, bulkRequests, logisticsJobs, warehouses, setOrderStatus, liveTick, setLiveTick, setView, logout, notify, farmerVerification, setFarmerVerification }) {
   const [tab, setTab] = useState("action");
   const [listings, setListings] = useState([]);
   const [listingCategory, setListingCategory] = useState("pending");
@@ -4319,7 +4901,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
   return <section className="page admin-page">
     <div className="page-top"><div><p className="eyebrow green">LIVE OPERATIONS COMMAND CENTER</p><h1>FarmLink Admin</h1><p>Verify listings, coordinate collection and warehouse work, connect wholesale buyers, and map the route for every handoff.</p></div><button className="secondary" onClick={logout}><LogOut size={17}/>Sign out</button></div>
     <div className="metric-grid"><Metric icon={<Users/>} label="Farmer requests" value={String(produceRequests.length)} note={`${pending} item(s) require attention`}/><Metric icon={<ShoppingCart/>} label="Consumer orders" value={String(orders.length)} note={`${readyOrders.length} packed and awaiting collection`}/><Metric icon={<PackageCheck/>} label="Collections confirmed" value={String(completedOrders.length)} note={`₹${collectedValue.toFixed(2)} completed pickup value`}/><Metric icon={<Truck/>} label="Logistics jobs" value={String(logisticsJobs.length)} note="Route and schedule tracking"/><Metric icon={<PackageCheck/>} label="Live inventory" value={`${lots.reduce((sum, lot) => sum + lot.qty, 0)} kg`} note="Verified warehouse stock"/></div>
-    <section className="admin-control"><div className="tabs">{[["action","Action centre"],["listings","Listing approvals"],["wholesale","Wholesale desk"],["warehouses","Warehouse inspector"],["routes","Route map"],["price floors","Reference floors"],["market data","MSP & mandi data"],["integrations","Integrations"]].map(([key,label]) => <button key={key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>
+    <section className="admin-control"><div className="tabs">{[["action","Action centre"],["listings","Listing approvals"],["verification","Farmer KYC approvals"],["wholesale","Wholesale desk"],["warehouses","Warehouse inspector"],["routes","Route map"],["price floors","Reference floors"],["market data","MSP & mandi data"],["integrations","Integrations"]].map(([key,label]) => <button key={key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>
     {tab === "action" && <div className="admin-grid">
       <QueuePanel title="Newest farmer & cluster requests" empty="No open farmer requests." items={produceRequests.slice(0, 8)} render={(item) => <><b>{item.crop} · {item.grossWeight} kg</b><small>{item.farmer} · {item.cluster} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["collection_scheduled","received"].includes(item.status)} onClick={() => scheduleClusterRequest(item)}>{["collection_scheduled","received"].includes(item.status) ? "Scheduled" : "Verify & schedule"}</button>}/>
       <QueuePanel title="Newest consumer orders" empty="No pending consumer orders." items={orders.slice(0, 8)} render={(item) => <><b>{item.id} · {item.quantity} kg · ₹{item.totalAmount.toFixed(2)}</b><small>{item.consumerName || "Consumer"}{item.consumerMobile ? ` · ${item.consumerMobile}` : ""}</small><small>{item.consumerAddress || "Address not provided"} · Pickup: {item.pickupWarehouse} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["verified","ready for pickup"].includes(String(item.status).toLowerCase())} onClick={async () => { if (await setOrderStatus(item.id, "Verified")) notify("Consumer order verified across admin, consumer and warehouse queues."); }}>{["verified","ready for pickup"].includes(String(item.status).toLowerCase()) ? "Verified" : "Verify order"}</button>}/>
@@ -4444,6 +5026,148 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
         </div>
       )}
     </div>}
+    {tab === "verification" && (
+      <div className="admin-work-panel">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "14px" }}>
+          <div>
+            <h3>Farmer identity &amp; land record verification (KYC)</h3>
+            <p style={{ margin: "2px 0 0", color: "#555" }}>
+              Verify government identity, land titles (Khasra/7/12 extract), and bank payout credentials before granting trusted farmer badges.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <span style={{
+              padding: "4px 10px",
+              borderRadius: "20px",
+              fontSize: "0.82rem",
+              fontWeight: 600,
+              background: farmerVerification?.status === "verified" ? "#d1fae5" : farmerVerification?.status === "under_review" ? "#fef3c7" : "#fee2e2",
+              color: farmerVerification?.status === "verified" ? "#065f46" : farmerVerification?.status === "under_review" ? "#92400e" : "#991b1b"
+            }}>
+              {farmerVerification?.status === "verified" ? "● Verified Farmer" : farmerVerification?.status === "under_review" ? "⏳ KYC Under Review" : "⚠️ Unverified"}
+            </span>
+          </div>
+        </div>
+
+        <div className="verification-card" style={{ background: "#ffffff", border: "1px solid #c8d9cb", borderRadius: "10px", padding: "18px", marginBottom: "18px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px", borderBottom: "1px solid #e5ede7", paddingBottom: "14px", marginBottom: "16px" }}>
+            <div>
+              <h4 style={{ margin: 0, color: "#133827", fontSize: "1.1rem" }}>{farmerVerification?.farmerName || "Ramesh Kumar"}</h4>
+              <small style={{ color: "#555" }}>Application ID: <b>{farmerVerification?.id || "KYC-RJ-2026-9812"}</b> · Mobile: <b>{farmerVerification?.mobile || "+91 98290 14820"}</b></small>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <small style={{ display: "block", color: "#666" }}>Submitted: {farmerVerification?.submittedAt ? new Date(farmerVerification.submittedAt).toLocaleDateString("en-IN") : "Sep 18, 2026"}</small>
+              {farmerVerification?.reviewedAt && (
+                <small style={{ display: "block", color: "#15803d" }}>Reviewed: {new Date(farmerVerification.reviewedAt).toLocaleDateString("en-IN")}</small>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
+            <div style={{ background: "#f9fcf9", padding: "12px", borderRadius: "8px", border: "1px solid #e1eee3" }}>
+              <strong style={{ color: "#175034", display: "block", marginBottom: "6px" }}>🪪 Identity Record</strong>
+              <div style={{ fontSize: "0.88rem", color: "#333", lineHeight: "1.6" }}>
+                <div>Document: <b>{farmerVerification?.idType || "Aadhaar Card"}</b></div>
+                <div>ID Number: <b>{farmerVerification?.idNumber || "4920-8812-7741"}</b></div>
+                <div style={{ marginTop: "4px" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.8rem", color: "#166534", background: "#e8f5e9", padding: "2px 6px", borderRadius: "4px" }}>
+                    📄 {farmerVerification?.idDocName || "aadhaar_card_scan.pdf"} (Uploaded)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ background: "#f9fcf9", padding: "12px", borderRadius: "8px", border: "1px solid #e1eee3" }}>
+              <strong style={{ color: "#175034", display: "block", marginBottom: "6px" }}>🌾 Land Title &amp; Survey (Khasra)</strong>
+              <div style={{ fontSize: "0.88rem", color: "#333", lineHeight: "1.6" }}>
+                <div>Location: <b>{farmerVerification?.village || "Phulera"}, {farmerVerification?.landDistrict || "Jaipur"}, {farmerVerification?.landState || "Rajasthan"}</b></div>
+                <div>Khasra Survey: <b>{farmerVerification?.khasraNumber || "412/1 & 412/2"}</b> ({farmerVerification?.landAcres || "4.5"} Acres)</div>
+                <div>Crops: <b>{farmerVerification?.cropsGrown || "Mustard, Tomato, Wheat"}</b></div>
+                <div style={{ marginTop: "4px" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.8rem", color: "#166534", background: "#e8f5e9", padding: "2px 6px", borderRadius: "4px" }}>
+                    📜 {farmerVerification?.landDocName || "khasra_girdawari_record.pdf"} (Verified)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ background: "#f9fcf9", padding: "12px", borderRadius: "8px", border: "1px solid #e1eee3" }}>
+              <strong style={{ color: "#175034", display: "block", marginBottom: "6px" }}>🏦 Bank Payout &amp; FPO</strong>
+              <div style={{ fontSize: "0.88rem", color: "#333", lineHeight: "1.6" }}>
+                <div>Bank: <b>{farmerVerification?.bankName || "State Bank of India (Phulera)"}</b></div>
+                <div>Account: <b>{farmerVerification?.accountNumber || "30984920112"}</b></div>
+                <div>IFSC: <b>{farmerVerification?.ifsc || "SBIN0031129"}</b> · UPI: <b>{farmerVerification?.upiId || "ramesh.kisan@sbi"}</b></div>
+                <div>FPO: <b>{farmerVerification?.fpoName || "Kisan Samriddhi FPO"}</b></div>
+              </div>
+            </div>
+          </div>
+
+          {farmerVerification?.reviewerNote && (
+            <div style={{ marginTop: "14px", padding: "10px 14px", borderRadius: "8px", background: "#f0f8ee", border: "1px solid #d2e7ce", fontSize: "0.86rem", color: "#255738" }}>
+              <b>Current Review Note:</b> {farmerVerification.reviewerNote}
+            </div>
+          )}
+
+          <div style={{ marginTop: "18px", display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+            <button
+              type="button"
+              className="primary"
+              disabled={farmerVerification?.status === "verified"}
+              onClick={() => {
+                const updated = {
+                  ...farmerVerification,
+                  status: "verified",
+                  reviewedAt: new Date().toISOString(),
+                  reviewerNote: "KYC credentials, Khasra survey record, and bank details verified by FarmLink Admin.",
+                };
+                setFarmerVerification(updated);
+                localStorage.setItem("farmlink_farmer_verification", JSON.stringify(updated));
+                notify("Farmer verification approved! Trusted Farmer badge is now active for buyers.");
+              }}
+            >
+              <Check size={16} /> Approve KYC &amp; Mark Verified
+            </button>
+
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => {
+                const reason = window.prompt("Enter note or query for farmer:", farmerVerification?.reviewerNote || "Please submit an updated high-resolution copy of land record (Khasra Girdawari).");
+                if (reason === null) return;
+                const updated = {
+                  ...farmerVerification,
+                  status: "under_review",
+                  reviewerNote: reason,
+                };
+                setFarmerVerification(updated);
+                localStorage.setItem("farmlink_farmer_verification", JSON.stringify(updated));
+                notify("Application marked under review and feedback saved.");
+              }}
+            >
+              ⏳ Request More Information / Under Review
+            </button>
+
+            <button
+              type="button"
+              className="danger"
+              onClick={() => {
+                if (!window.confirm("Reset this farmer's verification status to unverified?")) return;
+                const updated = {
+                  ...farmerVerification,
+                  status: "unverified",
+                  reviewerNote: "Verification rejected due to mismatch in submitted records. Please resubmit.",
+                };
+                setFarmerVerification(updated);
+                localStorage.setItem("farmlink_farmer_verification", JSON.stringify(updated));
+                notify("Farmer verification status set to unverified.");
+              }}
+            >
+              Reset to Unverified
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     {tab === "wholesale" && <div className="admin-work-panel"><h3>Connect wholesale requests to crop-matched farmers</h3><p>Only farmers with live, verified stock of the requested crop can receive a quote. If no one farmer can fulfil it, create a capacity-checked farmer cluster.</p>{bulkRequests.length ? bulkRequests.filter((request) => !["confirmed","declined"].includes(request.status)).map((request) => { const eligible = eligibleFarmers(request); const selected = clusterSelections[request.id] || []; const clusterCapacity = eligible.filter((farmer) => selected.includes(farmer.id)).reduce((sum, farmer) => sum + Number(farmer.stock[request.crop] || 0), 0); return <div className="quote-assignment" key={request.id}><div className="assignment-row"><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · MSP floor ₹{Number(request.msp_per_kg || 0).toFixed(2)}/kg · {request.status}</small><small>{eligible.length} crop-matched farmer(s) · {eligible.reduce((sum, farmer) => sum + Number(farmer.stock[request.crop] || 0), 0)} kg live capacity</small></div><select value={assignments[request.id] || request.farmer_id || ""} onChange={(event) => setAssignments({ ...assignments, [request.id]: event.target.value })}><option value="">Choose an eligible farmer</option>{eligible.filter((farmer) => Number(farmer.stock[request.crop] || 0) >= Number(request.quantity_kg)).map((farmer) => <option key={farmer.id} value={farmer.id}>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""} · {farmer.stock[request.crop]} kg</option>)}</select><button className="primary" disabled={!eligible.some((farmer) => Number(farmer.stock[request.crop] || 0) >= Number(request.quantity_kg))} onClick={() => assignFarmer(request)}>Assign single farmer</button></div><div className="cluster-picker"><b>Or create a farmer cluster</b><small>Select contributors with {request.crop}; capacity is allocated automatically up to the buyer requirement.</small>{eligible.map((farmer) => <label key={farmer.id}><input type="checkbox" checked={selected.includes(farmer.id)} onChange={() => toggleClusterFarmer(request.id, farmer.id)}/><span>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""}</span><strong>{farmer.stock[request.crop]} kg available</strong></label>)}{eligible.length ? <div><span>Selected capacity: <b>{clusterCapacity} / {request.quantity_kg} kg</b></span><button className="secondary" disabled={selected.length < 2 || clusterCapacity < Number(request.quantity_kg)} onClick={() => assignCluster(request)}>Create cluster & assign quote</button></div> : <p className="empty-state">No farmer currently has published live stock of {request.crop}.</p>}</div></div>; }) : <p className="empty-state">No wholesale requests are awaiting review.</p>}</div>}
     {tab === "warehouses" && <div className="admin-work-panel"><h3>Warehouse inspection menu</h3><p>Open a warehouse to handle intake, consumer pickups, and its associated live queue.</p>{warehouses.map((warehouse) => <div className="contract-row" key={warehouse.id || warehouse.name}><div><b>{warehouse.name}</b><small>{warehouse.address}</small></div><span>{orders.filter((order) => order.pickupWarehouse === warehouse.name).length} pickup order(s)</span><button className="primary" onClick={() => setView("warehouse")}>Inspect</button></div>)}</div>}
     {tab === "routes" && <div className="admin-work-panel"><h3>Farm-to-warehouse route mapping</h3><p>Map collection → intake warehouse → inter-warehouse transfer → pickup fulfilment.</p><LiveRoutePlanner notify={notify} initialOrigin={warehouses[0]?.address || ""} initialDestination={warehouses[1]?.address || warehouses[0]?.address || ""}/><form className="route-form" onSubmit={addRoute}><select value={route.origin} onChange={(event) => setRoute({ ...route, origin: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><span>→</span><select value={route.destination} onChange={(event) => setRoute({ ...route, destination: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><button className="primary" type="submit">Save transfer route</button></form><button className="secondary" onClick={() => setView("warehouse")}>Open warehouse operations</button></div>}
@@ -4669,7 +5393,8 @@ function Voice({ close, notify }) {
     try {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(textToSpeak);
-      utterance.lang = langCode === 'hi' ? 'hi-IN' : 'en-IN';
+      const langEntry = CONSTITUTIONAL_LANGUAGES.find((l) => l.code === langCode);
+      utterance.lang = langEntry?.speechCode || (langCode === 'hi' ? 'hi-IN' : 'en-IN');
       utterance.rate = 0.92;
       window.speechSynthesis.speak(utterance);
     } catch {}
@@ -4682,27 +5407,27 @@ function Voice({ close, notify }) {
     let replyText = "";
     let replyType = "general";
 
-    if (text.includes("टमाटर") || text.includes("tomato") || text.includes("भाव") || text.includes("price") || text.includes("rate") || text.includes("दाम")) {
+    if (text.includes("टमाटर") || text.includes("tomato") || text.includes("भाव") || text.includes("price") || text.includes("rate") || text.includes("दाम") || text.includes("விலை") || text.includes("ధర")) {
       replyType = "price";
       replyText = language === "hi"
         ? "टमाटर का आज का अनुमानित भाव छब्बीस से उनतीस रुपये प्रति किलो है। मांग आठ प्रतिशत बढ़ी है और शेल्फ लाइफ जोखिम कम है। आप फसल अभी बेच सकते हैं।"
         : "Estimated tomato price is ₹26 to ₹29 per kg. Regional demand is up 8% this week. Low shelf-life risk; recommend selling this week.";
-    } else if (text.includes("सरसों") || text.includes("mustard") || text.includes("msp") || text.includes("एमएसपी")) {
+    } else if (text.includes("सरसों") || text.includes("mustard") || text.includes("msp") || text.includes("एमएसपी") || text.includes("न्यूनतम")) {
       replyType = "price";
       replyText = language === "hi"
         ? "सरसों का सरकारी न्यूनतम समर्थन मूल्य छप्पन रुपये पचास पैसे प्रति किलो है। फुलेरा और जयपुर मंडी में बिक्री भाव बयासी से अठानवे रुपये चालीस पैसे है। आप इसे होल्ड करके ई-एनडब्ल्यूआर एडवांस ले सकते हैं।"
         : "Rapeseed & Mustard MSP floor is ₹56.50/kg. Regional selling price is ₹82 to ₹98.40/kg with 50% e-NWR pledge eligibility.";
-    } else if (text.includes("स्टॉक") || text.includes("stock") || text.includes("गोदाम") || text.includes("warehouse")) {
+    } else if (text.includes("स्टॉक") || text.includes("stock") || text.includes("गोदाम") || text.includes("warehouse") || text.includes("inventory")) {
       replyType = "stock";
       replyText = language === "hi"
         ? "जयपुर नॉर्थ और सांगानेर गोदाम में आपकी फसल का सत्यापित डिजिटल लेजर रिकॉर्ड मौजूद है। सभी लॉट सुरक्षित हैं।"
         : "Your verified crop batches are securely recorded on the FarmLink warehouse digital ledger with active lot tracking.";
-    } else if (text.includes("पिकअप") || text.includes("pickup") || text.includes("गाड़ी") || text.includes("गाड़ी") || text.includes("वाहन") || text.includes("collection")) {
+    } else if (text.includes("पिकअप") || text.includes("pickup") || text.includes("गाड़ी") || text.includes("गाड़ी") || text.includes("वाहन") || text.includes("collection") || text.includes("transport")) {
       replyType = "pickup";
       replyText = language === "hi"
         ? "क्लस्टर वाहन पिकअप का अनुरोध दर्ज कर लिया गया है। निकटतम संग्रहण केंद्र से वाहन आपके गांव के लिए रूट कर दिया जाएगा।"
         : "Cluster pickup request recorded. Route optimization engine will assign a collection vehicle to your farm cluster.";
-    } else if (text.includes("एडवांस") || text.includes("advance") || text.includes("लोन") || text.includes("loan") || text.includes("पैसा") || text.includes("e-nwr")) {
+    } else if (text.includes("एडवांस") || text.includes("advance") || text.includes("लोन") || text.includes("loan") || text.includes("पैसा") || text.includes("e-nwr") || text.includes("क्रेडिट")) {
       replyType = "finance";
       replyText = language === "hi"
         ? "गोदाम में जमा सत्यापित फसल के आधार पर आप पचास प्रतिशत तक अग्रिम कार्यशील पूंजी का लाभ उठा सकते हैं। सहमति दर्ज करके आवेदन करें।"
@@ -4753,16 +5478,36 @@ function Voice({ close, notify }) {
       }
       const recognition = new Recognition();
       recognitionRef.current = recognition;
-      recognition.lang = language === 'hi' ? 'hi-IN' : 'en-IN';
+      const langEntry = CONSTITUTIONAL_LANGUAGES.find((l) => l.code === language);
+      recognition.lang = langEntry?.speechCode || (language === 'hi' ? 'hi-IN' : 'en-IN');
       recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.interimResults = true;
       recognition.onresult = event => {
-        const spoken = event.results[0][0].transcript;
-        setTranscript(spoken);
-        processVoiceQuery(spoken);
+        let interim = "";
+        let finalSpoken = "";
+        for (let i = 0; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalSpoken += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        const text = finalSpoken || interim;
+        if (text) setTranscript(text);
+        if (finalSpoken) {
+          processVoiceQuery(finalSpoken);
+        }
       };
       recognition.onerror = event => {
-        setStatus(`Speech recognition: ${event.error}. Use typed prompt below.`);
+        let msg = `Speech notice: ${event.error}.`;
+        if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+          msg = "Microphone access blocked. Please enable mic permissions in your browser or type below.";
+        } else if (event.error === 'no-speech') {
+          msg = "No speech detected. Tap to speak again or use quick prompts.";
+        } else if (event.error === 'network') {
+          msg = "Speech recognition network error. You can type below.";
+        }
+        setStatus(msg);
         setRecording(false);
       };
       recognition.onend = () => setRecording(false);
@@ -4770,9 +5515,9 @@ function Voice({ close, notify }) {
         recognition.start();
         setRecording(true);
         setTranscript('');
-        setStatus('Listening… बोलिए…');
+        setStatus('Listening… बोलिए… Speak your query now.');
       } catch {
-        setStatus('Speech recognition could not start. Please try again.');
+        setStatus('Speech recognition could not start. Please try again or type directly.');
       }
       return;
     }
@@ -4824,10 +5569,10 @@ function Voice({ close, notify }) {
         <div className="voice-orb" style={{ animation: recording ? 'pulse 1.2s infinite' : 'none' }}>
           <Mic size={42} />
         </div>
-        <p className="eyebrow green">MULTILINGUAL VOICE AI (TOLL-FREE DEMO)</p>
+        <p className="eyebrow green">MULTILINGUAL VOICE AI (ALL 22 INDIAN LANGUAGES)</p>
         <h2>Ask in your own language · अपनी भाषा में पूछें</h2>
         <p style={{ fontSize: '0.9rem', color: '#555' }}>
-          Call, speak, or select a query in Hindi or English to get instant AI price guidance and logistics support.
+          Speak or select a query in any of India's 22 official constitutional languages for instant AI guidance on mandi rates, MSP, warehouse lots, and logistics.
         </p>
 
         <div className="voice-options" style={{ margin: '10px 0' }}>
@@ -4838,8 +5583,11 @@ function Voice({ close, notify }) {
               disabled={recording}
               onChange={(e) => setLanguage(e.target.value)}
             >
-              <option value="hi">हिंदी (Hindi)</option>
-              <option value="en">English</option>
+              {CONSTITUTIONAL_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.nativeName} · {l.name}
+                </option>
+              ))}
             </select>
           </label>
           <label>
