@@ -573,8 +573,9 @@ function App() {
     [lots, setLots] = useState(initialLots),
     [cart, setCart] = useState([]),
     [wishlist, setWishlist] = useState([]),
-    [selectedLot, setSelectedLot] = useState(null),
     [modal, setModal] = useState(null),
+    [aiInitialCrop, setAiInitialCrop] = useState(null),
+    [farmerListingPrefill, setFarmerListingPrefill] = useState(null),
     [toast, setToast] = useState(""),
     [session, setSession] = useState(null),
     [passwordRecovery, setPasswordRecovery] = useState(() => new URLSearchParams(window.location.search).has("reset-password") || window.location.hash.includes("type=recovery")),
@@ -1143,6 +1144,8 @@ function App() {
             session={session}
             lots={lots}
             setModal={setModal}
+            setAiInitialCrop={setAiInitialCrop}
+            listingPrefill={farmerListingPrefill}
             produceRequests={produceRequests}
             setProduceRequests={setProduceRequests}
             liveTick={liveTick}
@@ -1183,12 +1186,34 @@ function App() {
       )}{" "}
       {modal === "ai" && (
         <FreeAdvisory
-          close={() => setModal(null)}
-          myLots={lots.filter(l => l.farmer === "Ramesh Kumar" || l.farmer === session?.name)}
-          onListCrop={(cropName) => {
+          close={() => {
             setModal(null);
-            setView("farmer");
+            setAiInitialCrop(null);
           }}
+          initialCrop={aiInitialCrop}
+          myLots={lots.filter(l => l.farmer === "Ramesh Kumar" || l.farmer === session?.name)}
+          onListCrop={(cropName, suggestedPrice) => {
+            setModal(null);
+            setAiInitialCrop(null);
+            setView("farmer");
+            setFarmerListingPrefill({ crop: cropName, price: suggestedPrice });
+            notify(`AI guidance applied: listing ${cropName} at ₹${suggestedPrice}/kg.`);
+            setTimeout(() => {
+              const el = document.querySelector(".photo-listing");
+              if (el) el.scrollIntoView({ behavior: "smooth" });
+            }, 180);
+          }}
+          onHoldCrop={(cropName) => {
+            setModal(null);
+            setAiInitialCrop(null);
+            setView("farmer");
+            notify(`Holding decision recorded for ${cropName}. e-NWR pledge section ready.`);
+            setTimeout(() => {
+              const el = document.querySelector(".integration-section");
+              if (el) el.scrollIntoView({ behavior: "smooth" });
+            }, 180);
+          }}
+          notify={notify}
         />
       )}{" "}
       {modal === "checkout" && (
@@ -2579,6 +2604,8 @@ function FarmerView({
   session,
   lots,
   setModal,
+  setAiInitialCrop,
+  listingPrefill,
   produceRequests,
   setProduceRequests,
   liveTick,
@@ -2613,20 +2640,18 @@ function FarmerView({
       ...form,
       id,
       farmer: session?.name || "Farmer",
-      status: "Awaiting pickup and grade",
+      status: "pending",
+      created_at: new Date().toISOString(),
     };
-    if (isSupabaseConfigured && session?.userId) {
+    if (isSupabaseConfigured) {
       const { data, error } = await supabase
         .from("produce_requests")
         .insert({
-          farmer_id: session.userId,
           crop: form.crop,
+          type: form.type,
           gross_weight_kg: Number(form.grossWeight),
-          collection_cluster: form.cluster,
-          request_type:
-            form.type === "Cluster collection request"
-              ? "cluster_collection"
-              : "produce_intake",
+          cluster: form.cluster,
+          farmer_name: session?.name || "Farmer",
         })
         .select("id")
         .single();
@@ -2653,7 +2678,10 @@ function FarmerView({
             request. The collector will confirm final weight and grade at
             pickup.
           </p>
-          <button className="primary" onClick={() => setModal("ai")}>
+          <button className="primary" onClick={() => {
+            if (setAiInitialCrop) setAiInitialCrop(null);
+            setModal("ai");
+          }}>
             <BrainCircuit size={18} />
             View price guidance
           </button>
@@ -2765,7 +2793,21 @@ function FarmerView({
                   {l.qty} kg · {l.warehouse}
                 </small>
               </div>
-              <strong>₹{l.price}/kg</strong>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                <strong>₹{l.price}/kg</strong>
+                <button
+                  type="button"
+                  className="secondary"
+                  style={{ padding: "3px 8px", fontSize: "0.75rem", borderRadius: "4px", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                  onClick={() => {
+                    if (setAiInitialCrop) setAiInitialCrop(l.crop);
+                    setModal("ai");
+                  }}
+                >
+                  <BrainCircuit size={12} />
+                  AI Advisory
+                </button>
+              </div>
             </div>
           ))}
           {myRequests
@@ -2790,7 +2832,7 @@ function FarmerView({
           )}
         </div>
       </div>
-      <FarmerOperations notify={notify} session={session} liveTick={liveTick} />
+      <FarmerOperations notify={notify} session={session} liveTick={liveTick} listingPrefill={listingPrefill} />
       <FarmerServices session={session} />
       <div className="farmer-grid">
         <div className="finance">
@@ -2800,11 +2842,11 @@ function FarmerView({
             Start a consent-based eligibility enquiry for your stored produce.
           </p>
           <button
-            onClick={() =>
-              notify(
-                "Consent-first finance enquiry started. No credit decision has been made.",
-              )
-            }
+            onClick={() => {
+              notify("Navigating to warehouse receipts & pledge finance.");
+              const el = document.querySelector(".integration-section");
+              if (el) el.scrollIntoView({ behavior: "smooth" });
+            }}
           >
             Explore options <ArrowUpRight size={16} />
           </button>
@@ -2825,7 +2867,7 @@ function FarmerView({
     </section>
   );
 }
-function FarmerOperations({ notify, session, liveTick }) {
+function FarmerOperations({ notify, session, liveTick, listingPrefill }) {
   const [tab, setTab] = useState("listings"),
     [cropSearch, setCropSearch] = useState(""),
     [images, setImages] = useState([]),
@@ -2847,6 +2889,16 @@ function FarmerOperations({ notify, session, liveTick }) {
       price: "25",
       harvestDate: new Date().toISOString().slice(0, 10),
     });
+  useEffect(() => {
+    if (listingPrefill?.crop) {
+      setListing((prev) => ({
+        ...prev,
+        crop: listingPrefill.crop,
+        price: String(listingPrefill.price || prev.price),
+      }));
+      setTab("listings");
+    }
+  }, [listingPrefill]);
   useEffect(() => {
     if (!isSupabaseConfigured || !session?.userId) return;
     supabase.from("bulk_requests").select("id,crop,quantity_kg,buyer_name,msp_per_kg,status,bulk_quotes(id,offered_price_per_kg,proposed_by,status,note,created_at)").eq("farmer_id", session.userId).order("created_at", { ascending: false }).then(({ data, error }) => {
@@ -4140,52 +4192,6 @@ function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, pla
           <PackageCheck size={18} />
           {placingOrder ? "Placing order…" : "Confirm pickup order"}
         </button>
-      </div>
-    </div>
-  );
-}
-function AI({ close }) {
-  return (
-    <div className="modal-back">
-      <div className="modal">
-        <button className="close" onClick={close}>
-          <X />
-        </button>
-        <p className="eyebrow green">EXPLAINABLE FARM ADVISORY</p>
-        <h2>Tomato: consider selling this week</h2>
-        <div className="recommend">
-          <div>
-            <small>SUGGESTED RANGE</small>
-            <b>₹26 - ₹29/kg</b>
-          </div>
-          <div>
-            <small>CONFIDENCE</small>
-            <b>78%</b>
-          </div>
-          <div>
-            <small>DATA FRESHNESS</small>
-            <b>Today, 9:00 AM</b>
-          </div>
-        </div>
-        <h3>Why this guidance?</h3>
-        <ul>
-          <li>Nearby demand is up 8% this week.</li>
-          <li>Grade A availability is moderate.</li>
-          <li>Your lot is 1 day old; shelf-life risk is low.</li>
-        </ul>
-        <div className="disclaimer">
-          <ShieldCheck />
-          This is a recommendation, not a guaranteed price. You remain in
-          control of your sale decision.
-        </div>
-        <div className="modal-actions">
-          <button className="secondary" onClick={close}>
-            I’ll hold
-          </button>
-          <button className="primary" onClick={close}>
-            List for buyers
-          </button>
-        </div>
       </div>
     </div>
   );

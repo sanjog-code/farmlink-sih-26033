@@ -59,18 +59,45 @@ export function FarmerServices({ session }) {
 
   useOperationsRefresh(load, 'farmer-services');
 
+  const effectiveLots = lots.length > 0 ? lots : [
+    { id: 'demo-lot-1', crop: 'Rapeseed & mustard', quantity_kg: 100, lot_code: 'FL-LOT-RJ-091' },
+    { id: 'demo-lot-2', crop: 'Wheat', quantity_kg: 250, lot_code: 'FL-LOT-RJ-092' },
+    { id: 'demo-lot-3', crop: 'Tomato', quantity_kg: 80, lot_code: 'FL-LOT-RJ-093' },
+  ];
+
   const submit = async e => {
     e.preventDefault();
     setBusy(true);
     try {
+      const selectedLot = effectiveLots.find(l => l.id === form.lot) || effectiveLots[0];
+      const targetLotId = form.lot || selectedLot.id;
+
+      if (!supabase || String(targetLotId).startsWith('demo-')) {
+        const newApp = {
+          id: 'app-' + Date.now(),
+          service_type: form.service,
+          status: 'under_review',
+          review_note: 'Warehouse receipt eligibility confirmed under WDRA guidelines.',
+          created_at: new Date().toISOString(),
+          crop: selectedLot.crop,
+          quantity_kg: selectedLot.quantity_kg
+        };
+        setApps(prev => [newApp, ...prev]);
+        setMessage('Your enquiry has been submitted. Sample e-NWR certificate generated below.');
+        showCertificate(selectedLot);
+        setForm({ ...form, consent: false, note: '' });
+        return;
+      }
+
       await check(supabase.rpc('submit_farmer_service_application', {
-        p_lot_id: form.lot,
+        p_lot_id: targetLotId,
         p_service_type: form.service,
         p_requested_amount: form.service === 'finance_enquiry' ? Number(form.amount) : null,
         p_note: form.note,
         p_consent: form.consent
       }));
       setMessage('Your enquiry has been submitted. Sample e-NWR certificate generated below.');
+      showCertificate(selectedLot);
       setForm({ ...form, consent: false, note: '' });
       await load();
     } catch (error) {
@@ -83,14 +110,14 @@ export function FarmerServices({ session }) {
   const showCertificate = (appOrLot) => {
     const cropName = appOrLot?.crop || 'Rapeseed & mustard';
     const weight = appOrLot?.quantity_kg || 100;
-    const rate = cropName.toLowerCase().includes('mustard') ? 82 : 26;
+    const rate = cropName.toLowerCase().includes('mustard') ? 86 : cropName.toLowerCase().includes('wheat') ? 26 : 28;
     const totalVal = weight * rate;
     const advanceVal = Math.round(totalVal * 0.5);
 
     setCertModal({
       certNo: 'e-NWR/2026/RJ-JAI-' + Math.floor(10000 + Math.random() * 90000),
       warehouseName: 'Jaipur North Agricultural Hub (WDRA Reg: WR-RJ-2026-091)',
-      farmerName: session?.name || 'Kalpit Saxena',
+      farmerName: session?.name || 'Ramesh Kumar',
       farmerId: session?.farmerId || 'FL-FARM-8291',
       crop: cropName,
       weightKg: weight,
@@ -122,7 +149,7 @@ export function FarmerServices({ session }) {
         <label>Your warehouse lot
           <select required value={form.lot} onChange={e => setForm({ ...form, lot: e.target.value })}>
             <option value="">Choose verified stock</option>
-            {lots.map(lot => (
+            {effectiveLots.map(lot => (
               <option key={lot.id} value={lot.id}>{lot.crop} · {lot.quantity_kg} kg · {lot.lot_code}</option>
             ))}
           </select>
@@ -147,7 +174,7 @@ export function FarmerServices({ session }) {
             {' '}I consent to sharing this lot data with the accredited WDRA warehouse and partner lender for working-capital pledge advance.
           </span>
         </label>
-        <button className="primary" disabled={busy || !lots.length}>{busy ? 'Submitting…' : 'Request e-NWR Review'}</button>
+        <button className="primary" disabled={busy}>{busy ? 'Submitting…' : 'Request e-NWR Review'}</button>
       </form>
 
       <div className="service-list" style={{ marginTop: '16px' }}>
