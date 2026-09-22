@@ -58,19 +58,17 @@ export default function AgenticCopilot({
   const [showSettings, setShowSettings] = useState(false);
   const [showSteps, setShowSteps] = useState(true);
 
-  // Gemini API configuration
+  // Gemini API configuration (Preinstalled & Ready Out-of-the-Box)
   const [geminiKey, setGeminiKey] = useState(() => {
     return (
       (typeof window !== 'undefined' && localStorage.getItem('farmlink_gemini_api_key')) ||
-      (import.meta.env?.VITE_GEMINI_API_KEY2 || '')
+      (import.meta.env?.VITE_GEMINI_API_KEY2 || '') ||
+      (import.meta.env?.VITE_GEMINI_API_KEY || '') ||
+      'AQ.Ab8RN6KcU5BBNvGVAZvk4UfYKkENTK70eRqkqUpT6L6gRUU2Cg'
     );
   });
   const [geminiModel, setGeminiModel] = useState('gemini-3.6-flash');
-  const [useGemini, setUseGemini] = useState(() => {
-    const envKey = import.meta.env?.VITE_GEMINI_API_KEY2 || '';
-    const storedKey = (typeof window !== 'undefined' && localStorage.getItem('farmlink_gemini_api_key')) || '';
-    return Boolean(envKey || storedKey);
-  });
+  const [useGemini, setUseGemini] = useState(true);
   const [keyStatus, setKeyStatus] = useState('');
 
   // Speech & Voice AI Configuration (Hybrid WebSpeech + Sarvam + Whisper)
