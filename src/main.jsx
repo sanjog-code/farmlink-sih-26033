@@ -728,6 +728,7 @@ function App() {
     [view, setView] = useState("home"),
     [authRole, setAuthRole] = useState("consumer"),
     [lots, setLots] = useState(initialLots),
+    [selectedLot, setSelectedLot] = useState(null),
     [cart, setCart] = useState([]),
     [wishlist, setWishlist] = useState([]),
     [modal, setModal] = useState(null),
