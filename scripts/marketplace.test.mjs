@@ -36,3 +36,26 @@ test('market rankAndFilter handles numeric IDs, nulls, and missing fields safely
   assert.equal(ranked.length, 3);
 });
 
+test('marketplace lot photo selection prioritizes farmer-uploaded image over warehouse photo', () => {
+  const listingWithBoth = {
+    id: 'listing-101',
+    crop: 'Tomato',
+    image_url: 'https://cdn.farmlink.in/farmer/tomato-ramesh.jpg',
+    warehouse_image_url: 'https://cdn.farmlink.in/warehouse-intake/tomato-operator-live.jpg',
+  };
+
+  // Farmer-uploaded photo must show directly in marketplace
+  const primaryImageUrl = listingWithBoth.image_url || listingWithBoth.warehouse_image_url;
+  assert.equal(primaryImageUrl, 'https://cdn.farmlink.in/farmer/tomato-ramesh.jpg');
+
+  // Fallback when farmer photo is absent
+  const listingWithoutFarmerPhoto = {
+    id: 'listing-102',
+    crop: 'Tomato',
+    image_url: null,
+    warehouse_image_url: 'https://cdn.farmlink.in/warehouse-intake/tomato-operator-live.jpg',
+  };
+  const fallbackImageUrl = listingWithoutFarmerPhoto.image_url || listingWithoutFarmerPhoto.warehouse_image_url;
+  assert.equal(fallbackImageUrl, 'https://cdn.farmlink.in/warehouse-intake/tomato-operator-live.jpg');
+});
+

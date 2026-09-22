@@ -884,7 +884,7 @@ function App() {
           farmer: listing.farmer_name || "FarmLink farmer",
           dist: "Not calculated",
           trend: 0,
-          imageUrl: listing.warehouse_image_url || listing.image_url,
+          imageUrl: listing.image_url || listing.warehouse_image_url,
           farmerImageUrl: listing.image_url,
           farmerImageUrls: listing.image_urls?.length ? listing.image_urls : [listing.image_url].filter(Boolean),
           warehouseImageUrl: listing.warehouse_image_url,
@@ -2025,6 +2025,8 @@ function ProductDetail({
       uploadedDateFormatted = null;
     }
   }
+  const [selectedImage, setSelectedImage] = useState(lot.imageUrl);
+  const activeImage = selectedImage || lot.imageUrl;
   return (
     <section className="page product-detail">
       <button className="text-btn" onClick={() => setView("market")}>
@@ -2032,14 +2034,27 @@ function ProductDetail({
       </button>
       <div className="detail-grid">
         <div className={"detail-visual " + cropClass}>
-          {lot.imageUrl ? (
-            <img src={lot.imageUrl} alt={`${cropName} listing`} />
+          {activeImage ? (
+            <img src={activeImage} alt={`${cropName} listing`} />
           ) : (
             cropEmoji(cropName, lot.category)
           )}
           <i className="crop-emoji-badge detail-crop-emoji" aria-label={`${cropName} crop icon`}>{cropEmoji(cropName, lot.category)}</i>
-          <span>{lot.listing ? (lot.warehouseImageUrl ? "Warehouse-verified photo" : "Farmer photo listing") : `Verified Grade ${lot.grade || "A"}`}</span>
-          {galleryPhotos.length > 1 && <div className="product-photo-gallery">{galleryPhotos.map((photo, index) => <img key={photo} src={photo} alt={`${cropName} gallery image ${index + 1}`} />)}</div>}
+          <span>{lot.listing ? "Farmer photo listing" : `Verified Grade ${lot.grade || "A"}`}</span>
+          {galleryPhotos.length > 1 && (
+            <div className="product-photo-gallery">
+              {galleryPhotos.map((photo, index) => (
+                <button
+                  key={photo}
+                  type="button"
+                  className={`photo-thumbnail ${activeImage === photo ? "selected" : ""}`}
+                  onClick={() => setSelectedImage(photo)}
+                >
+                  <img src={photo} alt={`${cropName} gallery image ${index + 1}`} />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           <p className="eyebrow green">TRACEABLE LOT {lot.id}</p>
@@ -2096,8 +2111,8 @@ function ProductDetail({
             Grade {lot.grade || "A"} was confirmed by the warehouse intake operator using the live intake photo.
             A model result is shown only when a configured grading service produced a saved report.
           </p>
-          {lot.warehouseImageUrl && <><img className="intake-proof-photo" src={lot.warehouseImageUrl} alt={`${cropName} photographed during warehouse grading`} /><small>Live warehouse intake photo · Operator-confirmed Grade {lot.grade || "A"}{lot.gradingConfidence ? ` · ${lot.gradingConfidence}% model confidence` : ""}</small></>}
-          {lot.farmerImageUrl && lot.farmerImageUrl !== lot.imageUrl && <><img className="intake-proof-photo" src={lot.farmerImageUrl} alt={`${cropName} photo submitted by the farmer`} /><small>Original farmer listing photo</small></>}
+          {lot.farmerImageUrl && <><img className="intake-proof-photo" src={lot.farmerImageUrl} alt={`${cropName} photo submitted by the farmer`} /><small>Farmer uploaded listing photo</small></>}
+          {lot.warehouseImageUrl && <><img className="intake-proof-photo" src={lot.warehouseImageUrl} alt={`${cropName} photographed during warehouse grading`} /><small>Live warehouse intake verification photo · Operator-confirmed Grade {lot.grade || "A"}{lot.gradingConfidence ? ` · ${lot.gradingConfidence}% model confidence` : ""}</small></>}
         </article>
         <article>
           <h3>Farmer profile</h3>
