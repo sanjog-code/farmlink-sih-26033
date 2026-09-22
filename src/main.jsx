@@ -1181,7 +1181,16 @@ function App() {
       {modal === "voice" && (
         <Voice close={() => setModal(null)} notify={notify} />
       )}{" "}
-      {modal === "ai" && <FreeAdvisory close={() => setModal(null)} />}{" "}
+      {modal === "ai" && (
+        <FreeAdvisory
+          close={() => setModal(null)}
+          myLots={lots.filter(l => l.farmer === "Ramesh Kumar" || l.farmer === session?.name)}
+          onListCrop={(cropName) => {
+            setModal(null);
+            setView("farmer");
+          }}
+        />
+      )}{" "}
       {modal === "checkout" && (
           <Checkout
             cart={cart}
