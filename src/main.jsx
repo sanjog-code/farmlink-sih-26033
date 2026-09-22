@@ -848,26 +848,35 @@ function App() {
     )
       return;
     let active = true;
-    const loadOrders = async (showError = true) => {
+    const loadOrders = async (showError = false) => {
       // Makes an expired cancellation window durable even on projects where
       // database cron is unavailable, before reading the live order state.
-      await supabase.rpc("expire_consumer_cancellation_windows");
-      const result = session.role === "admin"
-        ? await supabase.rpc("get_admin_consumer_orders")
-        : await supabase
-            .from("consumer_orders")
-            .select("id,order_code,total_kg,total_amount,status,cancellation_expires_at,created_at,warehouses(name)")
-            .eq("consumer_id", session.userId)
-            .order("created_at", { ascending: false });
-      const { data, error } = result;
-      if (error) {
-        if (showError) notify(`Orders could not be loaded: ${error.message}`);
-        return;
+      try {
+        await supabase.rpc("expire_consumer_cancellation_windows");
+      } catch (err) {
+        console.warn("expire_consumer_cancellation_windows notice:", err);
       }
-      if (active && data) setOrders(data.map((order) => ({
+      try {
+        const result = session.role === "admin"
+          ? await supabase.rpc("get_admin_consumer_orders")
+          : await supabase
+              .from("consumer_orders")
+              .select("id,order_code,total_kg,total_amount,status,cancellation_expires_at,created_at,warehouses(name)")
+              .eq("consumer_id", session.userId)
+              .order("created_at", { ascending: false });
+        const { data, error } = result;
+        if (error) {
+          console.warn("Orders could not be loaded:", error.message);
+          if (showError && !error.message.includes("recursion")) {
+            notify(`Orders could not be loaded: ${error.message}`);
+          }
+          return;
+        }
+        if (active && data) {
+          setOrders(data.map((order) => ({
             id: order.order_code,
             dbId: order.id,
-            quantity: Number(order.total_kg),
+            quantity: Number(order.total_kg || 0),
             totalAmount: Number(order.total_amount || 0),
             items: 0,
             status: (order.status || "pending_verification")
@@ -883,8 +892,12 @@ function App() {
             consumerMobile: order.consumer_mobile || "",
             createdAt: order.created_at,
           })));
+        }
+      } catch (err) {
+        console.warn("loadOrders exception:", err);
+      }
     };
-    loadOrders();
+    loadOrders(false);
     // Covers an order made in another browser when a realtime event is missed.
     const refreshTimer = window.setInterval(() => loadOrders(false), 5000);
     return () => { active = false; window.clearInterval(refreshTimer); };
@@ -3170,9 +3183,9 @@ function FarmerOperations({ notify, session, liveTick, listingPrefill }) {
       supabase.from("order_items").select("id,quantity_kg,unit_price,produce_lots!inner(farmer_id,crop),consumer_orders(order_code,status,created_at,warehouses(name))").eq("produce_lots.farmer_id", session.userId).order("id", { ascending: false }),
       supabase.from("logistics_jobs").select("id,source_type,details,status,created_at").order("created_at", { ascending: false }),
     ]).then(([listingResult, orderResult, jobsResult]) => {
-      if (listingResult.error) notify(listingResult.error.message); else setFarmerListings(listingResult.data || []);
-      if (orderResult.error) notify(orderResult.error.message); else setFarmerOrders(orderResult.data || []);
-      if (jobsResult.error) notify(jobsResult.error.message); else setFarmerJobs(jobsResult.data || []);
+      if (listingResult.error) console.warn("Farmer listings load error:", listingResult.error.message); else setFarmerListings(listingResult.data || []);
+      if (orderResult.error) console.warn("Farmer orders load error:", orderResult.error.message); else setFarmerOrders(orderResult.data || []);
+      if (jobsResult.error) console.warn("Farmer jobs load error:", jobsResult.error.message); else setFarmerJobs(jobsResult.data || []);
     });
   }, [session?.userId, liveTick]);
   const respondToQuote = async (request, quote, action) => {

@@ -169,9 +169,26 @@ returns void language sql security definer set search_path = public as $$
     and cancellation_expires_at <= now();
 $$;
 
+create or replace function public.is_order_owner_or_admin(p_order_id uuid)
+returns boolean language sql security definer set search_path = public as $$
+  select exists (
+    select 1 from public.consumer_orders o
+    where o.id = p_order_id and (o.consumer_id = auth.uid() or public.is_admin())
+  );
+$$;
+
+create or replace function public.farmer_owns_order_lot(p_order_id uuid)
+returns boolean language sql security definer set search_path = public as $$
+  select exists (
+    select 1 from public.order_items item
+    join public.produce_lots lot on lot.id = item.lot_id
+    where item.order_id = p_order_id and lot.farmer_id = auth.uid()
+  );
+$$;
+
 revoke all on function public.confirm_expired_consumer_orders() from public;
 grant execute on function public.confirm_expired_consumer_orders() to authenticated;
-create policy "order owners and admins read order items" on public.order_items for select using (exists (select 1 from public.consumer_orders o where o.id = order_id and (o.consumer_id = auth.uid() or public.is_admin())));
+create policy "order owners and admins read order items" on public.order_items for select using (public.is_order_owner_or_admin(order_id));
 create policy "consumers add items to own orders" on public.order_items for insert with check (exists (select 1 from public.consumer_orders o where o.id = order_id and o.consumer_id = auth.uid()));
 create policy "anyone reads published farmer listings" on public.farmer_listings for select using (status = 'published' or farmer_id = auth.uid() or public.is_admin());
 create policy "farmers create own listings" on public.farmer_listings for insert with check (farmer_id = auth.uid() and exists (select 1 from public.profiles where id = auth.uid() and role = 'farmer'));
