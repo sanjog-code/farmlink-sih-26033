@@ -8,20 +8,15 @@ import { CROP_INTELLIGENCE } from './FreeAdvisory.jsx';
 export function parseGoalEntities(text = '') {
   const lower = text.toLowerCase();
 
-  // Match crop
-  let matchedCrop = 'Mustard';
-  for (const crop of Object.keys(CROP_INTELLIGENCE)) {
-    if (lower.includes(crop.toLowerCase())) {
-      matchedCrop = crop;
-      break;
-    }
-  }
+  // Match crop with safe resolver
+  const resolved = tools.getCropProfile ? tools.getCropProfile(text) : null;
+  let matchedCrop = resolved ? resolved.name : 'Rapeseed & mustard';
 
-  // Hindi aliases
-  if (lower.includes('सरसों') || lower.includes('sarson')) matchedCrop = 'Mustard';
+  // Explicit Hindi / common aliases override
+  if (lower.includes('सरसों') || lower.includes('sarson') || lower.includes('mustard')) matchedCrop = 'Rapeseed & mustard';
   else if (lower.includes('गेहूं') || lower.includes('गेहूँ') || lower.includes('gehu') || lower.includes('wheat')) matchedCrop = 'Wheat';
   else if (lower.includes('टमाटर') || lower.includes('tamatar') || lower.includes('tomato')) matchedCrop = 'Tomato';
-  else if (lower.includes('चना') || lower.includes('chana') || lower.includes('gram')) matchedCrop = 'Chickpea (Gram)';
+  else if (lower.includes('चना') || lower.includes('chana') || lower.includes('gram') || lower.includes('chickpea')) matchedCrop = 'Chickpea (Gram)';
   else if (lower.includes('मक्का') || lower.includes('makka') || lower.includes('maize')) matchedCrop = 'Maize';
   else if (lower.includes('बाजरा') || lower.includes('bajra')) matchedCrop = 'Pearl millet (Bajra)';
   else if (lower.includes('मूंग') || lower.includes('moong')) matchedCrop = 'Green gram (Moong)';
@@ -352,25 +347,27 @@ export async function executeAutonomousAgent({
       const { matchedCrop, quantityKg } = parseGoalEntities(goal);
       const enwr = tools.tool_calculate_enwr_pledge({ crop: matchedCrop, quantityKg });
       const mandi = tools.tool_get_mandi_msp({ crop: matchedCrop });
+      const safeModalPrice = Number(mandi?.modalPriceKg) || 30;
+      const safeAdvance = Number(enwr?.pledgeAdvanceAmount) || 15000;
 
       const geminiActionCards = [
         {
           id: 'act-gemini-enwr',
           type: 'ACTION_APPLY_ENWR',
           title: language === 'hi' ? '50% e-NWR अग्रिम ऋण प्राप्त करें' : 'Apply for 50% e-NWR Advance',
-          badge: `₹${enwr.pledgeAdvanceAmount.toLocaleString('en-IN')} instant loan`,
+          badge: `₹${safeAdvance.toLocaleString('en-IN')} instant loan`,
           description: `Unlock WDRA 50% advance for ${quantityKg} kg ${matchedCrop} at 7% p.a.`,
           buttonLabel: language === 'hi' ? 'अग्रिम आवेदन खोलें ➔' : 'Proceed with e-NWR Advance ➔',
-          payload: { crop: matchedCrop, quantityKg, advanceAmount: enwr.pledgeAdvanceAmount }
+          payload: { crop: matchedCrop, quantityKg, advanceAmount: safeAdvance }
         },
         {
           id: 'act-gemini-listing',
           type: 'ACTION_PREFILL_LISTING',
           title: language === 'hi' ? 'अनुकूलतम मूल्य पर मार्केटप्लेस में सूचीबद्ध करें' : 'List Produce with Optimal Price Floor',
-          badge: `₹${(mandi.modalPriceKg + 2).toFixed(2)}/kg`,
+          badge: `₹${(safeModalPrice + 2).toFixed(2)}/kg`,
           description: 'Direct farmgate sale avoiding APMC commission agents.',
           buttonLabel: language === 'hi' ? 'लिस्टिंग फॉर्म भरें ➔' : 'Pre-fill Marketplace Listing ➔',
-          payload: { crop: matchedCrop, quantityKg, priceKg: mandi.modalPriceKg + 2, grade: 'A' }
+          payload: { crop: matchedCrop, quantityKg, priceKg: safeModalPrice + 2, grade: 'A' }
         }
       ];
 

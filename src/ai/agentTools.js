@@ -27,19 +27,66 @@ export function calculateHaversineKm(lat1, lon1, lat2, lon2) {
   return Math.round(R * c * 10) / 10;
 }
 
+// Safe resolver for crop intelligence profiles with fuzzy matching and bulletproof fallback
+export function getCropProfile(cropName = 'Mustard') {
+  const query = String(cropName || '').trim().toLowerCase();
+  
+  // 1. Direct case-insensitive match
+  let key = Object.keys(CROP_INTELLIGENCE).find(k => k.toLowerCase() === query);
+
+  // 2. Substring matching (e.g. "mustard" matches "Rapeseed & mustard", "gram" matches "Chickpea (Gram)")
+  if (!key) {
+    key = Object.keys(CROP_INTELLIGENCE).find(k => {
+      const kl = k.toLowerCase();
+      return kl.includes(query) || query.includes(kl);
+    });
+  }
+
+  // 3. Common Hindi & dialect aliases
+  if (!key) {
+    if (query.includes('सरसों') || query.includes('sarson') || query.includes('mustard')) key = 'Rapeseed & mustard';
+    else if (query.includes('गेहूं') || query.includes('गेहूँ') || query.includes('gehu') || query.includes('wheat')) key = 'Wheat';
+    else if (query.includes('टमाटर') || query.includes('tamatar') || query.includes('tomato')) key = 'Tomato';
+    else if (query.includes('चना') || query.includes('chana') || query.includes('gram') || query.includes('chickpea')) key = 'Chickpea (Gram)';
+    else if (query.includes('मक्का') || query.includes('makka') || query.includes('maize')) key = 'Maize';
+    else if (query.includes('बाजरा') || query.includes('bajra')) key = 'Pearl millet (Bajra)';
+    else if (query.includes('मूंग') || query.includes('moong')) key = 'Green gram (Moong)';
+    else if (query.includes('प्याज') || query.includes('pyaz') || query.includes('onion')) key = 'Onion';
+    else if (query.includes('आलू') || query.includes('aaloo') || query.includes('potato')) key = 'Potato';
+    else if (query.includes('सोयाबीन') || query.includes('soybean')) key = 'Soybean';
+  }
+
+  const profile = (key && CROP_INTELLIGENCE[key]) || CROP_INTELLIGENCE['Rapeseed & mustard'] || Object.values(CROP_INTELLIGENCE)[0];
+  const normalizedName = key || 'Rapeseed & mustard';
+
+  return {
+    name: normalizedName,
+    category: profile.category || 'Agricultural Produce',
+    baseLow: Number(profile.baseLow) || 25,
+    baseHigh: Number(profile.baseHigh) || 40,
+    msp: Number(profile.msp) || 25,
+    mspNotified: Boolean(profile.mspNotified),
+    mandi: profile.mandi || 'Regional APMC Mandi Hub',
+    modalPrice: Number(profile.modalPrice) || 30,
+    shelfLifeDays: Number(profile.shelfLifeDays) || 180,
+    storageType: profile.storageType || 'Standard Agricultural Storage',
+    holdingCostPerMonth: Number(profile.holdingCostPerMonth) || 0.25,
+    enwrEligible: Boolean(profile.enwrEligible !== false),
+    season: profile.season || 'Current season',
+    demandTrend: profile.demandTrend || '+5% (Active regional wholesale absorption)',
+    notes: profile.notes || 'Verified agricultural commodity on FarmLink ledger.'
+  };
+}
+
 // ─── 1. TOOL: Mandi vs MSP Price Intelligence ────────────────────────────────
 export function tool_get_mandi_msp({ crop = 'Mustard', region = 'Rajasthan' }) {
-  const normalizedCrop = Object.keys(CROP_INTELLIGENCE).find(
-    k => k.toLowerCase() === crop.trim().toLowerCase()
-  ) || 'Mustard';
-
-  const info = CROP_INTELLIGENCE[normalizedCrop] || CROP_INTELLIGENCE['Mustard'];
+  const info = getCropProfile(crop);
   const spread = Math.round((info.modalPrice - info.msp) * 100) / 100;
   const isBelowMsp = spread < 0;
 
   return {
     tool: 'tool_get_mandi_msp',
-    crop: normalizedCrop,
+    crop: info.name,
     category: info.category,
     mandi: info.mandi,
     region,
@@ -60,10 +107,7 @@ export function tool_get_mandi_msp({ crop = 'Mustard', region = 'Rajasthan' }) {
 
 // ─── 2. TOOL: Statistical AI Price Forecasting ────────────────────────────────
 export function tool_forecast_price_trend({ crop = 'Mustard', daysAhead = 7 }) {
-  const normalizedCrop = Object.keys(CROP_INTELLIGENCE).find(
-    k => k.toLowerCase() === crop.trim().toLowerCase()
-  ) || 'Mustard';
-  const info = CROP_INTELLIGENCE[normalizedCrop] || CROP_INTELLIGENCE['Mustard'];
+  const info = getCropProfile(crop);
 
   // Generate historical calibration series (last 28 days) based on modal price and volatility
   const base = info.modalPrice;
@@ -84,7 +128,7 @@ export function tool_forecast_price_trend({ crop = 'Mustard', daysAhead = 7 }) {
 
   return {
     tool: 'tool_forecast_price_trend',
-    crop: normalizedCrop,
+    crop: info.name,
     currentPriceKg: currentPrice,
     predictedPriceKg: forecast.predicted,
     forecastDate: forecast.date,
@@ -94,16 +138,13 @@ export function tool_forecast_price_trend({ crop = 'Mustard', daysAhead = 7 }) {
     trendTrajectory: diff > 0.5 ? 'BULLISH_UPWARD' : diff < -0.5 ? 'BEARISH_DOWNWARD' : 'STABLE',
     meanAbsoluteError: forecast.mae,
     modelConfidencePercent: Math.max(75, Math.min(94, Math.round(92 - forecast.mae * 5))),
-    summary: `Statistical trend extrapolation predicts ${normalizedCrop} will move from ₹${currentPrice.toFixed(2)} to ₹${forecast.predicted.toFixed(2)}/kg in ${daysAhead} days (${percentChange > 0 ? '+' : ''}${percentChange}%).`
+    summary: `Statistical trend extrapolation predicts ${info.name} will move from ₹${currentPrice.toFixed(2)} to ₹${forecast.predicted.toFixed(2)}/kg in ${daysAhead} days (${percentChange > 0 ? '+' : ''}${percentChange}%).`
   };
 }
 
 // ─── 3. TOOL: Hold vs Sell Decision Evaluator ─────────────────────────────────
 export function tool_evaluate_hold_vs_sell({ crop = 'Mustard', quantityKg = 500, daysToHold = 30 }) {
-  const normalizedCrop = Object.keys(CROP_INTELLIGENCE).find(
-    k => k.toLowerCase() === crop.trim().toLowerCase()
-  ) || 'Mustard';
-  const info = CROP_INTELLIGENCE[normalizedCrop] || CROP_INTELLIGENCE['Mustard'];
+  const info = getCropProfile(crop);
 
   const qty = Math.max(10, Number(quantityKg) || 500);
   const days = Math.max(7, Number(daysToHold) || 30);
@@ -125,7 +166,7 @@ export function tool_evaluate_hold_vs_sell({ crop = 'Mustard', quantityKg = 500,
 
   return {
     tool: 'tool_evaluate_hold_vs_sell',
-    crop: normalizedCrop,
+    crop: info.name,
     quantityKg: qty,
     daysToHold: days,
     currentModalPriceKg: info.modalPrice,
@@ -138,17 +179,14 @@ export function tool_evaluate_hold_vs_sell({ crop = 'Mustard', quantityKg = 500,
     enwrAdvanceEligible: enwrAdvanceEligible,
     recommendation: isHoldingAdvised ? 'HOLD_IN_WDRA_STORAGE' : 'SELL_DIRECT_ON_MARKETPLACE',
     actionPlan: isHoldingAdvised
-      ? `Deposit ${qty} kg of ${normalizedCrop} into accredited warehouse. Unlock ₹${enwrAdvanceEligible.toLocaleString('en-IN')} instant cash (50% e-NWR pledge advance) to meet household/input expenses while capturing projected ₹${netGainOverImmediateSale.toLocaleString('en-IN')} net price appreciation.`
-      : `List ${qty} kg of ${normalizedCrop} directly on FarmLink Marketplace at ₹${info.baseLow}–₹${info.baseHigh}/kg for rapid direct-to-consumer monetization.`
+      ? `Deposit ${qty} kg of ${info.name} into accredited warehouse. Unlock ₹${enwrAdvanceEligible.toLocaleString('en-IN')} instant cash (50% e-NWR pledge advance) to meet household/input expenses while capturing projected ₹${netGainOverImmediateSale.toLocaleString('en-IN')} net price appreciation.`
+      : `List ${qty} kg of ${info.name} directly on FarmLink Marketplace at ₹${info.baseLow}–₹${info.baseHigh}/kg for rapid direct-to-consumer monetization.`
   };
 }
 
 // ─── 4. TOOL: e-NWR Warehouse Receipt Pledge Advance Calculator ─────────────
 export function tool_calculate_enwr_pledge({ crop = 'Mustard', quantityKg = 1000, grade = 'A' }) {
-  const normalizedCrop = Object.keys(CROP_INTELLIGENCE).find(
-    k => k.toLowerCase() === crop.trim().toLowerCase()
-  ) || 'Mustard';
-  const info = CROP_INTELLIGENCE[normalizedCrop] || CROP_INTELLIGENCE['Mustard'];
+  const info = getCropProfile(crop);
 
   const qty = Math.max(10, Number(quantityKg) || 1000);
   const gradeMultiplier = grade.toUpperCase().startsWith('A') ? 1.05 : grade.toUpperCase().startsWith('B') ? 1.0 : 0.92;
@@ -160,7 +198,7 @@ export function tool_calculate_enwr_pledge({ crop = 'Mustard', quantityKg = 1000
 
   return {
     tool: 'tool_calculate_enwr_pledge',
-    crop: normalizedCrop,
+    crop: info.name,
     quantityKg: qty,
     qualityGrade: grade,
     commodityValuation: totalValuation,
@@ -172,15 +210,14 @@ export function tool_calculate_enwr_pledge({ crop = 'Mustard', quantityKg = 1000
     collateralCoverageRatio: '200%',
     accreditationAuthority: 'WDRA (Warehousing Development & Regulatory Authority, GoI)',
     disbursementTime: 'Instant (Direct UPI / NEFT to Kisan Bank Account)',
-    summary: `Against ${qty} kg Grade-${grade} ${normalizedCrop} (Valuation: ₹${totalValuation.toLocaleString('en-IN')}), farmer is eligible for ₹${advanceAmount.toLocaleString('en-IN')} instant 50% e-NWR pledge financing at 7% p.a.`
+    summary: `Against ${qty} kg Grade-${grade} ${info.name} (Valuation: ₹${totalValuation.toLocaleString('en-IN')}), farmer is eligible for ₹${advanceAmount.toLocaleString('en-IN')} instant 50% e-NWR pledge financing at 7% p.a.`
   };
 }
 
 // ─── 5. TOOL: Wholesale Buyer Cluster Matching ──────────────────────────────
 export function tool_match_farmer_clusters({ crop = 'Mustard', totalDemandKg = 5000, lots = [] }) {
-  const normalizedCrop = Object.keys(CROP_INTELLIGENCE).find(
-    k => k.toLowerCase() === crop.trim().toLowerCase()
-  ) || 'Mustard';
+  const info = getCropProfile(crop);
+  const normalizedCrop = info.name;
 
   const safeLots = Array.isArray(lots) ? lots : [];
   const matchingLots = safeLots.filter(l => 
@@ -307,9 +344,8 @@ export function tool_audit_warehouse_spoilage({ warehouseName = 'Jaipur North Ce
 
   for (const lot of safeLots) {
     if (!lot) continue;
-    const cropKey = Object.keys(CROP_INTELLIGENCE).find(k => k.toLowerCase() === String(lot.crop || '').toLowerCase());
-    const info = cropKey ? CROP_INTELLIGENCE[cropKey] : null;
-    const shelfLife = info?.shelfLifeDays || 14;
+    const info = getCropProfile(lot.crop);
+    const shelfLife = info.shelfLifeDays || 14;
     const ageDays = Number(lot.old) || 2;
     const lifeConsumedPercent = Math.min(100, Math.round((ageDays / shelfLife) * 100));
 
