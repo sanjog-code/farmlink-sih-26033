@@ -3857,6 +3857,7 @@ function LegacyAdminView({ lots, orders, produceRequests, setView, logout, notif
 function AdminView({ session, lots, orders, produceRequests, bulkRequests, logisticsJobs, warehouses, setOrderStatus, liveTick, setLiveTick, setView, logout, notify }) {
   const [tab, setTab] = useState("action");
   const [listings, setListings] = useState([]);
+  const [listingCategory, setListingCategory] = useState("pending");
   const [farmers, setFarmers] = useState([]);
   const [assignments, setAssignments] = useState({});
   const [clusterSelections, setClusterSelections] = useState({});
@@ -3865,6 +3866,66 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
   const [priceFloors, setPriceFloors] = useState([]);
   const [route, setRoute] = useState({ origin: warehouses[0]?.name || "", destination: warehouses[1]?.name || "" });
   const refresh = () => setLiveTick((tick) => tick + 1);
+
+  const demoListings = useMemo(() => [
+    {
+      id: "demo-listing-1",
+      crop: "Rapeseed & mustard",
+      category: "Oilseeds",
+      description: "Phulera pilot intake batch. 40%+ oil content verified.",
+      quantity_kg: 200,
+      price_per_kg: 86.00,
+      image_url: "https://images.unsplash.com/photo-1508747703725-719777637510?auto=format&fit=crop&w=600&q=80",
+      harvest_date: "2026-03-15",
+      status: "pending",
+      created_at: new Date(Date.now() - 3600000).toISOString(),
+      profiles: { full_name: "Ramesh Kumar" }
+    },
+    {
+      id: "demo-listing-2",
+      crop: "Wheat",
+      category: "Cereals & millets",
+      description: "Sharbati golden grain, moisture 11.2%, cleaned and bagged.",
+      quantity_kg: 500,
+      price_per_kg: 26.50,
+      image_url: "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?auto=format&fit=crop&w=600&q=80",
+      harvest_date: "2026-03-10",
+      status: "pending",
+      created_at: new Date(Date.now() - 7200000).toISOString(),
+      profiles: { full_name: "Suresh Patel" }
+    },
+    {
+      id: "demo-listing-3",
+      crop: "Tomato",
+      category: "Vegetables",
+      description: "Grade A greenhouse tomatoes, Jaipur North cluster intake.",
+      quantity_kg: 150,
+      price_per_kg: 28.00,
+      image_url: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80",
+      harvest_date: "2026-03-20",
+      status: "published",
+      created_at: new Date(Date.now() - 86400000).toISOString(),
+      profiles: { full_name: "Ramesh Kumar" }
+    },
+    {
+      id: "demo-listing-4",
+      crop: "Chickpea (Gram)",
+      category: "Pulses",
+      description: "Bold desi gram, harvested from Sanganer cluster.",
+      quantity_kg: 300,
+      price_per_kg: 64.00,
+      image_url: "https://images.unsplash.com/photo-1515543904379-3d757afe72e4?auto=format&fit=crop&w=600&q=80",
+      harvest_date: "2026-03-12",
+      status: "published",
+      created_at: new Date(Date.now() - 172800000).toISOString(),
+      profiles: { full_name: "Aman Sharma" }
+    }
+  ], []);
+
+  const effectiveListings = listings.length > 0 ? listings : demoListings;
+  const awaitingListings = effectiveListings.filter(l => l.status === "pending" || l.status === "scheduled");
+  const activeListings = effectiveListings.filter(l => l.status === "published");
+
   useEffect(() => {
     if (!isSupabaseConfigured || tab !== "listings") return;
     supabase.from("farmer_listings").select("id,crop,category,description,quantity_kg,price_per_kg,image_url,harvest_date,status,created_at,profiles(full_name)").in("status", ["pending", "published"]).order("created_at", { ascending: false }).then(({ data, error }) => {
@@ -3897,24 +3958,39 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
     refresh(); notify(message);
   };
   const reviewListing = async (id, status) => {
+    if (String(id).startsWith("demo-")) {
+      setListings((current) => (current.length ? current : demoListings).map(item => item.id === id ? { ...item, status } : item));
+      notify(status === "published" ? "Listing verified and published with the farmer photo." : "Listing rejected; the farmer can correct it and resubmit.");
+      return;
+    }
     const { error } = await supabase.from("farmer_listings").update({ status, reviewed_at: new Date().toISOString() }).eq("id", id);
     if (error) return notify(error.message);
     notify(status === "published" ? "Listing verified and published with the farmer photo." : "Listing rejected; the farmer can correct it and resubmit."); refresh();
   };
   const removeMarketplaceListing = async (listing) => {
     if (!window.confirm(`Remove ${listing.crop} from the marketplace? The traceable intake record will be retained.`)) return;
+    if (String(listing.id).startsWith("demo-")) {
+      setListings((current) => (current.length ? current : demoListings).filter(item => item.id !== listing.id));
+      notify(`${listing.crop} has been removed from the marketplace. The underlying traceability record was retained.`);
+      return;
+    }
     const { error } = await supabase.rpc("remove_marketplace_listing", { p_listing_id: listing.id });
     if (error) return notify(error.message);
     notify(`${listing.crop} has been removed from the marketplace. The underlying traceability record was retained.`);
     refresh();
   };
   const scheduleListing = async (listing) => {
-    const warehouseId = listingWarehouses[listing.id] || warehouses[0]?.id;
-    const warehouse = warehouses.find((item) => item.id === warehouseId);
-    if (!warehouseId || !warehouse) return notify("Choose a warehouse before scheduling this listing.");
+    const warehouseId = listingWarehouses[listing.id] || warehouses[0]?.id || warehouses[0]?.name;
+    const warehouse = warehouses.find((item) => item.id === warehouseId || item.name === warehouseId) || warehouses[0];
+    if (!warehouse) return notify("Choose a warehouse before scheduling this listing.");
+    if (String(listing.id).startsWith("demo-")) {
+      setListings((current) => (current.length ? current : demoListings).map(item => item.id === listing.id ? { ...item, status: "scheduled", warehouses: { name: warehouse.name } } : item));
+      notify(`Listing scheduled to ${warehouse.name}. It is now visible in warehouse intake.`);
+      return;
+    }
     const { error } = await supabase.from("farmer_listings").update({ status: "scheduled", intake_warehouse_id: warehouseId, scheduled_at: new Date().toISOString() }).eq("id", listing.id);
     if (error) return notify(error.message);
-    const { error: jobError } = await supabase.from("logistics_jobs").insert({ requested_by: session.userId, source_type: "farmer_listing_intake", source_id: listing.id, details: `${listing.crop} · ${listing.quantity_kg} kg → ${warehouse.name}` });
+    const { error: jobError } = await supabase.from("logistics_jobs").insert({ requested_by: session?.userId, source_type: "farmer_listing_intake", source_id: listing.id, details: `${listing.crop} · ${listing.quantity_kg} kg → ${warehouse.name}` });
     if (jobError) notify(`Listing scheduled, but logistics job needs review: ${jobError.message}`);
     else notify(`Listing scheduled to ${warehouse.name}. It is now visible in warehouse intake.`);
     refresh();
@@ -3995,7 +4071,125 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
       <QueuePanel title="Newest consumer orders" empty="No pending consumer orders." items={orders.slice(0, 8)} render={(item) => <><b>{item.id} · {item.quantity} kg · ₹{item.totalAmount.toFixed(2)}</b><small>{item.consumerName || "Consumer"}{item.consumerMobile ? ` · ${item.consumerMobile}` : ""}</small><small>{item.consumerAddress || "Address not provided"} · Pickup: {item.pickupWarehouse} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["verified","ready for pickup"].includes(String(item.status).toLowerCase())} onClick={async () => { if (await setOrderStatus(item.id, "Verified")) notify("Consumer order verified across admin, consumer and warehouse queues."); }}>{["verified","ready for pickup"].includes(String(item.status).toLowerCase()) ? "Verified" : "Verify order"}</button>}/>
       <QueuePanel title="Logistics scheduling" empty="No logistics jobs awaiting action." items={logisticsJobs.slice(0, 8)} render={(item) => <><b>{item.source_type.replaceAll("_", " ")}</b><small>{item.details} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={item.status === "scheduled"} onClick={() => update("logistics_jobs", item.id, "scheduled", "Logistics job scheduled across live dashboards.")}>{item.status === "scheduled" ? "Scheduled ✓" : "Schedule job"}</button>}/>
     </div>}
-    {tab === "listings" && <div className="admin-work-panel"><h3>Farmer listings & marketplace controls</h3><p>Inspect submitted photos, schedule warehouse intake, and remove any live listing from the marketplace while retaining its traceability record.</p>{listings.length ? listings.map((item) => <article className="listing-review" key={item.id}><img src={item.image_url} alt={`${item.crop} submitted by farmer`}/><div><b>{item.crop} · {item.quantity_kg} kg · ₹{item.price_per_kg}/kg</b><small>{item.profiles?.full_name || "Farmer"} · {item.category} · harvested {item.harvest_date ? new Date(`${item.harvest_date}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "not recorded"}</small><p>{item.description}</p>{item.status === "published" ? <><span className="listing-live">● Live in marketplace</span><button className="danger" onClick={() => removeMarketplaceListing(item)}>Remove listing</button></> : <><select value={listingWarehouses[item.id] || warehouses[0]?.id || ""} onChange={(event) => setListingWarehouses({ ...listingWarehouses, [item.id]: event.target.value })}><option value="">Choose intake warehouse</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name} · {warehouse.address}</option>)}</select><button className="primary" onClick={() => scheduleListing(item)}>Schedule warehouse intake</button> <button className="secondary" onClick={() => reviewListing(item.id, "rejected")}>Reject</button></>}</div></article>) : <p className="empty-state">No farmer listings are awaiting scheduling or live in the marketplace.</p>}</div>}
+    {tab === "listings" && <div className="admin-work-panel">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "8px" }}>
+        <div>
+          <h3>Farmer listings &amp; marketplace approvals</h3>
+          <p style={{ margin: "2px 0 0", color: "#555" }}>
+            Review submitted produce photos, schedule warehouse intake, and manage live marketplace listings.
+          </p>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: "10px", margin: "14px 0 16px", borderBottom: "2px solid #e2ece5", paddingBottom: "10px" }}>
+        <button
+          type="button"
+          className={listingCategory === "pending" ? "primary" : "secondary"}
+          onClick={() => setListingCategory("pending")}
+          style={{ padding: "8px 16px", fontSize: "0.9rem", display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}
+        >
+          <span>⏳ Listings awaiting approval</span>
+          <span style={{
+            background: listingCategory === "pending" ? "#fff" : "#e2ece5",
+            color: listingCategory === "pending" ? "#1f5c37" : "#143823",
+            padding: "2px 8px", borderRadius: "12px", fontSize: "0.78rem", fontWeight: "bold"
+          }}>
+            {awaitingListings.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className={listingCategory === "active" ? "primary" : "secondary"}
+          onClick={() => setListingCategory("active")}
+          style={{ padding: "8px 16px", fontSize: "0.9rem", display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}
+        >
+          <span>🟢 Active listings</span>
+          <span style={{
+            background: listingCategory === "active" ? "#fff" : "#e2ece5",
+            color: listingCategory === "active" ? "#1f5c37" : "#143823",
+            padding: "2px 8px", borderRadius: "12px", fontSize: "0.78rem", fontWeight: "bold"
+          }}>
+            {activeListings.length}
+          </span>
+        </button>
+      </div>
+
+      {listingCategory === "pending" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+            <h4 style={{ margin: 0, color: "#143823" }}>Listings awaiting approval ({awaitingListings.length})</h4>
+            <small style={{ color: "#666" }}>Inspect farmer photos, verify quality, and schedule warehouse intake</small>
+          </div>
+
+          {awaitingListings.length ? awaitingListings.map((item) => (
+            <article className="listing-review" key={item.id}>
+              <img src={item.image_url} alt={`${item.crop} submitted by farmer`} />
+              <div>
+                <b>{item.crop} · {item.quantity_kg} kg · ₹{item.price_per_kg}/kg</b>
+                <small>
+                  {item.profiles?.full_name || "Farmer"} · {item.category} · harvested {item.harvest_date ? new Date(`${item.harvest_date}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "not recorded"}
+                </small>
+                <p>{item.description}</p>
+                <div style={{ marginTop: "8px", display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                  <select
+                    value={listingWarehouses[item.id] || warehouses[0]?.id || warehouses[0]?.name || ""}
+                    onChange={(event) => setListingWarehouses({ ...listingWarehouses, [item.id]: event.target.value })}
+                  >
+                    <option value="">Choose intake warehouse</option>
+                    {warehouses.map((warehouse) => (
+                      <option key={warehouse.id || warehouse.name} value={warehouse.id || warehouse.name}>
+                        {warehouse.name} · {warehouse.address}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="primary" onClick={() => scheduleListing(item)}>
+                    Schedule warehouse intake
+                  </button>
+                  <button className="secondary" onClick={() => reviewListing(item.id, "rejected")}>
+                    Reject
+                  </button>
+                </div>
+              </div>
+            </article>
+          )) : (
+            <p className="empty-state">No farmer listings are currently awaiting approval.</p>
+          )}
+        </div>
+      )}
+
+      {listingCategory === "active" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+            <h4 style={{ margin: 0, color: "#143823" }}>Active marketplace listings ({activeListings.length})</h4>
+            <small style={{ color: "#666" }}>Traceable lots live in the consumer &amp; buyer catalogue</small>
+          </div>
+
+          {activeListings.length ? activeListings.map((item) => (
+            <article className="listing-review" key={item.id} style={{ borderLeft: "4px solid #1f5c37" }}>
+              <img src={item.image_url} alt={`${item.crop} live listing`} />
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <b>{item.crop} · {item.quantity_kg} kg · ₹{item.price_per_kg}/kg</b>
+                  <span className="listing-live" style={{ margin: 0 }}>● Live in marketplace</span>
+                </div>
+                <small>
+                  {item.profiles?.full_name || "Farmer"} · {item.category} · listed {item.created_at ? new Date(item.created_at).toLocaleDateString("en-IN") : "recently"}
+                </small>
+                <p>{item.description}</p>
+                <div style={{ marginTop: "8px" }}>
+                  <button className="danger" onClick={() => removeMarketplaceListing(item)}>
+                    Remove from marketplace
+                  </button>
+                </div>
+              </div>
+            </article>
+          )) : (
+            <p className="empty-state">No listings are currently active in the marketplace.</p>
+          )}
+        </div>
+      )}
+    </div>}
     {tab === "wholesale" && <div className="admin-work-panel"><h3>Connect wholesale requests to crop-matched farmers</h3><p>Only farmers with live, verified stock of the requested crop can receive a quote. If no one farmer can fulfil it, create a capacity-checked farmer cluster.</p>{bulkRequests.length ? bulkRequests.filter((request) => !["confirmed","declined"].includes(request.status)).map((request) => { const eligible = eligibleFarmers(request); const selected = clusterSelections[request.id] || []; const clusterCapacity = eligible.filter((farmer) => selected.includes(farmer.id)).reduce((sum, farmer) => sum + Number(farmer.stock[request.crop] || 0), 0); return <div className="quote-assignment" key={request.id}><div className="assignment-row"><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · MSP floor ₹{Number(request.msp_per_kg || 0).toFixed(2)}/kg · {request.status}</small><small>{eligible.length} crop-matched farmer(s) · {eligible.reduce((sum, farmer) => sum + Number(farmer.stock[request.crop] || 0), 0)} kg live capacity</small></div><select value={assignments[request.id] || request.farmer_id || ""} onChange={(event) => setAssignments({ ...assignments, [request.id]: event.target.value })}><option value="">Choose an eligible farmer</option>{eligible.filter((farmer) => Number(farmer.stock[request.crop] || 0) >= Number(request.quantity_kg)).map((farmer) => <option key={farmer.id} value={farmer.id}>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""} · {farmer.stock[request.crop]} kg</option>)}</select><button className="primary" disabled={!eligible.some((farmer) => Number(farmer.stock[request.crop] || 0) >= Number(request.quantity_kg))} onClick={() => assignFarmer(request)}>Assign single farmer</button></div><div className="cluster-picker"><b>Or create a farmer cluster</b><small>Select contributors with {request.crop}; capacity is allocated automatically up to the buyer requirement.</small>{eligible.map((farmer) => <label key={farmer.id}><input type="checkbox" checked={selected.includes(farmer.id)} onChange={() => toggleClusterFarmer(request.id, farmer.id)}/><span>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""}</span><strong>{farmer.stock[request.crop]} kg available</strong></label>)}{eligible.length ? <div><span>Selected capacity: <b>{clusterCapacity} / {request.quantity_kg} kg</b></span><button className="secondary" disabled={selected.length < 2 || clusterCapacity < Number(request.quantity_kg)} onClick={() => assignCluster(request)}>Create cluster & assign quote</button></div> : <p className="empty-state">No farmer currently has published live stock of {request.crop}.</p>}</div></div>; }) : <p className="empty-state">No wholesale requests are awaiting review.</p>}</div>}
     {tab === "warehouses" && <div className="admin-work-panel"><h3>Warehouse inspection menu</h3><p>Open a warehouse to handle intake, consumer pickups, and its associated live queue.</p>{warehouses.map((warehouse) => <div className="contract-row" key={warehouse.id || warehouse.name}><div><b>{warehouse.name}</b><small>{warehouse.address}</small></div><span>{orders.filter((order) => order.pickupWarehouse === warehouse.name).length} pickup order(s)</span><button className="primary" onClick={() => setView("warehouse")}>Inspect</button></div>)}</div>}
     {tab === "routes" && <div className="admin-work-panel"><h3>Farm-to-warehouse route mapping</h3><p>Map collection → intake warehouse → inter-warehouse transfer → pickup fulfilment.</p><LiveRoutePlanner notify={notify} initialOrigin={warehouses[0]?.address || ""} initialDestination={warehouses[1]?.address || warehouses[0]?.address || ""}/><form className="route-form" onSubmit={addRoute}><select value={route.origin} onChange={(event) => setRoute({ ...route, origin: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><span>→</span><select value={route.destination} onChange={(event) => setRoute({ ...route, destination: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><button className="primary" type="submit">Save transfer route</button></form><button className="secondary" onClick={() => setView("warehouse")}>Open warehouse operations</button></div>}
