@@ -82,8 +82,11 @@ export default function AgenticCopilot({
   const [sarvamSpeaker, setSarvamSpeaker] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('farmlink_sarvam_speaker')) || 'aditya';
   });
-  const [whisperKey, setWhisperKey] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('farmlink_whisper_api_key')) || (import.meta.env?.VITE_GROQ_API_KEY || import.meta.env?.VITE_WHISPER_API_KEY || '');
+  const [openAiKey, setOpenAiKey] = useState(() => {
+    return (typeof window !== 'undefined' && (localStorage.getItem('farmlink_openai_api_key') || localStorage.getItem('farmlink_whisper_api_key'))) || (import.meta.env?.VITE_OPENAI_API_KEY || '');
+  });
+  const [openAiVoice, setOpenAiVoice] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('farmlink_openai_voice')) || 'nova';
   });
   const [speaking, setSpeaking] = useState(false);
   const [activeTTSProvider, setActiveTTSProvider] = useState('');
@@ -116,7 +119,9 @@ export default function AgenticCopilot({
       language,
       provider: voiceProvider,
       sarvamKey,
+      openAiKey,
       speaker: sarvamSpeaker,
+      openAiVoice,
       onStart: ({ provider }) => {
         setSpeaking(true);
         setActiveTTSProvider(provider);
@@ -153,24 +158,37 @@ export default function AgenticCopilot({
           audioRecorderRef.current = null;
           if (audioBlob && audioBlob.size > 0) {
             let transcript = '';
-            if (voiceProvider === 'sarvam' || (voiceProvider === 'auto' && sarvamKey)) {
+            if (voiceProvider === 'openai') {
               try {
-                transcript = await transcribeWithSarvam(audioBlob, { apiKey: sarvamKey, language });
+                transcript = await transcribeWithWhisper(audioBlob, { apiKey: openAiKey, language });
               } catch (err) {
-                console.warn('Sarvam ASR notice, attempting Whisper fallback:', err);
-                if (whisperKey) {
+                console.warn('OpenAI Whisper notice, attempting Sarvam fallback:', err);
+                if (sarvamKey) {
                   try {
-                    transcript = await transcribeWithWhisper(audioBlob, { apiKey: whisperKey, language });
-                  } catch (wErr) {
-                    console.warn('Whisper ASR error:', wErr);
+                    transcript = await transcribeWithSarvam(audioBlob, { apiKey: sarvamKey, language });
+                  } catch (sErr) {
+                    console.warn('Sarvam ASR error:', sErr);
                   }
                 }
               }
-            } else if (voiceProvider === 'whisper' || (voiceProvider === 'auto' && whisperKey)) {
+            } else if (voiceProvider === 'sarvam' || (voiceProvider === 'auto' && sarvamKey)) {
               try {
-                transcript = await transcribeWithWhisper(audioBlob, { apiKey: whisperKey, language });
+                transcript = await transcribeWithSarvam(audioBlob, { apiKey: sarvamKey, language });
+              } catch (err) {
+                console.warn('Sarvam ASR notice, attempting OpenAI Whisper fallback:', err);
+                if (openAiKey) {
+                  try {
+                    transcript = await transcribeWithWhisper(audioBlob, { apiKey: openAiKey, language });
+                  } catch (wErr) {
+                    console.warn('OpenAI Whisper error:', wErr);
+                  }
+                }
+              }
+            } else if (openAiKey) {
+              try {
+                transcript = await transcribeWithWhisper(audioBlob, { apiKey: openAiKey, language });
               } catch (wErr) {
-                console.warn('Whisper ASR error:', wErr);
+                console.warn('OpenAI Whisper error:', wErr);
               }
             }
 
@@ -193,8 +211,8 @@ export default function AgenticCopilot({
     const hasWebSpeech = typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
     const useCloudAudioCapture =
       (voiceProvider === 'sarvam' && Boolean(sarvamKey)) ||
-      (voiceProvider === 'whisper' && Boolean(whisperKey)) ||
-      (!hasWebSpeech && (Boolean(sarvamKey) || Boolean(whisperKey)));
+      (voiceProvider === 'openai' && Boolean(openAiKey)) ||
+      (!hasWebSpeech && (Boolean(sarvamKey) || Boolean(openAiKey)));
 
     if (useCloudAudioCapture) {
       try {
@@ -202,7 +220,7 @@ export default function AgenticCopilot({
         await recorder.start();
         audioRecorderRef.current = recorder;
         setRecording(true);
-        const provName = voiceProvider === 'whisper' ? 'Groq Whisper' : 'Sarvam Saaras ASR';
+        const provName = voiceProvider === 'openai' ? 'OpenAI Whisper-1' : 'Sarvam Saaras ASR';
         notify(`🎙️ Recording with ${provName} (${resolveSpeechCode(language).name}). Click mic when finished.`);
       } catch (err) {
         console.warn('Microphone stream error, falling back to Browser Web Speech:', err);
@@ -480,17 +498,56 @@ export default function AgenticCopilot({
                       }}
                       style={{ padding: '6px 8px', fontSize: '0.78rem', borderRadius: '6px', border: '1px solid #bdd7bc' }}
                     >
-                      <option value="auto">Auto (Smart Hybrid · WebSpeech + Sarvam/Whisper)</option>
+                      <option value="auto">Auto (Smart Hybrid · WebSpeech + Sarvam/OpenAI)</option>
                       <option value="webspeech">Browser Web Speech (100% Free, Zero Key, 0ms Latency)</option>
-                      <option value="sarvam">Sarvam AI (Indian Rural Dialects & Natural Bulbul Voice)</option>
-                      <option value="whisper">Groq / OpenAI Whisper (Field Noise Tolerant STT)</option>
+                      <option value="openai">OpenAI Whisper & TTS (Global Standard · whisper-1 + tts-1)</option>
+                      <option value="sarvam">Sarvam AI (Indian Rural Dialects · Saaras + Bulbul)</option>
+                    </select>
+                  </div>
+
+                  {/* OpenAI API Key Row */}
+                  <div style={{ display: 'grid', gap: '4px', marginTop: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
+                      <span style={{ fontWeight: 600 }}>🌐 OpenAI API Key (Whisper STT & Studio TTS):</span>
+                      <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" style={{ color: '#176b49', textDecoration: 'underline' }}>
+                        Get OpenAI Key ↗
+                      </a>
+                    </div>
+                    <input
+                      type="password"
+                      placeholder="Paste your OpenAI API key (sk-proj-... / sk-...)"
+                      value={openAiKey}
+                      onChange={(e) => setOpenAiKey(e.target.value)}
+                      style={{ fontSize: '0.78rem' }}
+                    />
+                  </div>
+
+                  {/* OpenAI TTS Voice Selection Row */}
+                  <div style={{ display: 'grid', gap: '4px', marginTop: '4px', fontSize: '0.78rem' }}>
+                    <label style={{ fontWeight: 600, color: '#17372c' }}>OpenAI Studio TTS Voice:</label>
+                    <select
+                      value={openAiVoice}
+                      onChange={(e) => {
+                        setOpenAiVoice(e.target.value);
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('farmlink_openai_voice', e.target.value);
+                        }
+                      }}
+                      style={{ padding: '6px 8px', fontSize: '0.78rem', borderRadius: '6px', border: '1px solid #bdd7bc' }}
+                    >
+                      <option value="nova">Nova (Warm & Natural Female · Recommended)</option>
+                      <option value="alloy">Alloy (Neutral & Balanced)</option>
+                      <option value="echo">Echo (Clear Male)</option>
+                      <option value="shimmer">Shimmer (Expressive & Bright Female)</option>
+                      <option value="onyx">Onyx (Deep Authoritative Male)</option>
+                      <option value="fable">Fable (Dynamic & Warm)</option>
                     </select>
                   </div>
 
                   {/* Sarvam AI Key Row */}
                   <div style={{ display: 'grid', gap: '4px', marginTop: '4px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                      <span style={{ fontWeight: 600 }}>🇮🇳 Sarvam AI Subscription Key (Optional):</span>
+                      <span style={{ fontWeight: 600 }}>🇮🇳 Sarvam AI Subscription Key (Pre-configured):</span>
                       <a href="https://www.sarvam.ai/" target="_blank" rel="noreferrer" style={{ color: '#176b49', textDecoration: 'underline' }}>
                         Get Sarvam Key ↗
                       </a>
@@ -527,23 +584,6 @@ export default function AgenticCopilot({
                     </select>
                   </div>
 
-                  {/* Whisper Key Row */}
-                  <div style={{ display: 'grid', gap: '4px', marginTop: '4px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                      <span style={{ fontWeight: 600 }}>⚡ Groq / OpenAI Whisper Key (Optional):</span>
-                      <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" style={{ color: '#176b49', textDecoration: 'underline' }}>
-                        Get Free Groq Key ↗
-                      </a>
-                    </div>
-                    <input
-                      type="password"
-                      placeholder="Paste your Groq / Whisper API key (gsk_...)"
-                      value={whisperKey}
-                      onChange={(e) => setWhisperKey(e.target.value)}
-                      style={{ fontSize: '0.78rem' }}
-                    />
-                  </div>
-
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
                     <button
                       type="button"
@@ -551,12 +591,13 @@ export default function AgenticCopilot({
                       style={{ padding: '6px 12px', fontSize: '0.78rem' }}
                       onClick={() => {
                         if (typeof window !== 'undefined') {
+                          localStorage.setItem('farmlink_openai_api_key', openAiKey.trim());
+                          localStorage.setItem('farmlink_openai_voice', openAiVoice);
                           localStorage.setItem('farmlink_sarvam_api_key', sarvamKey.trim());
                           localStorage.setItem('farmlink_sarvam_speaker', sarvamSpeaker);
-                          localStorage.setItem('farmlink_whisper_api_key', whisperKey.trim());
                           localStorage.setItem('farmlink_voice_provider', voiceProvider);
                         }
-                        setVoiceStatus('✅ Voice settings saved! Ready for high-accuracy Indian speech.');
+                        setVoiceStatus('✅ Voice settings saved! OpenAI Whisper & Sarvam AI ready.');
                       }}
                     >
                       Save Voice Configuration
@@ -786,8 +827,8 @@ export default function AgenticCopilot({
                 <span className="audio-wave-bar"></span>
               </div>
               <span>
-                {voiceProvider === 'whisper' && whisperKey
-                  ? '🎙️ Groq Whisper Recording… Click Mic to Transcribe & Execute'
+                {voiceProvider === 'openai' && openAiKey
+                  ? '🎙️ OpenAI Whisper Recording… Click Mic to Transcribe & Execute'
                   : voiceProvider === 'sarvam' && sarvamKey
                   ? '🎙️ Sarvam Indic ASR Recording… Click Mic to Transcribe & Execute'
                   : `🎙️ Listening via Browser Web Speech (${resolveSpeechCode(language).name})… Speak now`}

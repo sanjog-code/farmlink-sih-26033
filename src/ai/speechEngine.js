@@ -1,5 +1,5 @@
 // FarmLink Unified Hybrid Speech Engine (SIH PS 26033)
-// Merging Browser Web Speech API, Sarvam AI (Saaras & Bulbul), and Groq/OpenAI Whisper
+// Merging Browser Web Speech API, Sarvam AI (Saaras & Bulbul), and OpenAI (Whisper STT & Studio TTS)
 import { CONSTITUTIONAL_LANGUAGES } from '../translations/constitutional22.js';
 
 // Language code mapper between ISO, BCP-47, Sarvam, and Whisper
@@ -86,28 +86,24 @@ export class WebSpeechRecognizer {
   }
 }
 
-// ─── 2. GROQ / OPENAI WHISPER TRANSCRIPTION (AUDIO BLOB UPLOAD) ─────────────
+// ─── 2. OPENAI WHISPER ASR & OPENAI TTS ──────────────────────────────────────
 
-export async function transcribeWithWhisper(audioBlob, { apiKey, endpoint = 'groq', language = 'hi' }) {
-  if (!apiKey || !apiKey.trim()) throw new Error('Whisper API key is required.');
-  
-  // Use Groq Whisper (ultra-fast 250ms) or OpenAI Whisper
-  const url = endpoint === 'openai'
-    ? 'https://api.openai.com/v1/audio/transcriptions'
-    : 'https://api.groq.com/openai/v1/audio/transcriptions';
+export async function transcribeWithWhisper(audioBlob, { apiKey, language = 'hi' }) {
+  if (!apiKey || !apiKey.trim()) throw new Error('OpenAI API key is required.');
 
-  const model = endpoint === 'openai' ? 'whisper-1' : 'whisper-large-v3';
+  // Transcode to clean 16kHz PCM WAV for OpenAI Whisper
+  const wavBlob = await convertBlobToWav(audioBlob).catch(() => audioBlob);
 
   const formData = new FormData();
-  formData.append('file', audioBlob, 'speech.wav');
-  formData.append('model', model);
+  formData.append('file', wavBlob, 'audio.wav');
+  formData.append('model', 'whisper-1');
   const langInfo = resolveSpeechCode(language);
   if (langInfo.whisper) {
     formData.append('language', langInfo.whisper);
   }
   formData.append('response_format', 'json');
 
-  const res = await fetch(url, {
+  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey.trim()}`
@@ -117,11 +113,38 @@ export async function transcribeWithWhisper(audioBlob, { apiKey, endpoint = 'gro
 
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
-    throw new Error(errData?.error?.message || `Whisper error (HTTP ${res.status})`);
+    throw new Error(errData?.error?.message || `OpenAI Whisper error (HTTP ${res.status})`);
   }
 
   const data = await res.json();
   return data.text || '';
+}
+
+export async function synthesizeWithOpenAI(text, { apiKey, voice = 'nova', model = 'tts-1' }) {
+  if (!apiKey || !apiKey.trim()) throw new Error('OpenAI API key is required.');
+
+  const cleanText = (text || '').replace(/[#*`_~]/g, '').slice(0, 1000);
+
+  const res = await fetch('https://api.openai.com/v1/audio/speech', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey.trim()}`
+    },
+    body: JSON.stringify({
+      model: model || 'tts-1',
+      input: cleanText,
+      voice: voice || 'nova' // 'nova', 'alloy', 'echo', 'shimmer', 'onyx', 'fable'
+    })
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData?.error?.message || `OpenAI TTS error (HTTP ${res.status})`);
+  }
+
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
 
 // ─── 2.5 AUDIO FORMAT CONVERTER TO 16kHz MONO PCM WAV ─────────────────────────
@@ -313,7 +336,9 @@ export async function unifiedSpeak({
   language = 'hi',
   provider = 'auto',
   sarvamKey = '',
+  openAiKey = '',
   speaker = 'aditya',
+  openAiVoice = 'nova',
   onStart = () => {},
   onEnd = () => {},
   onError = () => {}
@@ -321,39 +346,73 @@ export async function unifiedSpeak({
   // Cancel any running speech
   stopAllSpeech();
 
-  // Try Sarvam AI Bulbul TTS if requested/configured
-  const shouldTrySarvam = (provider === 'sarvam' || (provider === 'auto' && Boolean(sarvamKey))) && Boolean(sarvamKey);
-
-  if (shouldTrySarvam) {
-    try {
-      onStart({ provider: 'sarvam' });
-      const audioUrl = await synthesizeWithSarvam(text, { apiKey: sarvamKey, language, speaker });
-      const audio = new Audio(audioUrl);
-      currentAudioInstance = audio;
-      audio.onended = () => {
+  const playUrl = async (audioUrl, provName) => {
+    onStart({ provider: provName });
+    const audio = new Audio(audioUrl);
+    currentAudioInstance = audio;
+    audio.onended = () => {
+      currentAudioInstance = null;
+      onEnd();
+    };
+    audio.onerror = () => {
+      currentAudioInstance = null;
+      speakWithBrowserNative(text, language, onStart, onEnd, onError);
+    };
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      await playPromise.catch((playErr) => {
+        console.warn(`${provName} audio play prevented by browser autoplay policy, falling back to Web Speech:`, playErr);
         currentAudioInstance = null;
-        onEnd();
-      };
-      audio.onerror = () => {
-        currentAudioInstance = null;
-        // Fall back to WebSpeech
         speakWithBrowserNative(text, language, onStart, onEnd, onError);
-      };
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        await playPromise.catch((playErr) => {
-          console.warn('Sarvam audio play prevented by browser autoplay policy, falling back to Web Speech:', playErr);
-          currentAudioInstance = null;
-          speakWithBrowserNative(text, language, onStart, onEnd, onError);
-        });
-      }
+      });
+    }
+  };
+
+  // 1. Explicit OpenAI TTS requested
+  if (provider === 'openai' && Boolean(openAiKey)) {
+    try {
+      const audioUrl = await synthesizeWithOpenAI(text, { apiKey: openAiKey, voice: openAiVoice });
+      await playUrl(audioUrl, 'openai');
+      return;
+    } catch (err) {
+      console.warn('OpenAI TTS failed, falling back to Web Speech:', err.message);
+    }
+  }
+
+  // 2. Explicit Sarvam Bulbul TTS requested
+  if (provider === 'sarvam' && Boolean(sarvamKey)) {
+    try {
+      const audioUrl = await synthesizeWithSarvam(text, { apiKey: sarvamKey, language, speaker });
+      await playUrl(audioUrl, 'sarvam');
       return;
     } catch (err) {
       console.warn('Sarvam TTS failed, falling back to Web Speech:', err.message);
     }
   }
 
-  // Fallback / Native Web Speech
+  // 3. Auto Mode: Prefer Sarvam if available (native Indian dialect), else OpenAI TTS
+  if (provider === 'auto') {
+    if (Boolean(sarvamKey)) {
+      try {
+        const audioUrl = await synthesizeWithSarvam(text, { apiKey: sarvamKey, language, speaker });
+        await playUrl(audioUrl, 'sarvam');
+        return;
+      } catch (err) {
+        console.warn('Sarvam TTS auto failed, trying OpenAI or Web Speech:', err.message);
+      }
+    }
+    if (Boolean(openAiKey)) {
+      try {
+        const audioUrl = await synthesizeWithOpenAI(text, { apiKey: openAiKey, voice: openAiVoice });
+        await playUrl(audioUrl, 'openai');
+        return;
+      } catch (err) {
+        console.warn('OpenAI TTS auto failed:', err.message);
+      }
+    }
+  }
+
+  // 4. Fallback / Native Web Speech
   speakWithBrowserNative(text, language, onStart, onEnd, onError);
 }
 
