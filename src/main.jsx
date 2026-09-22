@@ -1386,7 +1386,15 @@ function App() {
             <ShoppingCart size={18} />
             {cart.length || ""}
           </button>
-          <AgenticDockLauncher onOpen={() => setModal("agentic")} />
+          <button
+            type="button"
+            className="header-voice-btn"
+            onClick={() => setModal("agentic")}
+            title="Open FarmLink Agentic Copilot"
+            style={{ background: 'linear-gradient(135deg, #176b49, #0d462f)', color: '#fff', borderColor: '#c6e76e' }}
+          >
+            <Sparkles size={16} /> <span>AI Copilot</span>
+          </button>
         </div>
       </header>
       <main>
@@ -1572,7 +1580,8 @@ function App() {
           <Check size={17} />
           {toast}
         </div>
-      )} 
+      )}
+      <AgenticDockLauncher onOpen={() => setModal("agentic")} /> 
     </>
   );
 }
