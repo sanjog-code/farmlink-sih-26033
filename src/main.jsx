@@ -29,6 +29,17 @@ import {
   ClipboardList,
   ArrowUp,
   Sparkles,
+  Sun,
+  Moon,
+  Zap,
+  Shield,
+  Store,
+  TrendingUp,
+  Coins,
+  Scale,
+  Building2,
+  Bot,
+  CheckCircle2,
 } from "lucide-react";
 import "./styles.css";
 import "./auth.css";
@@ -37,6 +48,8 @@ import "./checkout.css";
 import "./crop-images.css";
 import "./intake-pipeline.css";
 import "./route-planner.css";
+import "./refinements.css";
+import "./jivexa-theme.css";
 import { isSupabaseConfigured, supabase } from "./supabase";
 import FreeAdvisory from "./ai/FreeAdvisory";
 import GradeReview from "./ai/GradeReview";
@@ -46,7 +59,6 @@ import IntegrationCenter, { FarmerServices } from "./operations/IntegrationCente
 import MarketDataAdmin from "./operations/MarketDataAdmin";
 import { availableToAdd, rankAndFilter, updateQuantity } from "./lib/marketplace.js";
 import { CONSTITUTIONAL_LANGUAGES, translateText } from "./translations/constitutional22.js";
-import "./refinements.css";
 import AgenticCopilot, { AgenticDockLauncher } from "./ai/AgenticCopilot.jsx";
 
 const initialLots = [
@@ -662,6 +674,7 @@ function localizeUI(root, language) {
       for (const [from, to] of hindiPairs) {
         if (next.includes(from)) next = next.split(from).join(to);
       }
+      next = translateText(next, "hi");
       if (next !== node.nodeValue) node.nodeValue = next;
     } else {
       const translated = translateText(baseText, language);
@@ -685,6 +698,7 @@ function localizeUI(root, language) {
         for (const [from, to] of hindiPairs) {
           if (next.includes(from)) next = next.split(from).join(to);
         }
+        next = translateText(next, "hi");
         if (next !== element.getAttribute(attribute)) element.setAttribute(attribute, next);
       } else {
         const translated = translateText(baseValue, language);
@@ -839,6 +853,26 @@ function App() {
     [placingOrder, setPlacingOrder] = useState(false),
     placingOrderRef = useRef(false);
   const t = translations[lang] || translations.en;
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem("farmlink_theme") || "light";
+    } catch {
+      return "light";
+    }
+  });
+  useEffect(() => {
+    try {
+      document.documentElement.setAttribute("data-theme", theme);
+      localStorage.setItem("farmlink_theme", theme);
+    } catch {}
+  }, [theme]);
+  const toggleTheme = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+
+  const tUI = (text) => {
+    if (!text) return "";
+    if (lang === "en") return text;
+    return translateText(text, lang);
+  };
   useEffect(() => {
     try {
       localStorage.setItem("farmlink_farmer_verification", JSON.stringify(farmerVerification));
@@ -1304,26 +1338,41 @@ function App() {
   if (passwordRecovery) return <PasswordRecovery onComplete={() => { setPasswordRecovery(false); window.history.replaceState({}, "", window.location.pathname); setView("auth"); notify("You can now sign in with your updated password."); }}/>;
   return (
     <>
-      <header>
+      <div className="top-announcement-banner">
+        <span>🌾 {tUI("Government e-NWR Integration Live: WDRA-accredited warehouse pledge finance at 50% MSP")}</span>
+        <button type="button" onClick={() => setModal("agentic")} className="banner-link">
+          {tUI("Check Advance Eligibility")} →
+        </button>
+      </div>
+      <header className="glass-nav">
         <button className="brand" onClick={() => setView("home")}>
           <span>
             <Sprout size={24} />
           </span>
-          Farm<span>Link</span>
+          Farm<span>Link</span> <span className="brand-badge">OS</span>
         </button>
         <nav>
           <button onClick={() => access("consumer", "market")}>
-            Marketplace
+            {tUI("Marketplace")}
           </button>
-          <button onClick={() => access("consumer", "bulk")}>Wholesale</button>
+          <button onClick={() => access("consumer", "bulk")}>{tUI("Wholesale")}</button>
           {session?.role !== "consumer" && (
             <button onClick={() => access("admin", "warehouse")}>
-              Warehouse
+              {tUI("Warehouse")}
             </button>
           )}
-          <button onClick={() => access("farmer", "farmer")}>Farmer</button>
+          <button onClick={() => access("farmer", "farmer")}>{tUI("Farmer")}</button>
         </nav>
         <div className="head-actions">
+          <button
+            type="button"
+            className="theme-toggle-btn"
+            onClick={toggleTheme}
+            aria-label="Toggle light/dark theme"
+            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
           <label className="language language-selector-wrap" title="Translate platform into all 22 official Indian languages">
             <Languages size={17} />
             <select
@@ -1351,7 +1400,7 @@ function App() {
             onClick={() => setModal("voice")}
             title="Multilingual Voice AI (All 22 Indian Languages)"
           >
-            <Mic size={16} /> <span>Voice AI</span>
+            <Mic size={16} /> <span>{tUI("Voice AI")}</span>
           </button>
           {session ? (
             <button
@@ -1368,14 +1417,14 @@ function App() {
           ) : (
             <button className="login-btn" onClick={() => setView("auth")}>
               <UserRound size={17} />
-              Sign in
+              {tUI("Sign in")}
             </button>
           )}
           <span className="logout-wrap">
             {session && (
               <button className="login-btn" onClick={logout}>
                 <LogOut size={17} />
-                Logout
+                {tUI("Logout")}
               </button>
             )}
           </span>
@@ -1392,9 +1441,9 @@ function App() {
             className="header-voice-btn"
             onClick={() => setModal("agentic")}
             title="Open FarmLink Agentic Copilot"
-            style={{ background: 'linear-gradient(135deg, #176b49, #0d462f)', color: '#fff', borderColor: '#c6e76e' }}
+            style={{ background: 'linear-gradient(135deg, #059669, #047857)', color: '#fff', borderColor: '#34d399' }}
           >
-            <Sparkles size={16} /> <span>AI Copilot</span>
+            <Sparkles size={16} /> <span>{tUI("AI Copilot ✨")}</span>
           </button>
         </div>
       </header>
@@ -1408,6 +1457,8 @@ function App() {
             access={access}
             reserve={reserve}
             setModal={setModal}
+            lang={lang}
+            tUI={tUI}
           />
         )}{" "}
         {view === "market" && (
@@ -1582,29 +1633,119 @@ function App() {
           {toast}
         </div>
       )}
+      <SiteFooter setView={setView} notify={notify} lang={lang} tUI={tUI} />
       <AgenticDockLauncher onOpen={() => setModal("agentic")} /> 
     </>
   );
 }
 
-function SiteFooter({ setView, notify }) {
+function SiteFooter({ setView, notify, lang, tUI }) {
   const [email, setEmail] = useState("");
+  const tr = tUI || ((x) => translateText(x, lang));
   const go = (view) => { setView(view); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const subscribe = (event) => {
     event.preventDefault();
     if (!/^\S+@\S+\.\S+$/.test(email)) return notify("Enter a valid email address to subscribe.");
-    notify("Thanks — your FarmLink updates subscription has been recorded.");
+    notify(tr("Thanks — your FarmLink updates subscription has been recorded."));
     setEmail("");
   };
-  return <footer className="site-footer">
-    <div className="footer-main">
-      <div className="footer-brand"><div className="brand light"><span><Sprout size={22}/></span>Farm<span>Link</span></div><p>Farm-to-market infrastructure for transparent, traceable trade.</p><div className="footer-socials"><a href="https://www.instagram.com/farmlink_30?stkn=MW5nZGM1NjYzdXh4cw==" target="_blank" rel="noreferrer" aria-label="FarmLink on Instagram">IG</a><a href="https://youtube.com/@farmlink_30?si=q0HJLuXgeHG6ggsb" target="_blank" rel="noreferrer" aria-label="FarmLink on YouTube">▶</a></div></div>
-      <div><h3>Explore</h3><button onClick={() => go("market")}>Marketplace</button><button onClick={() => go("bulk")}>Wholesale marketplace</button><button onClick={() => go("farmer")}>Farmer portal</button><button onClick={() => go("warehouse")}>Warehouse operations</button></div>
-      <div><h3>Contact</h3><a href="mailto:farmlink30@gmail.com">farmlink30@gmail.com</a><a href="tel:+918209193509">+91 82091 93509</a><p>India · FarmLink SIH 26033</p><button onClick={() => go("disclaimer")}>Platform disclaimer</button></div>
-      <div className="newsletter"><h3>Market updates</h3><p>Get updates on FarmLink features, fresh stock and farmer-first initiatives.</p><form onSubmit={subscribe}><input aria-label="Email for FarmLink updates" type="email" required placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)}/><button type="submit">Subscribe</button></form></div>
-    </div>
-    <div className="footer-bottom"><small>© 2026 FarmLink. All rights reserved.</small><div><button onClick={() => go("privacy")}>Privacy Policy</button><button onClick={() => go("terms")}>Terms of Service</button><button onClick={() => go("disclaimer")}>Disclaimer</button></div><button className="back-to-top" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>Back to top <ArrowUp size={15}/></button></div>
-  </footer>;
+  return (
+    <footer className="jivexa-footer">
+      <div className="footer-grid-jivexa">
+        <div className="footer-col">
+          <div className="brand" style={{ marginBottom: "16px", cursor: "pointer", display: "inline-flex", alignItems: "center" }} onClick={() => go("home")}>
+            <span style={{ display: "inline-flex", background: "rgba(16, 185, 129, 0.2)", padding: "6px", borderRadius: "8px", color: "var(--primary)" }}>
+              <Sprout size={22} />
+            </span>
+            <span style={{ fontSize: "1.3rem", fontWeight: 800, color: "#fff", marginLeft: "8px" }}>
+              Farm<span style={{ color: "var(--primary)" }}>Link</span> <span className="brand-badge">OS</span>
+            </span>
+          </div>
+          <p>
+            {tr("Next-generation farm-to-warehouse infrastructure combining WDRA-compliant storage, 50% pledge advances, live Mandi Agmarknet pricing, and multilingual AI voice copilot.")}
+          </p>
+          <div style={{ display: "flex", gap: "12px", marginTop: "16px" }}>
+            <a href="https://www.instagram.com/farmlink_30?stkn=MW5nZGM1NjYzdXh4cw==" target="_blank" rel="noreferrer" aria-label="FarmLink on Instagram" style={{ color: "#94a3b8", fontSize: "0.85rem", padding: "6px 12px", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px" }}>Instagram</a>
+            <a href="https://youtube.com/@farmlink_30?si=q0HJLuXgeHG6ggsb" target="_blank" rel="noreferrer" aria-label="FarmLink on YouTube" style={{ color: "#94a3b8", fontSize: "0.85rem", padding: "6px 12px", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px" }}>YouTube</a>
+          </div>
+        </div>
+
+        <div className="footer-col">
+          <h4>{tr("Ecosystem")}</h4>
+          <ul>
+            <li><button onClick={() => go("market")}>{tr("Marketplace")}</button></li>
+            <li><button onClick={() => go("bulk")}>{tr("Wholesale")}</button></li>
+            <li><button onClick={() => go("farmer")}>{tr("Farmer Portal")}</button></li>
+            <li><button onClick={() => go("warehouse")}>{tr("Warehouse & e-NWR")}</button></li>
+          </ul>
+        </div>
+
+        <div className="footer-col">
+          <h4>{tr("Support & Contact")}</h4>
+          <ul>
+            <li><a href="mailto:farmlink30@gmail.com">farmlink30@gmail.com</a></li>
+            <li><a href="tel:+918209193509">+91 82091 93509</a></li>
+            <li><span style={{ color: "#94a3b8", fontSize: "0.86rem" }}>{tr("India · FarmLink SIH 26033")}</span></li>
+            <li><button onClick={() => go("disclaimer")}>{tr("Platform disclaimer")}</button></li>
+          </ul>
+        </div>
+
+        <div className="footer-col">
+          <h4>{tr("Market Updates")}</h4>
+          <p>{tr("Get updates on FarmLink features, fresh stock and farmer-first initiatives.")}</p>
+          <form onSubmit={subscribe} style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
+            <input
+              aria-label="Email for FarmLink updates"
+              type="email"
+              required
+              placeholder="you@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              style={{
+                padding: "10px 14px",
+                borderRadius: "8px",
+                background: "rgba(255, 255, 255, 0.06)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                color: "#fff",
+                fontSize: "0.85rem"
+              }}
+            />
+            <button
+              type="submit"
+              style={{
+                padding: "10px 14px",
+                borderRadius: "8px",
+                background: "var(--primary)",
+                color: "#fff",
+                fontWeight: 700,
+                border: "0",
+                cursor: "pointer",
+                textAlign: "center"
+              }}
+            >
+              {tr("Subscribe")}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div className="footer-bottom-jivexa">
+        <small>© 2026 FarmLink OS. {tr("All rights reserved.")}</small>
+        <div className="footer-bottom-links">
+          <button onClick={() => go("privacy")}>{tr("Privacy Policy")}</button>
+          <button onClick={() => go("terms")}>{tr("Terms of Service")}</button>
+          <button onClick={() => go("disclaimer")}>{tr("Platform disclaimer")}</button>
+        </div>
+        <button
+          className="back-to-top"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          style={{ background: "transparent", border: "0", color: "#cbd5e1", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
+        >
+          {tr("Back to top")} <ArrowUp size={15} />
+        </button>
+      </div>
+    </footer>
+  );
 }
 function LegalPage({ type, setView }) {
   const content = {
@@ -1614,78 +1755,224 @@ function LegalPage({ type, setView }) {
   }[type];
   return <section className="page legal-page"><button className="secondary" onClick={() => setView("home")}>← Back to FarmLink</button><p className="eyebrow green">FARMLINK LEGAL</p><h1>{content.title}</h1><p className="legal-intro">{content.intro}</p>{content.sections.map(([heading, body]) => <article key={heading}><h2>{heading}</h2><p>{body}</p></article>)}<p className="legal-contact">Questions? Contact <a href="mailto:farmlink30@gmail.com">farmlink30@gmail.com</a>.</p></section>;
 }
-function Home({ t, lots, setView, access, reserve, setModal }) {
+function Home({ t, lots, setView, access, reserve, setModal, lang, tUI }) {
+  const tr = tUI || ((x) => translateText(x, lang));
   return (
     <>
-      <section className="hero">
-        <div className="hero-copy">
-          <p className="eyebrow">
-            <Leaf size={15} />
-            {t.tag}
+      <section className="hero-jivexa">
+        <div className="hero-copy-jivexa">
+          <div className="hero-tag">
+            <span className="pulse-dot"></span>
+            <span className="hero-tag-text">{tr("India's 1st Dual-Engine Agri Copilot & e-NWR Grid")}</span>
+          </div>
+
+          <h1 className="hero-title-jivexa">
+            {tr("Agricultural Trade Works Better")} <br />
+            <span className="text-gradient-emerald">{tr("When It's Connected")}</span>
+          </h1>
+
+          <p className="hero-subtitle-jivexa">
+            {tr("Next-generation farm-to-warehouse infrastructure combining WDRA-compliant storage, 50% pledge advances, live Mandi Agmarknet pricing, and multilingual AI voice copilot.")}
           </p>
-          <h1>{t.hero}</h1>
-          <p>{t.sub}</p>
-          <div className="cta">
-            <button
-              className="primary"
-              onClick={() => access("consumer", "market")}
-            >
-              {t.shop}
-              <ArrowUpRight size={18} />
+
+          <div className="hero-cta-row">
+            <button className="hero-btn-primary" onClick={() => setModal("agentic")}>
+              <Sparkles size={18} />
+              {tr("Launch AI Copilot 🚀")}
             </button>
-            <button
-              className="secondary"
-              onClick={() => access("farmer", "farmer")}
-            >
-              {t.farmer}
-              <ChevronRight size={18} />
+            <button className="hero-btn-secondary" onClick={() => access("consumer", "market")}>
+              <Store size={18} />
+              {tr("Explore Marketplace")}
             </button>
           </div>
-          <div className="trust">
-            <span>
-              <ShieldCheck />
-              Traceable lots
-            </span>
-            <span>
-              <ScanLine />
-              Human-verified grades
-            </span>
-          </div>
-        </div>
-        <div className="hero-card">
-          <div className="sun"></div>
-          <div className="field">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-          <div className="floating price">
-            <small>MARKET SIGNAL</small>
-            <b>Tomato +8%</b>
-            <em>High demand nearby</em>
-          </div>
-          <div className="floating stock">
-            <PackageCheck />
-            <div>
-              <b>2,510 kg</b>
-              <small>available today</small>
+
+          <div className="hero-trust-row">
+            <div className="hero-trust-item">
+              <ShieldCheck size={18} />
+              <span>{tr("e-NWR Compliant")}</span>
+            </div>
+            <div className="hero-trust-item">
+              <TrendingUp size={18} />
+              <span>{tr("Real-time Mandi Sync")}</span>
+            </div>
+            <div className="hero-trust-item">
+              <CheckCircle2 size={18} />
+              <span>{tr("Zero Distress Sales")}</span>
             </div>
           </div>
-          <div className="produce tomato">●</div>
-          <div className="produce onion">●</div>
+        </div>
+
+        <div className="hero-visual-container">
+          <div className="pulse-slow-aura"></div>
+          <div className="showcase-glass-card">
+            <div className="showcase-header">
+              <div className="showcase-title-row">
+                <TrendingUp size={18} color="var(--primary)" />
+                <b style={{ fontSize: "0.95rem", color: "var(--text-main)" }}>{tr("Live Mandi & e-NWR Pulse")}</b>
+              </div>
+              <span className="showcase-live-badge">
+                <span className="pulse-dot"></span> {tr("Agmarknet Live")}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div className="ticker-item">
+                <div className="ticker-crop-info">
+                  <span style={{ fontSize: "1.2rem" }}>🌾</span>
+                  <div>
+                    <div>{tr("Wheat (Kanak)")}</div>
+                    <small style={{ color: "var(--text-light)", fontSize: "0.75rem" }}>Jaipur North Mandi</small>
+                  </div>
+                </div>
+                <div className="ticker-rate-info">
+                  <div className="ticker-price">₹2,425/qtl</div>
+                  <span className="ticker-trend">+4.2% {tr("Today")}</span>
+                </div>
+              </div>
+
+              <div className="ticker-item">
+                <div className="ticker-crop-info">
+                  <span style={{ fontSize: "1.2rem" }}>🟡</span>
+                  <div>
+                    <div>{tr("Mustard (Sarson)")}</div>
+                    <small style={{ color: "var(--text-light)", fontSize: "0.75rem" }}>Alwar Hub</small>
+                  </div>
+                </div>
+                <div className="ticker-rate-info">
+                  <div className="ticker-price">₹5,650/qtl</div>
+                  <span className="ticker-trend">+2.8% {tr("Spread")}</span>
+                </div>
+              </div>
+
+              <div className="ticker-item">
+                <div className="ticker-crop-info">
+                  <span style={{ fontSize: "1.2rem" }}>🍅</span>
+                  <div>
+                    <div>{tr("Tomato (Hybrid)")}</div>
+                    <small style={{ color: "var(--text-light)", fontSize: "0.75rem" }}>Sanganer Cluster</small>
+                  </div>
+                </div>
+                <div className="ticker-rate-info">
+                  <div className="ticker-price">₹27/kg</div>
+                  <span className="ticker-trend">+8.0% {tr("Today")}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="enwr-preview-box">
+              <div className="enwr-preview-title">
+                <span>{tr("e-NWR 50% Pledge Loan Advance")}</span>
+                <Coins size={16} />
+              </div>
+              <p className="enwr-preview-text">
+                {tr("Deposit harvest in certified warehouse. Avail instant 50% working capital advance against electronic negotiable warehouse receipts.")}
+              </p>
+              <button type="button" className="enwr-preview-action" onClick={() => setModal("agentic")}>
+                {tr("Calculate Pledge Advance with Copilot")} →
+              </button>
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", paddingTop: "4px" }}>
+              <button
+                type="button"
+                onClick={() => setModal("voice")}
+                style={{
+                  fontSize: "0.78rem",
+                  padding: "6px 12px",
+                  borderRadius: "var(--radius-full)",
+                  border: "1px solid var(--border)",
+                  background: "var(--surface-raised)",
+                  color: "var(--text-main)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                <Mic size={13} color="var(--primary)" /> {tr("Voice AI Assistant")}
+              </button>
+              <button
+                type="button"
+                onClick={() => access("farmer", "farmer")}
+                style={{
+                  fontSize: "0.78rem",
+                  padding: "6px 12px",
+                  borderRadius: "var(--radius-full)",
+                  border: "1px solid var(--border)",
+                  background: "var(--surface-raised)",
+                  color: "var(--text-main)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                <Warehouse size={13} color="var(--primary)" /> {tr("Book Warehouse Intake")}
+              </button>
+            </div>
+          </div>
         </div>
       </section>
+
+      {/* JIVEXA 4-PILLAR ECOSYSTEM */}
+      <section className="ecosystem-section">
+        <div className="section-header-jivexa">
+          <span className="section-tag-jivexa">{tr("Connected Agri-Stack")}</span>
+          <h2 className="section-title-jivexa">{tr("Four Pillars of Seamless Trade")}</h2>
+          <p className="section-subtitle-jivexa">
+            {tr("Uniting growers, certified warehouses, aggregators, and institutional buyers in one transparent, data-driven ecosystem.")}
+          </p>
+        </div>
+        <div className="eco-grid-4">
+          <div className="eco-card">
+            <div className="eco-card-icon"><Leaf size={22} /></div>
+            <h3 className="eco-card-title">{tr("Smallholder Farmers")}</h3>
+            <p className="eco-card-desc">{tr("Zero distress sales. Get fair MSP price floors, door-step cluster pickup, and instant digital payments upon delivery.")}</p>
+            <button className="eco-card-link" onClick={() => access("farmer", "farmer")}>
+              {tr("Farmer Portal")} →
+            </button>
+          </div>
+          <div className="eco-card">
+            <div className="eco-card-icon"><Warehouse size={22} /></div>
+            <h3 className="eco-card-title">{tr("Accredited Warehouses")}</h3>
+            <p className="eco-card-desc">{tr("WDRA-certified storage with automated weight intake, sensor humidity tracking, and electronic e-NWR receipt generation.")}</p>
+            <button className="eco-card-link" onClick={() => access("admin", "warehouse")}>
+              {tr("Warehouse & e-NWR")} →
+            </button>
+          </div>
+          <div className="eco-card">
+            <div className="eco-card-icon"><Store size={22} /></div>
+            <h3 className="eco-card-title">{tr("Direct Institutional Buyers")}</h3>
+            <p className="eco-card-desc">{tr("Source lab-tested, human-verified Grade A produce directly from climate-controlled storage hubs with guaranteed provenance.")}</p>
+            <button className="eco-card-link" onClick={() => access("consumer", "market")}>
+              {tr("Explore Marketplace")} →
+            </button>
+          </div>
+          <div className="eco-card">
+            <div className="eco-card-icon"><Bot size={22} /></div>
+            <h3 className="eco-card-title">{tr("Dual-Engine AI Copilot")}</h3>
+            <p className="eco-card-desc">{tr("Real-time Agmarknet intelligence, multi-dialect Indic voice consultation via OpenAI Whisper + Sarvam AI, and freight route optimization.")}</p>
+            <button className="eco-card-link" onClick={() => setModal("agentic")}>
+              {tr("Launch AI Copilot 🚀")} →
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* VERIFIED WAREHOUSE INVENTORY */}
       <section className="section">
         <div className="section-head">
           <div>
-            <p className="eyebrow green">LIVE FROM NEARBY WAREHOUSES</p>
+            <p className="eyebrow green">{tr("LIVE FROM NEARBY WAREHOUSES")}</p>
             <h2>{t.stock}</h2>
           </div>
           <button
             className="text-btn"
             onClick={() => access("consumer", "market")}
           >
-            View marketplace <ArrowUpRight size={16} />
+            {tr("View marketplace")} <ArrowUpRight size={16} />
           </button>
         </div>
         <div className="cards">
@@ -1694,17 +1981,18 @@ function Home({ t, lots, setView, access, reserve, setModal }) {
           ))}
         </div>
       </section>
+
+      {/* ONE CONNECTED FLOW */}
       <section className="impact">
         <div>
-          <p className="eyebrow">ONE CONNECTED FLOW</p>
+          <p className="eyebrow">{tr("ONE CONNECTED FLOW")}</p>
           <h2>
-            Less uncertainty.
+            {tr("Less uncertainty.")}
             <br />
-            More choice.
+            {tr("More choice.")}
           </h2>
           <p>
-            FarmLink joins physical aggregation with market intelligence so
-            produce moves with clarity, not pressure.
+            {tr("FarmLink joins physical aggregation with market intelligence so produce moves with clarity, not pressure.")}
           </p>
           <button className="outline" onClick={() => setModal("ai")}>
             <BrainCircuit size={18} />
@@ -1715,40 +2003,42 @@ function Home({ t, lots, setView, access, reserve, setModal }) {
           <Flow
             n="1"
             icon={<Truck />}
-            title="Cluster pickup"
-            text="Village & FPO collection"
+            title={tr("Cluster pickup")}
+            text={tr("Village & FPO collection")}
           />
           <Flow
             n="2"
             icon={<Warehouse />}
-            title="Warehouse intake"
-            text="Weigh, grade & store"
+            title={tr("Warehouse intake")}
+            text={tr("Weigh, grade & store")}
           />
           <Flow
             n="3"
             icon={<BrainCircuit />}
-            title="AI guidance"
-            text="Price, demand & stock-age"
+            title={tr("AI guidance")}
+            text={tr("Price, demand & stock-age")}
           />
           <Flow
             n="4"
             icon={<ShoppingCart />}
-            title="Market access"
-            text="Consumer & bulk buyers"
+            title={tr("Market access")}
+            text={tr("Consumer & bulk buyers")}
           />
         </div>
       </section>
+
+      {/* MULTILINGUAL VOICE CONSULTATION BANNER */}
       <section className="voice-banner">
         <div className="mic">
           <Mic size={34} />
         </div>
         <div>
-          <p className="eyebrow">{t.voice.toUpperCase()}</p>
-          <h2>Ask in your own language.</h2>
-          <p>Call, speak, and get guided help with stock, prices or pickups.</p>
+          <p className="eyebrow">{t.voice ? t.voice.toUpperCase() : "VOICE AI"}</p>
+          <h2>{tr("Ask in your own language.")}</h2>
+          <p>{tr("Call, speak, and get guided help with stock, prices or pickups.")}</p>
         </div>
         <button className="primary pale" onClick={() => setModal("voice")}>
-          Try voice demo <Mic size={18} />
+          {tr("Try voice demo")} <Mic size={18} />
         </button>
       </section>
     </>
