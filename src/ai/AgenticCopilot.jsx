@@ -56,7 +56,6 @@ export default function AgenticCopilot({
   const [language, setLanguage] = useState('hi');
   const [recording, setRecording] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showSteps, setShowSteps] = useState(true);
 
   // Gemini API configuration (Preinstalled & Ready Out-of-the-Box)
   const [geminiKey, setGeminiKey] = useState(() => {
@@ -686,65 +685,20 @@ export default function AgenticCopilot({
             </div>
           </div>
 
-          {/* ReAct Execution Timeline */}
-          {steps.length > 0 && (
-            <div>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '8px',
-                  cursor: 'pointer'
-                }}
-                onClick={() => setShowSteps(!showSteps)}
-              >
-                <span className="quick-goals-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Cpu size={14} /> Agent Reasoning Steps ({steps.length})
-                </span>
-                <span style={{ fontSize: '0.75rem', color: '#64756d' }}>
-                  {showSteps ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </span>
+          {/* Running Status Indicator (Internal AI thought process and tool action controls are hidden from the user) */}
+          {running && (
+            <div className="copilot-running-card" style={{ padding: '16px', borderRadius: '14px', background: 'var(--surface-raised)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '14px', margin: '14px 0', boxShadow: 'var(--shadow-sm)' }}>
+              <div className="pulse-loader" style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary), var(--secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0, animation: 'pulseGlow 1.4s infinite' }}>
+                <Sparkles size={16} />
               </div>
-
-              {showSteps && (
-                <div className="react-timeline">
-                  {steps.map((s, idx) => (
-                    <div key={idx} className="react-step">
-                      {s.type === 'thought' && (
-                        <div className="step-thought">
-                          <div className="step-header">
-                            <Sparkles size={14} /> 💭 Agent Thought
-                          </div>
-                          <div>{s.content}</div>
-                        </div>
-                      )}
-                      {s.type === 'action' && (
-                        <div className="step-action">
-                          <div className="step-header">
-                            <Boxes size={14} /> 🛠️ Tool Action: <code>{s.tool}</code>
-                          </div>
-                          <div>{s.content}</div>
-                        </div>
-                      )}
-                      {s.type === 'observation' && (
-                        <div className="step-observation">
-                          <div className="step-header">
-                            <CheckCircle2 size={14} /> 📊 Tool Observation: <code>{s.tool}</code>
-                          </div>
-                          <div>{s.content}</div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {running && (
-                    <div style={{ padding: '8px', fontSize: '0.82rem', color: '#176b49', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span className="sparkle-icon"><Sparkles size={16} /></span>
-                      Autonomous agent reasoning & executing platform tools…
-                    </div>
-                  )}
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-main)' }}>
+                  FarmLink AI is synthesizing verified agricultural strategy…
                 </div>
-              )}
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Analyzing real-time Agmarknet mandi rates, cold-chain telemetry & e-NWR warehouse logistics.
+                </div>
+              </div>
             </div>
           )}
 

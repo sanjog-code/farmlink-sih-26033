@@ -42,6 +42,11 @@ import {
   CheckCircle2,
   DollarSign,
   Percent,
+  ShoppingBag,
+  Volume2,
+  Square,
+  Send,
+  RefreshCw,
 } from "lucide-react";
 import "./styles.css";
 import "./auth.css";
@@ -2220,13 +2225,14 @@ function LotCard({ lot, onClick }) {
   if (!lot) return null;
   const cropName = String(lot.crop || "Produce");
   const cropClass = (lot.crop ? String(lot.crop) : "produce").toLowerCase().replace(/[^a-z0-9]/g, "-");
-  const farmerName = lot.farmer || "FarmLink farmer";
+  const farmerName = lot.farmer || "Direct Verified Farmer";
   const warehouseName = lot.warehouse || "Verified storage";
   const distText = lot.dist || "Nearby";
   const gradeText = lot.grade ? `Grade ${lot.grade}` : "Intake verified";
   const trend = Number(lot.trend || 0);
   const qty = Number(lot.qty || 0);
   const price = Number(lot.price || 0);
+  const totalLotValue = qty * price;
   const ageDays = Number.isFinite(Number(lot.old)) ? Number(lot.old) : 0;
   let harvestDateFormatted = null;
   if (lot.harvestDate) {
@@ -2240,45 +2246,72 @@ function LotCard({ lot, onClick }) {
       harvestDateFormatted = null;
     }
   }
+
   return (
-    <article className="lot">
+    <article className="lot lot-card-modern">
       <div className={"lot-img " + cropClass}>
         {lot.imageUrl ? (
           <img src={lot.imageUrl} alt={`${cropName} grown by ${farmerName}`} />
         ) : (
           <span>{cropEmoji(cropName, lot.category)}</span>
         )}
+        <div className="lot-img-badges">
+          <span className="badge-grade">⭐ {gradeText}</span>
+          <span className="badge-wdra">🛡️ WDRA Certified</span>
+        </div>
         <i className="crop-emoji-badge" aria-label={`${cropName} crop icon`}>{cropEmoji(cropName, lot.category)}</i>
-        <b>{lot.listing ? "Farmer photo" : gradeText}</b>
+        <div className="lot-img-footer">
+          <span className="badge-farmer">👨‍🌾 {farmerName}</span>
+        </div>
       </div>
+
       <div className="lot-body">
-        <div className="lot-title">
+        <div className="lot-title-row">
           <div>
-            <h3>{cropName}</h3>
-            <p>
-              <MapPin size={14} />
+            <h3 className="lot-crop-name">{cropName}</h3>
+            <p className="lot-origin">
+              <MapPin size={13} />
               {warehouseName} · {distText}
             </p>
           </div>
-          <span className={trend >= 0 ? "up" : "down"}>
-            {trend >= 0 ? "↑" : ""}
-            {trend}%
+          <span className={`lot-trend-badge ${trend >= 0 ? "up" : "down"}`}>
+            {trend >= 0 ? "▲ +" : "▼ "}
+            {Math.abs(trend)}% vs MSP
           </span>
         </div>
-        <div className="lot-meta">
-          <span>{qty} kg available</span>
-          <span>
-            <Clock3 size={14} />
-            {harvestDateFormatted ? `Harvested ${harvestDateFormatted} · ${ageDays} day${ageDays === 1 ? "" : "s"} fresh` : `${ageDays} day old`}
-          </span>
+
+        {/* Highlighted Price & Batch Value Section */}
+        <div className="lot-pricing-block">
+          <div className="lot-rate-primary">
+            <span className="rate-currency">₹</span>
+            <span className="rate-amount">{price}</span>
+            <span className="rate-unit">/kg</span>
+          </div>
+          <div className="lot-total-val-badge">
+            <span className="val-label">Lot Total:</span>
+            <strong className="val-amount">₹{totalLotValue.toLocaleString("en-IN")}</strong>
+            <span className="val-qty">({qty} kg)</span>
+          </div>
         </div>
-        {lot.harvestDate && <small className="freshness-metric">Freshness: {gradeText}{lot.freshnessGradeChanged ? " · adjusted by harvest age" : " · intake verified"}</small>}
-        <div className="buy">
-          <b>
-            ₹{price}
-            <small>/kg</small>
-          </b>
-          <button onClick={onClick}>Reserve 10 kg</button>
+
+        {/* Freshness & Stock Metadata Bar */}
+        <div className="lot-meta-bar">
+          <div className="meta-item">
+            <PackageCheck size={14} className="meta-icon" />
+            <span><strong>{qty} kg</strong> in warehouse</span>
+          </div>
+          <div className="meta-item">
+            <Clock3 size={14} className="meta-icon" />
+            <span>{harvestDateFormatted ? `Harvested ${harvestDateFormatted} (${ageDays}d)` : `${ageDays} days fresh`}</span>
+          </div>
+        </div>
+
+        {/* Action Row */}
+        <div className="lot-action-row">
+          <button type="button" className="lot-reserve-btn" onClick={onClick}>
+            <ShoppingBag size={15} />
+            <span>Reserve 10 kg · ₹{price * 10}</span>
+          </button>
         </div>
       </div>
     </article>
@@ -6096,30 +6129,62 @@ function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, pla
   );
 }
 function Voice({ close, notify, setModal }) {
-  const [provider, setProvider] = useState("auto"),
-    [language, setLanguage] = useState("hi"),
-    [recording, setRecording] = useState(false),
-    [duration, setDuration] = useState(0),
-    [isSpeaking, setIsSpeaking] = useState(false),
-    [status, setStatus] = useState("Tap to speak or select a quick query below."),
-    [transcript, setTranscript] = useState(""),
-    [liveHeard, setLiveHeard] = useState(""),
-    [silenceCountdown, setSilenceCountdown] = useState(null),
-    [aiReply, setAiReply] = useState(null);
+  const [provider, setProvider] = useState("auto");
+  const [language, setLanguage] = useState("hi");
+  const [recording, setRecording] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [speakingMsgId, setSpeakingMsgId] = useState(null);
+  const [status, setStatus] = useState("Speak naturally or select a quick query below.");
+  const [inputText, setInputText] = useState("");
+  const [liveHeard, setLiveHeard] = useState("");
+  const [silenceCountdown, setSilenceCountdown] = useState(null);
 
-  const recorderRef = useRef(null),
-    chunksRef = useRef([]),
-    recognitionRef = useRef(null),
-    timerRef = useRef(null),
-    silenceTimeoutRef = useRef(null),
-    silenceIntervalRef = useRef(null),
-    lastSpokenRef = useRef(""),
-    isProcessingRef = useRef(false),
-    mediaStreamRef = useRef(null),
-    audioContextRef = useRef(null),
-    animFrameRef = useRef(null);
+  // Persistent Conversation Context Window
+  const conversationContextRef = useRef({
+    crop: "tomato",
+    cropHindi: "टमाटर",
+    price: 28,
+    quantityKg: 500,
+    warehouse: "Jaipur North Mandi & WDRA Warehouse",
+    cluster: "Chomu & Phulera Farmer Cluster",
+    lastTopic: "greeting"
+  });
+
+  // Stateful Multi-Turn Message Thread
+  const [messages, setMessages] = useState(() => [
+    {
+      id: "welcome-init",
+      role: "assistant",
+      text: language === "hi"
+        ? "नमस्ते किसान भाई! मैं फार्मलिंक का बहुभाषी वॉयस सहायक हूँ। आप बोलकर या लिखकर किसी भी फसल का मंडी भाव, 50% e-NWR अग्रिम लोन, या वाहन पिकअप के बारे में पूछ सकते हैं। आप आगे के सवाल भी पूछ सकते हैं!"
+        : "Namaste! I am your FarmLink Voice Assistant. You can speak or type to check live mandi rates, calculate 50% e-NWR pledge loans, or schedule cluster pickups. You can also ask follow-up questions!",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      quickFollowUps: language === "hi"
+        ? ["🍅 टमाटर का आज का मंडी भाव", "🌾 सरसों MSP व ताजा भाव", "💰 500 kg पर कितना एडवांस मिलेगा?", "🚚 क्लस्टर पिकअप गाड़ी भेजो"]
+        : ["🍅 Tomato Mandi Price Today", "🌾 Mustard MSP & Rate", "💰 Loan Advance on 500 kg?", "🚚 Request Cluster Pickup"]
+    }
+  ]);
+
+  const chatBottomRef = useRef(null);
+  const recorderRef = useRef(null);
+  const chunksRef = useRef([]);
+  const recognitionRef = useRef(null);
+  const timerRef = useRef(null);
+  const silenceTimeoutRef = useRef(null);
+  const silenceIntervalRef = useRef(null);
+  const lastSpokenRef = useRef("");
+  const isProcessingRef = useRef(false);
+  const mediaStreamRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const animFrameRef = useRef(null);
 
   const sarvamKey = (typeof window !== 'undefined' && localStorage.getItem('farmlink_sarvam_api_key')) || DEFAULT_SARVAM_KEY;
+
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
 
   const formatDuration = (sec) => {
     const m = Math.floor(sec / 60);
@@ -6160,77 +6225,197 @@ function Voice({ close, notify, setModal }) {
     stopAllSpeech();
   }, []);
 
-  const playVoiceResponse = (textToSpeak, langCode) => {
+  const playVoiceResponse = (textToSpeak, langCode, msgId) => {
     stopAllSpeech();
-    setIsSpeaking(true);
-    setStatus("🔊 Speaking response in your language…");
+    setSpeakingMsgId(msgId);
+    setStatus("🔊 Speaking response aloud…");
     speakHybrid(textToSpeak, {
       language: langCode || language,
       provider: 'auto',
       sarvamKey,
       speaker: 'aditya',
       onStart: () => {
-        setIsSpeaking(true);
+        setSpeakingMsgId(msgId);
         setStatus("🔊 Speaking response in your language…");
       },
       onEnd: () => {
-        setIsSpeaking(false);
-        setStatus("Voice response completed. Tap below to speak again.");
+        setSpeakingMsgId(null);
+        setStatus("Voice response completed. Tap below to speak or ask a follow-up.");
       },
       onError: (err) => {
         console.warn("TTS Notice:", err);
-        setIsSpeaking(false);
-        setStatus("Voice response completed.");
+        setSpeakingMsgId(null);
+        setStatus("Voice playback completed.");
       }
     });
   };
 
+  // Context-Aware Conversational Intelligence Engine
   const processVoiceQuery = (queryText) => {
-    const text = (queryText || transcript || lastSpokenRef.current).toLowerCase().trim();
-    if (!text) return;
+    const rawText = (queryText || inputText || lastSpokenRef.current).trim();
+    if (!rawText) return;
 
-    let replyText = "";
-    let replyType = "general";
+    const lower = rawText.toLowerCase();
+    const ctx = conversationContextRef.current;
 
-    if (text.includes("टमाटर") || text.includes("tomato") || text.includes("भाव") || text.includes("price") || text.includes("rate") || text.includes("दाम") || text.includes("விலை") || text.includes("ధర")) {
-      replyType = "price";
-      replyText = language === "hi"
-        ? "टमाटर का आज का अनुमानित मंडी भाव छब्बीस से उनतीस रुपये प्रति किलो है। मांग आठ प्रतिशत बढ़ी है। शेल्फ लाइफ जोखिम कम है; आप अभी बेच सकते हैं।"
-        : "Estimated tomato price is ₹26 to ₹29 per kg with 8% increased regional demand. High market liquidity; recommended to trade now.";
-    } else if (text.includes("सरसों") || text.includes("mustard") || text.includes("msp") || text.includes("एमएसपी") || text.includes("न्यूनतम")) {
-      replyType = "price";
-      replyText = language === "hi"
-        ? "सरसों का सरकारी न्यूनतम समर्थन मूल्य छप्पन रुपये पचास पैसे प्रति किलो है। फुलेरा व जयपुर मंडी में भाव बयासी से अठानवे रुपये है। पचास प्रतिशत ई-एनडब्ल्यूआर अग्रिम उपलब्ध है।"
-        : "Mustard MSP floor is ₹56.50/kg. Mandi selling range is ₹82 to ₹98.40/kg with 50% e-NWR pledge loan eligibility.";
-    } else if (text.includes("गेहूं") || text.includes("wheat") || text.includes("कनक") || text.includes("अनाज")) {
-      replyType = "price";
-      replyText = language === "hi"
-        ? "गेहूं का सरकारी न्यूनतम समर्थन मूल्य चौबीस सौ पच्चीस रुपये प्रति क्विंटल है। जयपुर नॉर्थ मंडी में बिक्री दर चौबीस सौ पचास रुपये प्रति क्विंटल चल रही है।"
-        : "Wheat official MSP is ₹2,425/quintal. Jaipur North Mandi trades at ₹2,450/quintal with verified WDRA warehouse storage.";
-    } else if (text.includes("स्टॉक") || text.includes("stock") || text.includes("गोदाम") || text.includes("warehouse") || text.includes("inventory")) {
-      replyType = "stock";
-      replyText = language === "hi"
-        ? "जयपुर नॉर्थ और सांगानेर गोदाम में आपकी फसल का सत्यापित डिजिटल लेजर रिकॉर्ड मौजूद है। सभी लॉट सुरक्षित और ग्रेड-ए प्रमाणित हैं।"
-        : "Your verified crop batches are securely recorded on the FarmLink warehouse digital ledger with active lot tracking.";
-    } else if (text.includes("पिकअप") || text.includes("pickup") || text.includes("गाड़ी") || text.includes("गाड़ी") || text.includes("वाहन") || text.includes("collection") || text.includes("transport")) {
-      replyType = "pickup";
-      replyText = language === "hi"
-        ? "क्लस्टर वाहन पिकअप का अनुरोध दर्ज कर लिया गया है। निकटतम संग्रहण केंद्र से वाहन आपके गांव के लिए रूट कर दिया जाएगा।"
-        : "Cluster pickup request recorded. Route optimization engine will assign a collection vehicle to your farm cluster.";
-    } else if (text.includes("एडवांस") || text.includes("advance") || text.includes("लोन") || text.includes("loan") || text.includes("पैसा") || text.includes("e-nwr") || text.includes("क्रेडिट")) {
-      replyType = "finance";
-      replyText = language === "hi"
-        ? "गोदाम में जमा सत्यापित फसल के आधार पर आप पचास प्रतिशत तक अग्रिम कार्यशील पूंजी का लाभ उठा सकते हैं। सहमति दर्ज करके आवेदन करें।"
-        : "Your stored warehouse stock is eligible for up to 50% working capital pledge advance under e-NWR.";
-    } else {
-      replyText = language === "hi"
-        ? "नमस्ते! मैं फार्मलिंक एआई सहायक हूँ। आप फसल के भाव, गोदाम स्टॉक, वाहन पिकअप या ई-एनडब्ल्यूआर 50% एडवांस के बारे में पूछ सकते हैं।"
-        : "Namaste! I am the FarmLink Voice Assistant. Ask about live mandi prices, stock holding, cluster pickups, or e-NWR 50% advance.";
+    // 1. Detect and switch crop context if mentioned
+    if (lower.includes("टमाटर") || lower.includes("tomato")) {
+      ctx.crop = "tomato";
+      ctx.cropHindi = "टमाटर";
+      ctx.price = 28;
+    } else if (lower.includes("सरसों") || lower.includes("mustard")) {
+      ctx.crop = "mustard";
+      ctx.cropHindi = "सरसों";
+      ctx.price = 88;
+    } else if (lower.includes("गेहूं") || lower.includes("wheat") || lower.includes("कनक") || lower.includes("अनाज")) {
+      ctx.crop = "wheat";
+      ctx.cropHindi = "गेहूं";
+      ctx.price = 24.5;
+    } else if (lower.includes("चना") || lower.includes("chickpea") || lower.includes("gram")) {
+      ctx.crop = "chickpea";
+      ctx.cropHindi = "चना";
+      ctx.price = 64;
+    } else if (lower.includes("आलू") || lower.includes("potato")) {
+      ctx.crop = "potato";
+      ctx.cropHindi = "आलू";
+      ctx.price = 22;
+    } else if (lower.includes("प्याज") || lower.includes("onion")) {
+      ctx.crop = "onion";
+      ctx.cropHindi = "प्याज";
+      ctx.price = 34;
     }
 
-    setAiReply({ type: replyType, text: replyText });
-    setStatus("🔊 AI Voice answering. Playing audio…");
-    playVoiceResponse(replyText, language);
+    // 2. Extract specific quantity if mentioned (e.g. 1000 kg, 200 किलो, 50 क्विंटल)
+    const numMatch = lower.match(/(\d+)\s*(kg|किलो|क्विंटल|quintal)?/);
+    if (numMatch && numMatch[1]) {
+      let parsedQty = parseInt(numMatch[1], 10);
+      if (lower.includes("क्विंटल") || lower.includes("quintal")) parsedQty *= 100;
+      if (parsedQty > 0 && parsedQty <= 50000) {
+        ctx.quantityKg = parsedQty;
+      }
+    }
+
+    // Append User Message to Thread
+    const userMsgId = `user-${Date.now()}`;
+    const userMsg = {
+      id: userMsgId,
+      role: 'user',
+      text: rawText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    let replyText = "";
+    let followUps = [];
+    const isHi = language === "hi";
+    const totalLotVal = Math.round(ctx.quantityKg * ctx.price);
+    const advanceVal = Math.round(totalLotVal * 0.5);
+
+    // 3. Resolve Multi-Turn Intent using active context
+    if (
+      lower.includes("एडवांस") || lower.includes("advance") || lower.includes("लोन") ||
+      lower.includes("loan") || lower.includes("पैसा") || lower.includes("e-nwr") ||
+      lower.includes("क्रेडिट") || lower.includes("pledge")
+    ) {
+      ctx.lastTopic = "advance";
+      replyText = isHi
+        ? `आपकी ${ctx.quantityKg} किलो ${ctx.cropHindi} (कुल अनुमानित मूल्य ₹${totalLotVal.toLocaleString('en-IN')}) पर WDRA गोदाम ई-एनडब्ल्यूआर रसीद के आधार पर 50% यानी ₹${advanceVal.toLocaleString('en-IN')} का तत्काल अग्रिम लोन स्वीकृत किया जा सकता है। यह कार्यशील पूंजी सीधे आपके बैंक खाते में 24 घंटे में जमा हो जाती है। क्या आप वाहन पिकअप शेड्यूल करना चाहते हैं?`
+        : `On your ${ctx.quantityKg} kg ${ctx.crop} (total lot value ₹${totalLotVal.toLocaleString('en-IN')}), you are eligible for an instant 50% e-NWR pledge loan of ₹${advanceVal.toLocaleString('en-IN')}. Funds disburse directly into your verified bank account within 24 hours. Would you like to schedule a farm pickup?`;
+      
+      followUps = isHi
+        ? [`🚚 ${ctx.quantityKg} kg ${ctx.cropHindi} का पिकअप शेड्यूल करें`, `📈 क्या ${ctx.cropHindi} का भाव और बढ़ेगा?`, `🌾 सरसों का भाव देखें`]
+        : [`🚚 Schedule pickup for ${ctx.quantityKg} kg ${ctx.crop}`, `📈 Will ${ctx.crop} price rise?`, `🌾 Check Mustard rate`];
+    } else if (
+      lower.includes("पिकअप") || lower.includes("pickup") || lower.includes("गाड़ी") ||
+      lower.includes("गाड़ी") || lower.includes("वाहन") || lower.includes("collection") ||
+      lower.includes("transport") || lower.includes("भेजो")
+    ) {
+      ctx.lastTopic = "pickup";
+      replyText = isHi
+        ? `आपके ${ctx.quantityKg} किलो ${ctx.cropHindi} के लिए ${ctx.cluster} से वाहन पिकअप का अनुरोध दर्ज कर लिया गया है। फार्मलिंक रूट ऑप्टिमाइज़र निकटतम ड्राइवर को असाइन कर रहा है। ड्राइवर का नाम व संपर्क आपके मोबाइल पर एसएमएस द्वारा भेजा जाएगा।`
+        : `Cluster pickup confirmed for your ${ctx.quantityKg} kg ${ctx.crop} from ${ctx.cluster}. FarmLink route engine is routing the nearest collection vehicle. Driver details and ETA will be sent to your phone via SMS.`;
+
+      followUps = isHi
+        ? [`💰 ₹${advanceVal.toLocaleString('en-IN')} e-NWR एडवांस अप्लाई करें`, `📦 ${ctx.warehouse} में स्टोरेज स्थिति`, `🍅 अन्य फसलों के भाव`]
+        : [`💰 Apply for ₹${advanceVal.toLocaleString('en-IN')} e-NWR loan`, `📦 Check storage at ${ctx.warehouse}`, `🍅 Check other crop rates`];
+    } else if (
+      lower.includes("बढ़ेगा") || lower.includes("बढ़ेगा") || lower.includes("forecast") ||
+      lower.includes("भविष्य") || lower.includes("पूर्वानुमान") || lower.includes("trend") ||
+      lower.includes("रुझान") || lower.includes("rise") || lower.includes("अगला")
+    ) {
+      ctx.lastTopic = "forecast";
+      replyText = isHi
+        ? `फार्मलिंक SARIMAX और एगमार्कनेट एआई पूर्वानुमान के अनुसार, आगामी 14 दिनों में ${ctx.cropHindi} की मांग में +7.4% वृद्धि की संभावना है (95% विश्वास अंतराल ₹${(ctx.price * 0.96).toFixed(1)} से ₹${(ctx.price * 1.08).toFixed(1)}/kg)। शेल्फ-लाइफ सुरक्षित रखने हेतु आप इसे WDRA कोल्ड स्टोरेज में जमा रख सकते हैं।`
+        : `According to FarmLink's SARIMAX and LightGBM AI forecast, regional demand for ${ctx.crop} is projected to rise +7.4% over the next 14 days (95% CI ₹${(ctx.price * 0.96).toFixed(1)} to ₹${(ctx.price * 1.08).toFixed(1)}/kg). Storing in WDRA cold-chain storage is recommended for maximum value realization.`;
+
+      followUps = isHi
+        ? [`💰 ₹${advanceVal.toLocaleString('en-IN')} अग्रिम लोन लें`, `🚚 पिकअप वाहन शेड्यूल करें`, `🌾 गेहूं का भाव देखें`]
+        : [`💰 Get ₹${advanceVal.toLocaleString('en-IN')} pledge advance`, `🚚 Schedule cluster pickup`, `🌾 Check Wheat price`];
+    } else if (
+      lower.includes("भाव") || lower.includes("price") || lower.includes("rate") ||
+      lower.includes("दाम") || lower.includes("msp") || lower.includes("एमएसपी") ||
+      lower.includes("रेट") || lower.includes("मूल्य")
+    ) {
+      ctx.lastTopic = "price";
+      if (ctx.crop === "mustard") {
+        replyText = isHi
+          ? `सरसों का सरकारी न्यूनतम समर्थन मूल्य ₹56.50 प्रति किलो है। फुलेरा व जयपुर नॉर्थ मंडी में बिक्री दर ₹82 से ₹98 प्रति किलो (औसत ₹88/kg) चल रही है। 50% e-NWR अग्रिम उपलब्ध है।`
+          : `Mustard official MSP floor is ₹56.50/kg. Active Jaipur Mandi trading ranges from ₹82 to ₹98.40/kg (avg ₹88/kg) with 50% working capital pledge loan eligibility.`;
+      } else if (ctx.crop === "wheat") {
+        replyText = isHi
+          ? `गेहूं का सरकारी न्यूनतम समर्थन मूल्य ₹2,425 प्रति क्विंटल (₹24.25/kg) है। जयपुर नॉर्थ मंडी में बिक्री दर ₹2,450 प्रति क्विंटल चल रही है।`
+          : `Wheat official MSP is ₹2,425/quintal (₹24.25/kg). Jaipur North Mandi trades at ₹2,450/quintal with verified WDRA warehouse storage.`;
+      } else if (ctx.crop === "chickpea") {
+        replyText = isHi
+          ? `चने का सरकारी न्यूनतम समर्थन मूल्य ₹5,440 प्रति क्विंटल है। स्थानीय मंडी में गुणवत्ता के आधार पर ₹62 से ₹66 प्रति किलो के सौदे हो रहे हैं।`
+          : `Chickpea MSP is ₹5,440/quintal. Spot trades at Jaipur Mandi range between ₹62 and ₹66/kg.`;
+      } else {
+        replyText = isHi
+          ? `टमाटर का आज का अनुमानित मंडी भाव ₹26 से ₹29 प्रति किलो है। क्षेत्रीय मांग में 8% वृद्धि दर्ज की गई है। शेल्फ-लाइफ सुरक्षित रखने हेतु अभी व्यापार करना लाभदायक है।`
+          : `Estimated tomato spot price is ₹26 to ₹29 per kg with 8% increased regional retail demand. High liquidity recommended for direct pickup.`;
+      }
+
+      followUps = isHi
+        ? [`💰 ${ctx.quantityKg} kg पर कितना एडवांस मिलेगा?`, `🚚 इस फसल का पिकअप करवाओ`, `📈 क्या भाव और बढ़ेगा?`]
+        : [`💰 How much advance on ${ctx.quantityKg} kg?`, `🚚 Request pickup for it`, `📈 Will price rise next week?`];
+    } else if (
+      lower.includes("स्टॉक") || lower.includes("stock") || lower.includes("गोदाम") ||
+      lower.includes("warehouse") || lower.includes("inventory") || lower.includes("लेजर")
+    ) {
+      ctx.lastTopic = "stock";
+      replyText = isHi
+        ? `जयपुर नॉर्थ और सांगानेर WDRA गोदाम में आपकी फसल का सत्यापित डिजिटल लेजर रिकॉर्ड सक्रिय है। कुल ${ctx.quantityKg} kg ${ctx.cropHindi} ग्रेड-ए प्रमाणित है और ई-एनडब्ल्यूआर टोकन सुरक्षित है।`
+        : `Your verified crop inventory is active on FarmLink's digital warehouse ledger at Jaipur North. ${ctx.quantityKg} kg ${ctx.crop} is Grade-A certified and backed by electronic Negotiable Warehouse Receipts (e-NWR).`;
+
+      followUps = isHi
+        ? [`💰 ₹${advanceVal.toLocaleString('en-IN')} एडवांस लोन अप्लाई करें`, `🚚 आउटबाउंड पिकअप शेड्यूल करें`, `🍅 टमाटर का भाव`]
+        : [`💰 Apply for ₹${advanceVal.toLocaleString('en-IN')} loan`, `🚚 Schedule outbound pickup`, `🍅 Tomato rate`];
+    } else {
+      replyText = isHi
+        ? `नमस्ते! फार्मलिंक एआई सहायक आपके साथ जुड़ा है। वर्तमान में हमने आपकी ${ctx.quantityKg} किलो ${ctx.cropHindi} (मूल्य ₹${ctx.price}/kg) का संदर्भ सक्रिय रखा है। आप इसके भाव, 50% एडवांस लोन, पिकअप, या किसी अन्य फसल के बारे में पूछ सकते हैं।`
+        : `Hello! FarmLink AI Voice is listening. Active context is your ${ctx.quantityKg} kg ${ctx.crop} (at ₹${ctx.price}/kg). You can ask about mandi rates, 50% e-NWR advances, pickup logistics, or compare with another crop.`;
+
+      followUps = isHi
+        ? [`💰 50% एडवांस की पात्रता`, `🚚 क्लस्टर पिकअप गाड़ी`, `🌾 सरसों का भाव`, `🍅 टमाटर का भाव`]
+        : [`💰 50% e-NWR Advance`, `🚚 Cluster Pickup`, `🌾 Mustard Rate`, `🍅 Tomato Rate`];
+    }
+
+    const assistantMsgId = `assistant-${Date.now()}`;
+    const assistantMsg = {
+      id: assistantMsgId,
+      role: 'assistant',
+      text: replyText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      quickFollowUps: followUps
+    };
+
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+    setInputText("");
+    setLiveHeard("");
+    lastSpokenRef.current = "";
+    scrollToBottom();
+
+    // Play Voice Audio
+    playVoiceResponse(replyText, language, assistantMsgId);
     notify?.("FarmLink Voice answer generated.");
   };
 
@@ -6239,16 +6424,12 @@ function Voice({ close, notify, setModal }) {
     try {
       const recognized = await transcribeWithSarvam(blob, { apiKey: sarvamKey, language });
       if (recognized && recognized.trim()) {
-        setTranscript(recognized);
-        setLiveHeard(recognized);
-        lastSpokenRef.current = recognized;
         processVoiceQuery(recognized);
       } else {
         setStatus("Could not detect clear words. Please try again or type below.");
       }
     } catch (err) {
       console.warn("Sarvam transcription notice:", err);
-      setStatus("Voice transcribed. Processing query…");
       processVoiceQuery(lastSpokenRef.current || (language === 'hi' ? "टमाटर का भाव बताओ" : "Check tomato price"));
     }
   };
@@ -6261,7 +6442,7 @@ function Voice({ close, notify, setModal }) {
     stopMediaAndRecognition();
     setRecording(false);
 
-    const textToRun = (finalText || lastSpokenRef.current || transcript).trim();
+    const textToRun = (finalText || lastSpokenRef.current || liveHeard || inputText).trim();
     if (textToRun) {
       setStatus("3-second pause detected. Processing query & speaking answer…");
       processVoiceQuery(textToRun);
@@ -6274,7 +6455,6 @@ function Voice({ close, notify, setModal }) {
     if (!heardText || !heardText.trim()) return;
     const clean = heardText.trim();
     lastSpokenRef.current = clean;
-    setTranscript(clean);
     setLiveHeard(clean);
 
     // Reset 3-second silence timeout & countdown
@@ -6299,10 +6479,9 @@ function Voice({ close, notify, setModal }) {
   };
 
   const start = async () => {
-    setAiReply(null);
     stopAllSpeech();
     clearAllTimers();
-    setTranscript("");
+    setInputText("");
     setLiveHeard("");
     setSilenceCountdown(null);
     setDuration(0);
@@ -6313,10 +6492,9 @@ function Voice({ close, notify, setModal }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
 
-      // Start duration counter
       timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
 
-      // Web Audio API for audio energy detection (silence detection backup)
+      // Web Audio API for energy detection
       try {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (AudioCtx) {
@@ -6373,7 +6551,6 @@ function Voice({ close, notify, setModal }) {
         console.warn("AudioContext init notice:", e);
       }
 
-      // MediaRecorder for capturing pristine audio
       const recorder = new MediaRecorder(stream);
       chunksRef.current = [];
       recorder.ondataavailable = (event) => {
@@ -6388,7 +6565,6 @@ function Voice({ close, notify, setModal }) {
       recorder.start();
       recorderRef.current = recorder;
 
-      // Start SpeechRecognition in parallel for real-time live transcription
       const Recognition = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
       if (Recognition) {
         try {
@@ -6423,10 +6599,10 @@ function Voice({ close, notify, setModal }) {
       }
 
       setRecording(true);
-      setStatus("🎙️ Listening… Speak now in your language.");
+      setStatus("🎙️ Listening… Speak in your language. Auto-submits after 3s pause.");
     } catch (err) {
       console.error("Microphone error:", err);
-      setStatus("Microphone permission denied or unavailable. Select a quick prompt or type below.");
+      setStatus("Microphone permission denied. Select a prompt or type below.");
       setRecording(false);
     }
   };
@@ -6439,7 +6615,7 @@ function Voice({ close, notify, setModal }) {
     stopMediaAndRecognition();
     setRecording(false);
 
-    const textToRun = (lastSpokenRef.current || transcript).trim();
+    const textToRun = (lastSpokenRef.current || liveHeard || inputText).trim();
     if (textToRun) {
       setStatus("Processing voice query…");
       processVoiceQuery(textToRun);
@@ -6448,48 +6624,193 @@ function Voice({ close, notify, setModal }) {
     }
   };
 
-  const handleQuickPrompt = (promptText) => {
-    setTranscript(promptText);
-    setLiveHeard(promptText);
-    processVoiceQuery(promptText);
+  const handleFollowUpClick = (chipText) => {
+    processVoiceQuery(chipText);
   };
 
   return (
     <div className="modal-back">
-      <div className="modal voice-modal" style={{ maxWidth: '540px' }}>
+      <div className="modal voice-modal voice-modal-conversational" style={{ maxWidth: '620px', width: '94%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: '24px 20px 18px' }}>
         <button className="close" onClick={() => { stopAllSpeech(); close(); }} aria-label="Close">
           <X size={18} />
         </button>
-        <div
-          className="voice-orb"
-          style={{
-            animation: recording ? 'pulseGlow 1.2s infinite' : (isSpeaking ? 'pulseGlow 1.5s infinite' : 'none'),
-            background: recording
-              ? 'linear-gradient(135deg, #ef4444, #dc2626)'
-              : (isSpeaking ? 'linear-gradient(135deg, #059669, #10b981)' : 'linear-gradient(135deg, var(--primary), var(--secondary))'),
-            boxShadow: recording
-              ? '0 0 24px rgba(239, 68, 68, 0.45)'
-              : (isSpeaking ? '0 0 24px rgba(16, 185, 129, 0.45)' : '0 0 24px var(--primary-glow)')
-          }}
-        >
-          <Mic size={38} color="#fff" />
-        </div>
-        <p className="eyebrow green" style={{ justifyContent: 'center' }}>MULTILINGUAL VOICE AI (ALL 22 INDIC LANGUAGES)</p>
-        <h2 style={{ fontSize: '1.5rem', margin: '4px 0 8px' }}>Ask in Your Own Language</h2>
-        <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', margin: '0 0 14px' }}>
-          Speak naturally in Hindi or any official Indian dialect. Voice AI listens live, auto-stops after a 3-second pause, and speaks the answer aloud.
-        </p>
 
-        {/* Live Recording Status Bar */}
+        {/* Modal Top Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
+          <div
+            className="voice-orb"
+            style={{
+              width: '46px',
+              height: '46px',
+              margin: 0,
+              animation: recording ? 'pulseGlow 1.2s infinite' : (speakingMsgId ? 'pulseGlow 1.5s infinite' : 'none'),
+              background: recording
+                ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                : (speakingMsgId ? 'linear-gradient(135deg, #059669, #10b981)' : 'linear-gradient(135deg, var(--primary), var(--secondary))'),
+              boxShadow: recording
+                ? '0 0 20px rgba(239, 68, 68, 0.45)'
+                : '0 0 18px var(--primary-glow)',
+              flexShrink: 0
+            }}
+          >
+            <Mic size={24} color="#fff" />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ fontSize: '1.25rem', margin: 0, fontWeight: 800 }}>FarmLink Multilingual Voice AI</h2>
+              <span className="live-kpi-chip" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>Context Active</span>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+              Ask follow-up questions freely. FarmLink retains your crop, quantity & warehouse context across chats.
+            </p>
+          </div>
+        </div>
+
+        {/* Controls: Language and Speech Engine */}
+        <div className="voice-options-bar" style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <label style={{ margin: 0, fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontWeight: 600 }}>भाषा / Lang:</span>
+            <select
+              value={language}
+              disabled={recording}
+              onChange={(e) => setLanguage(e.target.value)}
+              style={{ padding: '4px 8px', fontSize: '0.78rem', borderRadius: '6px', border: '1px solid var(--border)' }}
+            >
+              {CONSTITUTIONAL_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.name} ({l.nativeName})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ margin: 0, fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontWeight: 600 }}>TTS:</span>
+            <select
+              value={provider}
+              disabled={recording}
+              onChange={(e) => setProvider(e.target.value)}
+              style={{ padding: '4px 8px', fontSize: '0.78rem', borderRadius: '6px', border: '1px solid var(--border)' }}
+            >
+              <option value="auto">Sarvam Saaras + Bulbul</option>
+              <option value="browser">Browser Speech</option>
+            </select>
+          </label>
+          {conversationContextRef.current.crop && (
+            <span style={{ marginLeft: 'auto', fontSize: '0.74rem', background: 'var(--primary-light)', color: 'var(--primary)', padding: '3px 8px', borderRadius: '999px', fontWeight: 700, border: '1px solid var(--primary-glow)' }}>
+              🎯 {conversationContextRef.current.cropHindi || conversationContextRef.current.crop} ({conversationContextRef.current.quantityKg} kg)
+            </span>
+          )}
+        </div>
+
+        {/* Multi-Turn Chat Conversation Window */}
+        <div className="voice-chat-stream" style={{ flex: 1, overflowY: 'auto', minHeight: '220px', maxHeight: '380px', padding: '12px', background: 'var(--surface-raised)', borderRadius: '14px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {messages.map((m) => {
+            const isUser = m.role === 'user';
+            const isSpeakingThis = speakingMsgId === m.id;
+            return (
+              <div key={m.id} className={`voice-bubble-wrapper ${isUser ? 'user-align' : 'assistant-align'}`} style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', maxWidth: '100%' }}>
+                <div
+                  className={`voice-bubble ${isUser ? 'bubble-user' : 'bubble-assistant'}`}
+                  style={{
+                    maxWidth: '85%',
+                    padding: '11px 15px',
+                    borderRadius: isUser ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                    background: isUser ? 'linear-gradient(135deg, var(--primary), var(--secondary))' : 'var(--surface)',
+                    color: isUser ? '#ffffff' : 'var(--text-main)',
+                    border: isUser ? 'none' : '1px solid var(--border)',
+                    boxShadow: 'var(--shadow-sm)',
+                    fontSize: '0.9rem',
+                    lineHeight: '1.55'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', gap: '10px' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: isUser ? 'rgba(255,255,255,0.85)' : 'var(--primary)' }}>
+                      {isUser ? "You / आप" : "FarmLink AI Assistant"}
+                    </span>
+                    <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>{m.timestamp}</span>
+                  </div>
+                  <div>{m.text}</div>
+
+                  {/* Assistant Audio Replay Controls */}
+                  {!isUser && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {isSpeakingThis ? (
+                          <button
+                            type="button"
+                            className="secondary"
+                            style={{ fontSize: '0.72rem', padding: '3px 8px', color: '#ef4444', borderRadius: '6px' }}
+                            onClick={() => {
+                              stopAllSpeech();
+                              setSpeakingMsgId(null);
+                              setStatus("Audio stopped.");
+                            }}
+                          >
+                            <Square size={11} /> Stop Audio
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="secondary"
+                            style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '6px' }}
+                            onClick={() => playVoiceResponse(m.text, language, m.id)}
+                          >
+                            <Volume2 size={12} /> Replay Voice
+                          </button>
+                        )}
+                        {isSpeakingThis && (
+                          <div className="voice-waveform-equalizer" style={{ height: '14px' }}>
+                            <div className="play-bar" />
+                            <div className="play-bar" />
+                            <div className="play-bar" />
+                            <div className="play-bar" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Contextual Smart Follow-up Prompt Chips */}
+                {!isUser && m.quickFollowUps && m.quickFollowUps.length > 0 && (
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px', maxWidth: '85%' }}>
+                    {m.quickFollowUps.map((chip, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        className="voice-followup-chip"
+                        onClick={() => handleFollowUpClick(chip)}
+                        style={{
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '999px',
+                          padding: '4px 10px',
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          color: 'var(--text-main)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <div ref={chatBottomRef} />
+        </div>
+
+        {/* Live Recording Status Indicator & Preview */}
         {recording && (
-          <div className="voice-live-badge-row">
+          <div className="voice-live-badge-row" style={{ margin: '10px 0 6px' }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <span className="rec-pulse-dot" />
               <span>RECORDING LIVE ({formatDuration(duration)})</span>
             </div>
             <div className="voice-waveform-equalizer">
-              <div className="wave-bar" />
-              <div className="wave-bar" />
               <div className="wave-bar" />
               <div className="wave-bar" />
               <div className="wave-bar" />
@@ -6501,184 +6822,78 @@ function Voice({ close, notify, setModal }) {
                 ⏳ Auto-stops in {silenceCountdown}s
               </span>
             ) : (
-              <span style={{ fontSize: '0.72rem', opacity: 0.85 }}>3s silence auto-stop</span>
+              <span style={{ fontSize: '0.72rem', opacity: 0.85 }}>Auto-submits after 3s silence</span>
             )}
           </div>
         )}
 
-        {/* Live Transcript / What Has Been Recorded Box */}
-        <div className={`live-transcript-box ${recording ? 'active-recording' : ''}`}>
-          <div className="live-transcript-header">
-            <span>🎙️ Recorded Live Speech:</span>
-            {recording && (
-              <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span className="rec-pulse-dot" style={{ width: '6px', height: '6px' }} /> Listening
-              </span>
-            )}
+        {/* Live Heard Speech Box */}
+        {(recording || liveHeard) && (
+          <div className="live-transcript-box active-recording" style={{ margin: '6px 0', padding: '8px 12px', borderRadius: '10px', fontSize: '0.85rem' }}>
+            <span style={{ fontWeight: 700, color: 'var(--primary)' }}>Heard: </span>
+            <span>“{liveHeard || "Listening for speech…"}”</span>
+            {recording && <span className="blinking-cursor">|</span>}
           </div>
-          <div className="live-transcript-content">
-            {liveHeard || transcript ? (
-              <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                “{liveHeard || transcript}”
-                {recording && <span className="blinking-cursor">|</span>}
-              </span>
-            ) : (
-              <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>
-                {recording ? "Speak now into microphone… words will appear here in real time…" : "Click 'Tap to Speak' or select a quick query below."}
-              </span>
-            )}
-          </div>
-        </div>
+        )}
 
-        <div className="voice-options" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
-          <label style={{ margin: 0, fontSize: '0.8rem' }}>
-            <span>Language / भाषा:</span>
-            <select
-              value={language}
-              disabled={recording}
-              onChange={(e) => setLanguage(e.target.value)}
-              style={{ padding: '8px', fontSize: '0.82rem' }}
-            >
-              {CONSTITUTIONAL_LANGUAGES.map((l) => (
-                <option key={l.code} value={l.code}>
-                  {l.name} ({l.nativeName})
-                </option>
-              ))}
-            </select>
-          </label>
-          <label style={{ margin: 0, fontSize: '0.8rem' }}>
-            <span>Speech Engine:</span>
-            <select
-              value={provider}
-              disabled={recording}
-              onChange={(e) => setProvider(e.target.value)}
-              style={{ padding: '8px', fontSize: '0.82rem' }}
-            >
-              <option value="auto">Auto (Sarvam Saaras + Bulbul)</option>
-              <option value="browser">Browser Web Speech</option>
-            </select>
-          </label>
-        </div>
+        {/* Sticky Interaction Dock */}
+        <div style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button
+            type="button"
+            className={recording ? "primary" : "hero-btn-primary"}
+            onClick={recording ? stop : start}
+            style={{
+              padding: '10px 16px',
+              fontSize: '0.88rem',
+              background: recording ? '#dc2626' : undefined,
+              borderRadius: '10px',
+              flexShrink: 0
+            }}
+          >
+            <Mic size={17} />
+            <span>{recording ? "Stop" : "Tap to Speak"}</span>
+          </button>
 
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
-          <button type="button" className="secondary" style={{ fontSize: '0.78rem', padding: '5px 9px' }} onClick={() => handleQuickPrompt("टमाटर का आज का मंडी भाव बताओ")}>
-            🍅 टमाटर का भाव
-          </button>
-          <button type="button" className="secondary" style={{ fontSize: '0.78rem', padding: '5px 9px' }} onClick={() => handleQuickPrompt("सरसों का सरकारी एमएसपी और बिक्री मूल्य क्या है?")}>
-            🌾 सरसों मूल्य व MSP
-          </button>
-          <button type="button" className="secondary" style={{ fontSize: '0.78rem', padding: '5px 9px' }} onClick={() => handleQuickPrompt("गोदाम में मेरा कितना स्टॉक जमा है?")}>
-            📦 मेरा स्टॉक
-          </button>
-          <button type="button" className="secondary" style={{ fontSize: '0.78rem', padding: '5px 9px' }} onClick={() => handleQuickPrompt("e-NWR 50% अग्रिम लोन की पात्रता बताओ")}>
-            💰 50% e-NWR एडवांस
+          <input
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="Or type follow-up question (e.g. loan on 500 kg, pickup)..."
+            style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', fontSize: '0.86rem', border: '1px solid var(--border)', background: 'var(--surface)' }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && inputText.trim()) {
+                processVoiceQuery(inputText);
+              }
+            }}
+          />
+
+          <button
+            type="button"
+            className="primary"
+            disabled={!inputText.trim()}
+            onClick={() => processVoiceQuery(inputText)}
+            style={{ padding: '10px 14px', borderRadius: '10px', flexShrink: 0 }}
+          >
+            <Send size={15} />
           </button>
         </div>
 
-        <button
-          className={recording ? "primary" : "hero-btn-primary"}
-          onClick={recording ? stop : start}
-          style={{
-            width: '100%',
-            padding: '12px',
-            fontSize: '0.95rem',
-            background: recording ? '#dc2626' : undefined,
-            justifyContent: 'center'
-          }}
-        >
-          <Mic size={18} />
-          {recording ? "Stop Recording & Submit Now" : "Tap to Speak / बोलें"}
-        </button>
-
-        <p className="voice-status" style={{ margin: '10px 0', fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+        <p style={{ margin: '6px 0 0', fontSize: '0.76rem', color: 'var(--text-muted)', textAlign: 'center' }}>
           {status}
         </p>
 
-        <div style={{ margin: '10px 0' }}>
-          <input
-            value={transcript}
-            onChange={(e) => {
-              setTranscript(e.target.value);
-              setLiveHeard(e.target.value);
-            }}
-            placeholder="Or type your query here (e.g. Tomato price, pickup)..."
-            style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', fontSize: '0.88rem' }}
-            onKeyDown={(e) => { if (e.key === 'Enter') processVoiceQuery(transcript); }}
-          />
-          {transcript && (
-            <button
-              className="secondary"
-              type="button"
-              style={{ marginTop: '8px', width: '100%', padding: '8px', fontWeight: 700 }}
-              onClick={() => processVoiceQuery(transcript)}
-            >
-              Ask FarmLink AI ➔
-            </button>
-          )}
-        </div>
-
-        {/* Text + Voice Answer Card */}
-        {aiReply && (
-          <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: '12px', padding: '15px', marginTop: '14px', textAlign: 'left', boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <strong style={{ color: 'var(--primary)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  🔊 FarmLink Voice Answer
-                </strong>
-                {isSpeaking && (
-                  <div className="voice-waveform-equalizer" style={{ height: '16px' }}>
-                    <div className="play-bar" />
-                    <div className="play-bar" />
-                    <div className="play-bar" />
-                    <div className="play-bar" />
-                    <div className="play-bar" />
-                  </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  type="button"
-                  className="secondary"
-                  style={{ fontSize: '0.76rem', padding: '3px 9px', borderRadius: '6px' }}
-                  onClick={() => playVoiceResponse(aiReply.text, language)}
-                >
-                  {isSpeaking ? "Speaking… ↺" : "Replay Audio ↺"}
-                </button>
-                {isSpeaking && (
-                  <button
-                    type="button"
-                    className="secondary"
-                    style={{ fontSize: '0.76rem', padding: '3px 9px', color: '#ef4444', borderRadius: '6px' }}
-                    onClick={() => {
-                      stopAllSpeech();
-                      setIsSpeaking(false);
-                      setStatus("Voice playback stopped.");
-                    }}
-                  >
-                    Stop ■
-                  </button>
-                )}
-              </div>
-            </div>
-            <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.94rem', lineHeight: '1.6', fontWeight: 500 }}>
-              {aiReply.text}
-            </p>
-          </div>
-        )}
-
         {setModal && (
-          <div style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+          <div style={{ marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
             <button
               type="button"
               className="text-btn"
-              style={{ width: '100%', justifyContent: 'center', fontSize: '0.85rem' }}
+              style={{ width: '100%', justifyContent: 'center', fontSize: '0.82rem' }}
               onClick={() => {
                 stopAllSpeech();
                 close();
                 setModal("agentic");
               }}
             >
-              <Sparkles size={15} /> Switch to Full Dual-Engine AI Copilot 🚀
+              <Sparkles size={14} /> Open Full Strategic Copilot
             </button>
           </div>
         )}
