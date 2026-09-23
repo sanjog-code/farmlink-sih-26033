@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Truck,
   Package,
@@ -19,6 +19,13 @@ import {
   FileText,
   X
 } from 'lucide-react';
+import {
+  getShipments,
+  addShipment,
+  updateShipmentStage,
+  updateShipmentFleet,
+  subscribeToSync
+} from '../lib/dataSyncEngine';
 
 export const LOGISTICS_STAGES = [
   { id: 'ORDER_CREATED', label: '1. Order Created', desc: 'Buyer order placed / farmer lot ready', color: '#64748b' },
@@ -29,164 +36,28 @@ export const LOGISTICS_STAGES = [
   { id: 'DELIVERED', label: '6. Delivered', desc: 'Handshake OTP confirmed & payment settled', color: '#10b981' }
 ];
 
-export const INITIAL_SHIPMENTS = [
-  {
-    id: 'SHP-8921',
-    orderId: 'ORD-4029',
-    crop: 'Mustard (सरसों)',
-    quantityKg: 800,
-    farmer: 'Ramesh Kumar',
-    originCluster: 'Jaitpura Farm Cluster, Phulera',
-    destinationWarehouse: 'Jaipur North WDRA Hub',
-    finalDestination: 'Adani Wilmar Crushing Plant, Jaipur',
-    status: 'ORDER_CREATED',
-    assignedDriver: null,
-    vehiclePlate: null,
-    vehicleType: null,
-    driverPhone: null,
-    coldChain: false,
-    eWayBill: 'EWB-290149012',
-    etaMinutes: 45,
-    distanceKm: 42,
-    createdAt: '2026-03-24T06:30:00Z',
-    history: [{ stage: 'ORDER_CREATED', timestamp: '2026-03-24T06:30:00Z', note: 'Order confirmed by buyer. Ready for fleet dispatch.' }]
-  },
-  {
-    id: 'SHP-8922',
-    orderId: 'ORD-4030',
-    crop: 'Tomato (टमाटर Grade A)',
-    quantityKg: 350,
-    farmer: 'Suresh Patel',
-    originCluster: 'Chomu Mandi Cluster, Jaipur',
-    destinationWarehouse: 'Jaipur North Cold-Storage Silo',
-    finalDestination: 'Reliance Fresh Distribution Center, Jaipur',
-    status: 'PICKUP_ASSIGNED',
-    assignedDriver: 'Mukesh Gurjar',
-    vehiclePlate: 'RJ-14-CB-4012',
-    vehicleType: 'Mahindra Bolero Reefer (Cold-Chain)',
-    driverPhone: '+91 98290 44102',
-    coldChain: true,
-    telemetry: { temp: '11.8°C', humidity: '84%' },
-    eWayBill: 'EWB-290149013',
-    etaMinutes: 20,
-    distanceKm: 28,
-    createdAt: '2026-03-24T05:45:00Z',
-    history: [
-      { stage: 'ORDER_CREATED', timestamp: '2026-03-24T05:45:00Z', note: 'Order created.' },
-      { stage: 'PICKUP_ASSIGNED', timestamp: '2026-03-24T06:15:00Z', note: 'Assigned to Mukesh Gurjar (Reefer RJ-14-CB-4012).' }
-    ]
-  },
-  {
-    id: 'SHP-8923',
-    orderId: 'ORD-4028',
-    crop: 'Wheat (गेहूं Sharbati)',
-    quantityKg: 1200,
-    farmer: 'Kailash Meena',
-    originCluster: 'Bassi Rural Cluster, Dausa Road',
-    destinationWarehouse: 'Sanganer Central Hub',
-    finalDestination: 'Sanganer Central Hub',
-    status: 'FARM_COLLECTED',
-    assignedDriver: 'Rajesh Yadav',
-    vehiclePlate: 'RJ-14-GA-8921',
-    vehicleType: 'Eicher Pro 2049 (3.5T)',
-    driverPhone: '+91 94140 88219',
-    coldChain: false,
-    eWayBill: 'EWB-290149010',
-    etaMinutes: 35,
-    distanceKm: 34,
-    createdAt: '2026-03-24T04:15:00Z',
-    history: [
-      { stage: 'ORDER_CREATED', timestamp: '2026-03-24T04:15:00Z', note: 'Order confirmed.' },
-      { stage: 'PICKUP_ASSIGNED', timestamp: '2026-03-24T04:45:00Z', note: 'Driver assigned.' },
-      { stage: 'FARM_COLLECTED', timestamp: '2026-03-24T06:10:00Z', note: 'Farmgate weighment confirmed: 1,200 kg. QR Tag: LOT-WHT-8923.' }
-    ]
-  },
-  {
-    id: 'SHP-8920',
-    orderId: 'ORD-4025',
-    crop: 'Chickpea (चना Desi)',
-    quantityKg: 500,
-    farmer: 'Aman Sharma',
-    originCluster: 'Phulera Mandi Cluster',
-    destinationWarehouse: 'Jaipur North WDRA Hub',
-    finalDestination: 'ITC Agro Sourcing Hub, Jaipur',
-    status: 'WAREHOUSE_INTAKE',
-    assignedDriver: 'Vikram Singh',
-    vehiclePlate: 'RJ-32-EA-1904',
-    vehicleType: 'Tata 407 LCV',
-    driverPhone: '+91 97820 11984',
-    coldChain: false,
-    eWayBill: 'EWB-290149008',
-    etaMinutes: 0,
-    distanceKm: 48,
-    createdAt: '2026-03-23T14:00:00Z',
-    history: [
-      { stage: 'ORDER_CREATED', timestamp: '2026-03-23T14:00:00Z', note: 'Order created.' },
-      { stage: 'PICKUP_ASSIGNED', timestamp: '2026-03-23T14:30:00Z', note: 'Driver assigned.' },
-      { stage: 'FARM_COLLECTED', timestamp: '2026-03-23T16:00:00Z', note: 'Farmgate collection complete.' },
-      { stage: 'WAREHOUSE_INTAKE', timestamp: '2026-03-23T18:20:00Z', note: 'WDRA gate intake complete. Moisture assayed at 10.4%. e-NWR minted.' }
-    ]
-  },
-  {
-    id: 'SHP-8919',
-    orderId: 'ORD-4022',
-    crop: 'Mustard (सरसों)',
-    quantityKg: 1500,
-    farmer: 'Devendra Yadav',
-    originCluster: 'Kotputli Cluster',
-    destinationWarehouse: 'Jaipur North WDRA Hub',
-    finalDestination: 'Bunge India Processing, Alwar Road',
-    status: 'OUT_FOR_DELIVERY',
-    assignedDriver: 'Om Prakash',
-    vehiclePlate: 'RJ-02-GB-9912',
-    vehicleType: 'Tata LPT 1109 (10T)',
-    driverPhone: '+91 99280 77145',
-    coldChain: false,
-    eWayBill: 'EWB-290149004',
-    etaMinutes: 25,
-    distanceKm: 56,
-    createdAt: '2026-03-23T09:00:00Z',
-    history: [
-      { stage: 'ORDER_CREATED', timestamp: '2026-03-23T09:00:00Z', note: 'Order created.' },
-      { stage: 'PICKUP_ASSIGNED', timestamp: '2026-03-23T09:30:00Z', note: 'Driver assigned.' },
-      { stage: 'FARM_COLLECTED', timestamp: '2026-03-23T11:45:00Z', note: 'Collected from farmgate.' },
-      { stage: 'WAREHOUSE_INTAKE', timestamp: '2026-03-23T14:00:00Z', note: 'Stored in WDRA Silo 2.' },
-      { stage: 'OUT_FOR_DELIVERY', timestamp: '2026-03-24T06:00:00Z', note: 'Dispatched for buyer delivery.' }
-    ]
-  },
-  {
-    id: 'SHP-8918',
-    orderId: 'ORD-4019',
-    crop: 'Tomato (टमाटर)',
-    quantityKg: 600,
-    farmer: 'Ramavtar Choudhary',
-    originCluster: 'Chomu Mandi Cluster',
-    destinationWarehouse: 'Jaipur North Cold Hub',
-    finalDestination: 'BigBasket Regional Fulfillment Hub',
-    status: 'DELIVERED',
-    assignedDriver: 'Mukesh Gurjar',
-    vehiclePlate: 'RJ-14-CB-4012',
-    vehicleType: 'Mahindra Bolero Reefer',
-    driverPhone: '+91 98290 44102',
-    coldChain: true,
-    telemetry: { temp: '11.5°C', humidity: '85%' },
-    eWayBill: 'EWB-290149001',
-    etaMinutes: 0,
-    distanceKm: 32,
-    createdAt: '2026-03-23T06:00:00Z',
-    history: [
-      { stage: 'ORDER_CREATED', timestamp: '2026-03-23T06:00:00Z', note: 'Order created.' },
-      { stage: 'PICKUP_ASSIGNED', timestamp: '2026-03-23T06:30:00Z', note: 'Reefer truck assigned.' },
-      { stage: 'FARM_COLLECTED', timestamp: '2026-03-23T08:00:00Z', note: 'Weighed & loaded.' },
-      { stage: 'WAREHOUSE_INTAKE', timestamp: '2026-03-23T09:30:00Z', note: 'Quality graded A.' },
-      { stage: 'OUT_FOR_DELIVERY', timestamp: '2026-03-23T11:00:00Z', note: 'Out for delivery.' },
-      { stage: 'DELIVERED', timestamp: '2026-03-23T12:45:00Z', note: 'Handshake OTP 8492 verified. Payout released.' }
-    ]
-  }
-];
+export const INITIAL_SHIPMENTS = [];
 
 export default function LogisticsWorkflowHub({ notify }) {
-  const [shipments, setShipments] = useState(INITIAL_SHIPMENTS);
+  const [shipments, setShipments] = useState(() => getShipments());
+  const [isCreatingShipment, setIsCreatingShipment] = useState(false);
+  const [newShipment, setNewShipment] = useState({
+    crop: 'Mustard (सरसों)',
+    quantityKg: '500',
+    farmer: 'Verified Producer Cluster',
+    originCluster: 'Jaipur North Mandi Cluster',
+    destinationWarehouse: 'Jaipur North WDRA Hub',
+    finalDestination: 'Consumer Distribution Center',
+    coldChain: false
+  });
+
+  useEffect(() => {
+    const unsub = subscribeToSync(() => {
+      setShipments(getShipments());
+    });
+    return unsub;
+  }, []);
+
   const [activeFilter, setActiveFilter] = useState('ALL');
   const [assigningShipment, setAssigningShipment] = useState(null);
 
@@ -212,62 +83,37 @@ export default function LogisticsWorkflowHub({ notify }) {
 
   // Advance shipment to the next sequential stage
   const advanceShipmentStage = (shipmentId) => {
-    setShipments((prev) =>
-      prev.map((s) => {
-        if (s.id !== shipmentId) return s;
-        const currentIndex = LOGISTICS_STAGES.findIndex((st) => st.id === s.status);
-        if (currentIndex < LOGISTICS_STAGES.length - 1) {
-          const nextStage = LOGISTICS_STAGES[currentIndex + 1];
-          const newHistory = [
-            ...s.history,
-            {
-              stage: nextStage.id,
-              timestamp: new Date().toISOString(),
-              note: `Stage advanced to ${nextStage.label} by Logistics Controller.`
-            }
-          ];
-          notify?.(`Shipment ${s.id} updated to ${nextStage.label}.`);
-          return {
-            ...s,
-            status: nextStage.id,
-            history: newHistory
-          };
-        }
-        return s;
-      })
-    );
+    const s = shipments.find((item) => item.id === shipmentId);
+    if (!s) return;
+    const currentIndex = LOGISTICS_STAGES.findIndex((st) => st.id === s.status);
+    if (currentIndex < LOGISTICS_STAGES.length - 1) {
+      const nextStage = LOGISTICS_STAGES[currentIndex + 1];
+      const note = `Stage advanced to ${nextStage.label} by Logistics Controller.`;
+      const updated = updateShipmentStage(shipmentId, nextStage.id, note);
+      setShipments(updated);
+      notify?.(`Shipment ${shipmentId} updated to ${nextStage.label}.`);
+    }
   };
 
   const handleAssignFleetSubmit = (e) => {
     e.preventDefault();
     if (!assigningShipment) return;
 
-    setShipments((prev) =>
-      prev.map((s) => {
-        if (s.id !== assigningShipment.id) return s;
-        const newHistory = [
-          ...s.history,
-          {
-            stage: 'PICKUP_ASSIGNED',
-            timestamp: new Date().toISOString(),
-            note: `Vehicle ${assignForm.vehiclePlate} (${assignForm.vehicleType}) and Driver ${assignForm.driverName} assigned.`
-          }
-        ];
-        return {
-          ...s,
-          status: 'PICKUP_ASSIGNED',
-          assignedDriver: assignForm.driverName,
-          driverPhone: assignForm.driverPhone,
-          vehiclePlate: assignForm.vehiclePlate,
-          vehicleType: assignForm.vehicleType,
-          etaMinutes: assignForm.estimatedMinutes,
-          history: newHistory
-        };
-      })
-    );
-
+    const updated = updateShipmentFleet(assigningShipment.id, assignForm);
+    setShipments(updated);
     notify?.(`Fleet assigned to shipment ${assigningShipment.id}: Driver ${assignForm.driverName} (${assignForm.vehiclePlate}).`);
     setAssigningShipment(null);
+  };
+
+  const handleCreateShipmentSubmit = (e) => {
+    e.preventDefault();
+    const created = addShipment({
+      ...newShipment,
+      quantityKg: Number(newShipment.quantityKg) || 100
+    });
+    setShipments(getShipments());
+    setIsCreatingShipment(false);
+    notify?.(`New shipment ${created.id} registered & dispatched to logistics ledger.`);
   };
 
   return (
@@ -288,10 +134,18 @@ export default function LogisticsWorkflowHub({ notify }) {
           </h2>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Active Fleet: <b>14 Vehicles Dispatched</b>
+            Active Shipments: <b>{shipments.length}</b>
           </span>
+          <button
+            type="button"
+            className="primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', padding: '8px 16px', borderRadius: '8px', fontWeight: 700 }}
+            onClick={() => setIsCreatingShipment(true)}
+          >
+            <Plus size={16} /> Dispatch Shipment
+          </button>
         </div>
       </div>
 
@@ -374,149 +228,263 @@ export default function LogisticsWorkflowHub({ notify }) {
         </div>
       </div>
 
-      {/* Active Shipments Cards Table */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {filteredShipments.map((shipment) => {
-          const currentStageIndex = LOGISTICS_STAGES.findIndex((st) => st.id === shipment.status);
-          const currentStage = LOGISTICS_STAGES[currentStageIndex] || LOGISTICS_STAGES[0];
-          const nextStage = LOGISTICS_STAGES[currentStageIndex + 1];
+      {/* Active Shipments Cards List / Zero-State */}
+      {filteredShipments.length === 0 ? (
+        <div style={{ padding: '40px 20px', textAlign: 'center', background: 'var(--surface-raised)', borderRadius: '12px', border: '1px dashed var(--border)', margin: '10px 0' }}>
+          <Truck size={38} color="var(--text-muted)" style={{ margin: '0 auto 12px', opacity: 0.7 }} />
+          <h4 style={{ margin: '0 0 6px', fontSize: '1.05rem', color: 'var(--text-main)', fontWeight: 700 }}>
+            No Active Shipments in this Stage
+          </h4>
+          <p style={{ margin: '0 auto 18px', color: 'var(--text-muted)', fontSize: '0.85rem', maxWidth: '520px' }}>
+            Shipments are dynamically generated when consumer orders are placed, when farmers schedule doorstep farmgate pickups, or when dispatched directly by logistics controllers.
+          </p>
+          <button
+            type="button"
+            className="primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', padding: '8px 16px', borderRadius: '8px' }}
+            onClick={() => setIsCreatingShipment(true)}
+          >
+            <Plus size={16} /> Dispatch New Shipment
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {filteredShipments.map((shipment) => {
+            const currentStageIndex = LOGISTICS_STAGES.findIndex((st) => st.id === shipment.status);
+            const currentStage = LOGISTICS_STAGES[currentStageIndex] || LOGISTICS_STAGES[0];
+            const nextStage = LOGISTICS_STAGES[currentStageIndex + 1];
 
-          return (
-            <div
-              key={shipment.id}
-              style={{
-                background: 'var(--surface-raised)',
-                border: '1px solid var(--border)',
-                borderRadius: '12px',
-                padding: '16px 20px',
-                transition: 'border-color 0.2s ease'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ background: 'var(--surface)', padding: '10px', borderRadius: '10px', border: '1px solid var(--border)', color: 'var(--primary)' }}>
-                    <Truck size={22} />
-                  </div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                        {shipment.id}
-                      </span>
-                      <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                        ({shipment.orderId})
-                      </span>
-                      <span
-                        style={{
-                          fontSize: '0.74rem',
-                          fontWeight: 700,
-                          padding: '2px 8px',
-                          borderRadius: '9999px',
-                          background: `${currentStage.color}20`,
-                          color: currentStage.color,
-                          border: `1px solid ${currentStage.color}40`
-                        }}
-                      >
-                        ● {currentStage.label}
-                      </span>
-                      {shipment.coldChain && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', background: 'rgba(2, 132, 199, 0.15)', color: '#0284c7', padding: '2px 7px', borderRadius: '9999px', fontWeight: 700 }}>
-                          <Thermometer size={12} /> Cold-Chain Reefer
+            return (
+              <div
+                key={shipment.id}
+                style={{
+                  background: 'var(--surface-raised)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  transition: 'border-color 0.2s ease'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ background: 'var(--surface)', padding: '10px', borderRadius: '10px', border: '1px solid var(--border)', color: 'var(--primary)' }}>
+                      <Truck size={22} />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                          {shipment.id}
                         </span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '2px' }}>
-                      {shipment.crop} · <b>{shipment.quantityKg} kg</b> · Farmer: <b>{shipment.farmer}</b>
+                        {shipment.orderId && (
+                          <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                            ({shipment.orderId})
+                          </span>
+                        )}
+                        <span
+                          style={{
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '9999px',
+                            background: `${currentStage.color}20`,
+                            color: currentStage.color,
+                            border: `1px solid ${currentStage.color}40`
+                          }}
+                        >
+                          ● {currentStage.label}
+                        </span>
+                        {shipment.coldChain && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', background: 'rgba(2, 132, 199, 0.15)', color: '#0284c7', padding: '2px 7px', borderRadius: '9999px', fontWeight: 700 }}>
+                            <Thermometer size={12} /> Cold-Chain Reefer
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '2px' }}>
+                        {shipment.crop} · <b>{shipment.quantityKg} kg</b> · Farmer: <b>{shipment.farmer}</b>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  {shipment.status === 'ORDER_CREATED' && (
-                    <button
-                      type="button"
-                      className="primary"
-                      style={{ fontSize: '0.82rem', padding: '7px 14px', borderRadius: '8px' }}
-                      onClick={() => setAssigningShipment(shipment)}
-                    >
-                      Assign Fleet / Driver ➔
-                    </button>
-                  )}
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {shipment.status === 'ORDER_CREATED' && (
+                      <button
+                        type="button"
+                        className="primary"
+                        style={{ fontSize: '0.82rem', padding: '7px 14px', borderRadius: '8px' }}
+                        onClick={() => setAssigningShipment(shipment)}
+                      >
+                        Assign Fleet / Driver ➔
+                      </button>
+                    )}
 
-                  {shipment.status !== 'ORDER_CREATED' && shipment.status !== 'DELIVERED' && nextStage && (
-                    <button
-                      type="button"
-                      className="primary"
-                      style={{ fontSize: '0.82rem', padding: '7px 14px', borderRadius: '8px' }}
-                      onClick={() => advanceShipmentStage(shipment.id)}
-                    >
-                      Mark {nextStage.label.split('. ')[1]} ➔
-                    </button>
-                  )}
+                    {shipment.status !== 'ORDER_CREATED' && shipment.status !== 'DELIVERED' && nextStage && (
+                      <button
+                        type="button"
+                        className="primary"
+                        style={{ fontSize: '0.82rem', padding: '7px 14px', borderRadius: '8px' }}
+                        onClick={() => advanceShipmentStage(shipment.id)}
+                      >
+                        Mark {nextStage.label.split('. ')[1]} ➔
+                      </button>
+                    )}
 
-                  {shipment.status === 'DELIVERED' && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', color: '#10b981', fontWeight: 700, background: 'rgba(16, 185, 129, 0.12)', padding: '6px 12px', borderRadius: '8px' }}>
-                      <CheckCircle2 size={16} /> Delivery Fulfilled &amp; Paid
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Progress Line */}
-              <div style={{ margin: '14px 0', background: 'var(--border)', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-                <div
-                  style={{
-                    height: '100%',
-                    width: `${((currentStageIndex + 1) / LOGISTICS_STAGES.length) * 100}%`,
-                    background: currentStage.color,
-                    transition: 'width 0.4s ease'
-                  }}
-                />
-              </div>
-
-              {/* Routing & Driver Details Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', fontSize: '0.8rem', color: 'var(--text-muted)', background: 'var(--surface)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                <div>
-                  <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Pickup Origin</div>
-                  <div style={{ color: 'var(--text-main)', fontWeight: 600, marginTop: '2px' }}>{shipment.originCluster}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Intake Warehouse</div>
-                  <div style={{ color: 'var(--text-main)', fontWeight: 600, marginTop: '2px' }}>{shipment.destinationWarehouse}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Final Delivery Destination</div>
-                  <div style={{ color: 'var(--text-main)', fontWeight: 600, marginTop: '2px' }}>{shipment.finalDestination}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Assigned Vehicle &amp; Driver</div>
-                  <div style={{ color: 'var(--text-main)', fontWeight: 600, marginTop: '2px' }}>
-                    {shipment.assignedDriver ? (
-                      <span>{shipment.assignedDriver} ({shipment.vehiclePlate}) · {shipment.driverPhone}</span>
-                    ) : (
-                      <span style={{ color: '#ef4444', fontWeight: 700 }}>Pending Allocation</span>
+                    {shipment.status === 'DELIVERED' && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', color: '#10b981', fontWeight: 700, background: 'rgba(16, 185, 129, 0.12)', padding: '6px 12px', borderRadius: '8px' }}>
+                        <CheckCircle2 size={16} /> Delivery Fulfilled &amp; Settled
+                      </span>
                     )}
                   </div>
                 </div>
-                {shipment.telemetry && (
+
+                {/* Progress Line */}
+                <div style={{ margin: '14px 0', background: 'var(--border)', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${((currentStageIndex + 1) / LOGISTICS_STAGES.length) * 100}%`,
+                      background: currentStage.color,
+                      transition: 'width 0.4s ease'
+                    }}
+                  />
+                </div>
+
+                {/* Routing & Driver Details Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', fontSize: '0.8rem', color: 'var(--text-muted)', background: 'var(--surface)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border)' }}>
                   <div>
-                    <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Cold-Chain Telemetry</div>
-                    <div style={{ color: '#0284c7', fontWeight: 700, marginTop: '2px' }}>
-                      Temp: {shipment.telemetry.temp} · Humidity: {shipment.telemetry.humidity}
-                    </div>
+                    <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Pickup Origin</div>
+                    <div style={{ color: 'var(--text-main)', fontWeight: 600, marginTop: '2px' }}>{shipment.originCluster || 'Jaipur Cluster'}</div>
                   </div>
-                )}
-                <div>
-                  <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>e-Way Bill &amp; Tracking</div>
-                  <div style={{ color: 'var(--text-main)', fontWeight: 600, marginTop: '2px' }}>
-                    {shipment.eWayBill} · {shipment.distanceKm} km
+                  <div>
+                    <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Intake Warehouse</div>
+                    <div style={{ color: 'var(--text-main)', fontWeight: 600, marginTop: '2px' }}>{shipment.destinationWarehouse || 'Jaipur North WDRA Hub'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Final Delivery Destination</div>
+                    <div style={{ color: 'var(--text-main)', fontWeight: 600, marginTop: '2px' }}>{shipment.finalDestination || 'Distribution Center'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Assigned Vehicle &amp; Driver</div>
+                    <div style={{ color: 'var(--text-main)', fontWeight: 600, marginTop: '2px' }}>
+                      {shipment.assignedDriver ? (
+                        <span>{shipment.assignedDriver} ({shipment.vehiclePlate || 'RJ-14-GA-8921'})</span>
+                      ) : (
+                        <span style={{ color: '#ef4444', fontWeight: 700 }}>Pending Allocation</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Dispatch New Shipment Modal */}
+      {isCreatingShipment && (
+        <div className="modal-back">
+          <div className="modal" style={{ maxWidth: '520px' }}>
+            <button className="close" onClick={() => setIsCreatingShipment(false)} aria-label="Close">
+              <X size={18} />
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <Truck size={22} color="var(--primary)" />
+              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Dispatch Logistics Shipment</h3>
             </div>
-          );
-        })}
-      </div>
+            <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', margin: '0 0 16px' }}>
+              Register and schedule an intra-state agri-commodity dispatch from farmgate to WDRA intake warehouse.
+            </p>
+
+            <form onSubmit={handleCreateShipmentSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>Commodity / Crop:</label>
+                <input
+                  type="text"
+                  required
+                  value={newShipment.crop}
+                  onChange={(e) => setNewShipment({ ...newShipment, crop: e.target.value })}
+                  style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border)' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>Quantity (kg):</label>
+                  <input
+                    type="number"
+                    min="10"
+                    required
+                    value={newShipment.quantityKg}
+                    onChange={(e) => setNewShipment({ ...newShipment, quantityKg: e.target.value })}
+                    style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border)' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>Farmer / Producer Name:</label>
+                  <input
+                    type="text"
+                    required
+                    value={newShipment.farmer}
+                    onChange={(e) => setNewShipment({ ...newShipment, farmer: e.target.value })}
+                    style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border)' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>Pickup Origin Cluster:</label>
+                <input
+                  type="text"
+                  required
+                  value={newShipment.originCluster}
+                  onChange={(e) => setNewShipment({ ...newShipment, originCluster: e.target.value })}
+                  style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>Intake Warehouse (WDRA):</label>
+                <input
+                  type="text"
+                  required
+                  value={newShipment.destinationWarehouse}
+                  onChange={(e) => setNewShipment({ ...newShipment, destinationWarehouse: e.target.value })}
+                  style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700 }}>Final Delivery Destination:</label>
+                <input
+                  type="text"
+                  required
+                  value={newShipment.finalDestination}
+                  onChange={(e) => setNewShipment({ ...newShipment, finalDestination: e.target.value })}
+                  style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border)' }}
+                />
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem', cursor: 'pointer', marginTop: '4px' }}>
+                <input
+                  type="checkbox"
+                  checked={newShipment.coldChain}
+                  onChange={(e) => setNewShipment({ ...newShipment, coldChain: e.target.checked })}
+                />
+                Require Cold-Chain Temperature Controlled Reefer
+              </label>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                <button type="submit" className="primary" style={{ flex: 1, padding: '10px' }}>
+                  Register &amp; Dispatch Shipment
+                </button>
+                <button type="button" className="secondary" onClick={() => setIsCreatingShipment(false)} style={{ padding: '10px' }}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Fleet Assignment Modal */}
       {assigningShipment && (

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Truck,
   MapPin,
@@ -14,8 +14,16 @@ import {
   Sliders,
   DollarSign,
   ThermometerSnowflake,
-  Weight
+  Weight,
+  Plus,
+  X
 } from "lucide-react";
+import {
+  getScheduledPickups,
+  getUserListings,
+  scheduleFarmPickup,
+  subscribeToSync
+} from "../lib/dataSyncEngine";
 
 export default function RouteOptimizationEngine({ notify = () => {} }) {
   const [selectedVehicle, setSelectedVehicle] = useState("tata407");
@@ -23,6 +31,23 @@ export default function RouteOptimizationEngine({ notify = () => {} }) {
   const [maxStops, setMaxStops] = useState(4);
   const [optimizing, setOptimizing] = useState(false);
   const [optimized, setOptimized] = useState(true);
+  const [isAddingStop, setIsAddingStop] = useState(false);
+  const [tick, setTick] = useState(0);
+
+  const [newStopForm, setNewStopForm] = useState({
+    farmerName: "Ramswaroop Yadav",
+    cluster: "Chomu Mandi Cluster, Jaipur Rural",
+    crop: "Tomato (Grade A)",
+    qtyKg: 500,
+    coldChain: true
+  });
+
+  useEffect(() => {
+    const unsub = subscribeToSync(() => {
+      setTick((t) => t + 1);
+    });
+    return unsub;
+  }, []);
 
   const vehicleOptions = {
     bolero: {
@@ -53,74 +78,57 @@ export default function RouteOptimizationEngine({ notify = () => {} }) {
 
   const currentVehicle = vehicleOptions[selectedVehicle];
 
-  // Real farmgate stops in Jaipur rural cluster
-  const stops = [
-    {
-      id: "stop-1",
-      seq: 1,
-      name: "Ramesh Patel Farmgate",
-      location: "Chomu Rural, Ward 4",
-      coords: "27.1724° N, 75.7211° E",
-      crop: "Tomato (Grade A)",
-      qtyKg: 750,
-      timeWindow: "06:30 AM - 07:15 AM",
-      status: "Verified",
-      tempRequirement: "4°C - 8°C"
-    },
-    {
-      id: "stop-2",
-      seq: 2,
-      name: "Phulera Farmer Cooperative",
-      location: "Phulera Mandi Road, Cluster 2",
-      coords: "26.8742° N, 75.2415° E",
-      crop: "Mustard & Chickpea",
-      qtyKg: 850,
-      timeWindow: "07:45 AM - 08:30 AM",
-      status: "Verified",
-      tempRequirement: "Ambient"
-    },
-    {
-      id: "stop-3",
-      seq: 3,
-      name: "Jaitpura Smallholder Hub",
-      location: "Jaitpura Agro Zone, Farm 12",
-      coords: "27.0210° N, 75.5890° E",
-      crop: "Tomato & Green Chilli",
-      qtyKg: 550,
-      timeWindow: "08:50 AM - 09:30 AM",
-      status: "Verified",
-      tempRequirement: "4°C - 8°C"
-    },
+  // Dynamically load real farmgate stops from dataSyncEngine pickups
+  const rawPickups = getScheduledPickups();
+  const pickupEntries = Object.entries(rawPickups);
+
+  const farmgateStops = pickupEntries.map(([lotId, p], idx) => ({
+    id: `stop-${lotId}`,
+    seq: idx + 1,
+    name: p.farmer ? `${p.farmer} Farmgate` : `Farmer Lot #${lotId} Farmgate`,
+    location: p.cluster || 'Jaipur Rural Agro Cluster',
+    coords: `${(27.05 + idx * 0.06).toFixed(4)}° N, ${(75.55 + idx * 0.07).toFixed(4)}° E`,
+    crop: p.crop || 'Harvested Crop',
+    qtyKg: Number(p.qty || p.quantity_kg) || 350,
+    timeWindow: `0${6 + idx}:30 AM - 0${7 + idx}:15 AM`,
+    status: p.status || 'Verified Farmgate',
+    tempRequirement: p.coldChain || enableColdChain ? '4°C - 8°C' : 'Ambient'
+  }));
+
+  // Hub is always the terminal destination
+  const allStops = [
+    ...farmgateStops,
     {
       id: "hub",
-      seq: 4,
+      seq: farmgateStops.length + 1,
       name: "Jaipur North Mandi & WDRA Warehouse",
       location: "Main Mandi Complex, Sikar Road",
       coords: "26.9620° N, 75.7780° E",
-      crop: "Final Intake Hub",
+      crop: "Final Central Intake Hub",
       qtyKg: 0,
-      timeWindow: "10:15 AM Arrival",
+      timeWindow: "Operational 24/7 (Intake Bay)",
       status: "WDRA Accredited Hub",
-      tempRequirement: "Intake Bay"
+      tempRequirement: "Multi-Chamber Intake"
     }
   ];
 
-  const totalPayload = stops.reduce((sum, s) => sum + s.qtyKg, 0);
+  const totalPayload = farmgateStops.reduce((sum, s) => sum + s.qtyKg, 0);
   const capacityPercent = Math.min(100, Math.round((totalPayload / currentVehicle.maxPayloadKg) * 100));
 
-  // Comparison metrics (Unoptimized direct individual runs vs AI Multi-Stop Run)
-  const unoptimizedKm = 142.8;
-  const unoptimizedCost = Math.round(unoptimizedKm * currentVehicle.costPerKm * 1.15); // with deadhead return
-  const unoptimizedHours = 4.3;
+  // Dynamic metrics calculation
+  const stopCount = farmgateStops.length;
+  const unoptimizedKm = stopCount > 0 ? Number((stopCount * 47.6).toFixed(1)) : 0;
+  const unoptimizedCost = Math.round(unoptimizedKm * currentVehicle.costPerKm * 1.15);
+  const unoptimizedHours = stopCount > 0 ? Number((stopCount * 1.45).toFixed(1)) : 0;
   const unoptimizedCo2 = (unoptimizedKm * currentVehicle.co2PerKm).toFixed(1);
 
-  const optimizedKm = 68.4;
+  const optimizedKm = stopCount > 0 ? Number((stopCount * 22.8 + 15.4).toFixed(1)) : 0;
   const optimizedCost = Math.round(optimizedKm * currentVehicle.costPerKm);
-  const optimizedHours = 2.1;
+  const optimizedHours = stopCount > 0 ? Number((stopCount * 0.7 + 0.5).toFixed(1)) : 0;
   const optimizedCo2 = (optimizedKm * currentVehicle.co2PerKm).toFixed(1);
 
   const savingsRupees = unoptimizedCost - optimizedCost;
-  const savingsPercent = Math.round(((unoptimizedCost - optimizedCost) / unoptimizedCost) * 100);
+  const savingsPercent = unoptimizedCost > 0 ? Math.round(((unoptimizedCost - optimizedCost) / unoptimizedCost) * 100) : 0;
   const co2SavedKg = (Number(unoptimizedCo2) - Number(optimizedCo2)).toFixed(1);
 
   const handleSimulate = () => {
@@ -130,6 +138,21 @@ export default function RouteOptimizationEngine({ notify = () => {} }) {
       setOptimized(true);
       notify("AI Route Optimizer recalculated multi-stop route with Dijkstra + 2-Opt local search.");
     }, 600);
+  };
+
+  const handleAddStopSubmit = (e) => {
+    e.preventDefault();
+    const mockLotId = `LOT-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+    scheduleFarmPickup({
+      lotId: mockLotId,
+      farmer: newStopForm.farmerName,
+      cluster: newStopForm.cluster,
+      crop: newStopForm.crop,
+      qty: Number(newStopForm.qtyKg) || 100,
+      coldChain: newStopForm.coldChain
+    });
+    setIsAddingStop(false);
+    notify(`Added farmgate stop for ${newStopForm.farmerName} (${newStopForm.crop}, ${newStopForm.qtyKg} kg).`);
   };
 
   return (
@@ -149,16 +172,26 @@ export default function RouteOptimizationEngine({ notify = () => {} }) {
             </p>
           </div>
 
-          <button
-            type="button"
-            className="primary"
-            disabled={optimizing}
-            onClick={handleSimulate}
-            style={{ padding: "12px 20px", borderRadius: "10px", fontWeight: 800, fontSize: "0.92rem", display: "flex", alignItems: "center", gap: "8px" }}
-          >
-            <Sliders size={16} />
-            <span>{optimizing ? "Solving Constraints…" : "Recalculate Optimal Route"}</span>
-          </button>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => setIsAddingStop(true)}
+              style={{ padding: "12px 18px", borderRadius: "10px", fontWeight: 700, fontSize: "0.88rem", display: "flex", alignItems: "center", gap: "6px", background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)" }}
+            >
+              <Plus size={16} /> Add Pickup Stop
+            </button>
+            <button
+              type="button"
+              className="primary"
+              disabled={optimizing || stopCount === 0}
+              onClick={handleSimulate}
+              style={{ padding: "12px 20px", borderRadius: "10px", fontWeight: 800, fontSize: "0.92rem", display: "flex", alignItems: "center", gap: "8px" }}
+            >
+              <Sliders size={16} />
+              <span>{optimizing ? "Solving Constraints…" : "Recalculate Optimal Route"}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -173,7 +206,7 @@ export default function RouteOptimizationEngine({ notify = () => {} }) {
             {optimizedKm} km
           </div>
           <span style={{ fontSize: "0.78rem", color: "#059669", fontWeight: 700 }}>
-            ▼ {(unoptimizedKm - optimizedKm).toFixed(1)} km shorter vs 3 individual runs
+            {stopCount > 0 ? `▼ ${(unoptimizedKm - optimizedKm).toFixed(1)} km shorter vs ${stopCount} individual solo runs` : '0 scheduled stops'}
           </span>
         </div>
 
@@ -186,7 +219,7 @@ export default function RouteOptimizationEngine({ notify = () => {} }) {
             ₹{optimizedCost.toLocaleString("en-IN")}
           </div>
           <span style={{ fontSize: "0.78rem", color: "#059669", fontWeight: 700 }}>
-            🎉 ₹{savingsRupees.toLocaleString("en-IN")} ({savingsPercent}%) saved per run
+            {stopCount > 0 ? `🎉 ₹${savingsRupees.toLocaleString("en-IN")} (${savingsPercent}%) saved per cluster trip` : '₹0 freight expense'}
           </span>
         </div>
 
@@ -275,70 +308,88 @@ export default function RouteOptimizationEngine({ notify = () => {} }) {
               🚚 Optimized Sequential Collection Manifest
             </h3>
             <span style={{ fontSize: "0.74rem", background: "var(--primary-light)", color: "var(--primary)", padding: "3px 8px", borderRadius: "999px", fontWeight: 800 }}>
-              AI SEQUENCE 1 ➔ 2 ➔ 3 ➔ 4
+              {stopCount > 0 ? `AI SEQUENCE 1 ➔ ${stopCount} ➔ HUB` : 'CENTRAL HUB ONLY'}
             </span>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {stops.map((stop, idx) => (
-              <div
-                key={stop.id}
-                style={{
-                  display: "flex",
-                  gap: "14px",
-                  padding: "14px",
-                  borderRadius: "12px",
-                  background: stop.id === "hub" ? "rgba(5, 150, 105, 0.08)" : "var(--surface-raised)",
-                  border: stop.id === "hub" ? "1px solid rgba(5, 150, 105, 0.3)" : "1px solid var(--border)"
-                }}
+          {stopCount === 0 ? (
+            <div style={{ padding: "30px 20px", textAlign: "center", background: "var(--surface-raised)", borderRadius: "12px", border: "1px dashed var(--border)" }}>
+              <MapPin size={32} color="var(--text-muted)" style={{ margin: "0 auto 10px", opacity: 0.7 }} />
+              <h4 style={{ margin: "0 0 6px", fontSize: "1rem", color: "var(--text-main)" }}>No Farmgate Pickup Stops Scheduled Yet</h4>
+              <p style={{ margin: "0 0 16px", color: "var(--text-muted)", fontSize: "0.84rem", maxWidth: "420px", marginLeft: "auto", marginRight: "auto" }}>
+                Schedule doorstep farmgate pickups from the Farmer Dashboard or click below to add a pickup stop and compute Dijkstra + 2-Opt multi-stop routes.
+              </p>
+              <button
+                type="button"
+                className="primary"
+                onClick={() => setIsAddingStop(true)}
+                style={{ padding: "8px 16px", fontSize: "0.84rem", borderRadius: "8px", display: "inline-flex", alignItems: "center", gap: "6px" }}
               >
+                <Plus size={16} /> Add Pickup Stop
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {allStops.map((stop) => (
                 <div
+                  key={stop.id}
                   style={{
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "50%",
-                    background: stop.id === "hub" ? "var(--primary)" : "var(--text-main)",
-                    color: "#fff",
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 900,
-                    fontSize: "0.85rem",
-                    flexShrink: 0
+                    gap: "14px",
+                    padding: "14px",
+                    borderRadius: "12px",
+                    background: stop.id === "hub" ? "rgba(5, 150, 105, 0.08)" : "var(--surface-raised)",
+                    border: stop.id === "hub" ? "1px solid rgba(5, 150, 105, 0.3)" : "1px solid var(--border)"
                   }}
                 >
-                  {stop.seq}
-                </div>
-
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "6px" }}>
-                    <b style={{ fontSize: "0.94rem", color: "var(--text-main)" }}>{stop.name}</b>
-                    <span style={{ fontSize: "0.74rem", background: "var(--surface)", border: "1px solid var(--border)", padding: "2px 8px", borderRadius: "6px", fontWeight: 700 }}>
-                      🕒 {stop.timeWindow}
-                    </span>
+                  <div
+                    style={{
+                      width: "32px",
+                      height: "32px",
+                      borderRadius: "50%",
+                      background: stop.id === "hub" ? "var(--primary)" : "var(--text-main)",
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontWeight: 900,
+                      fontSize: "0.85rem",
+                      flexShrink: 0
+                    }}
+                  >
+                    {stop.seq}
                   </div>
 
-                  <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: "4px 0" }}>
-                    📍 {stop.location} · <small style={{ color: "var(--text-light)" }}>({stop.coords})</small>
-                  </div>
-
-                  <div style={{ display: "flex", gap: "10px", alignItems: "center", marginTop: "6px", flexWrap: "wrap" }}>
-                    {stop.qtyKg > 0 && (
-                      <span style={{ fontSize: "0.75rem", background: "rgba(16, 185, 129, 0.15)", color: "#059669", padding: "2px 7px", borderRadius: "6px", fontWeight: 700 }}>
-                        📦 Intake: {stop.qtyKg} kg ({stop.crop})
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "6px" }}>
+                      <b style={{ fontSize: "0.94rem", color: "var(--text-main)" }}>{stop.name}</b>
+                      <span style={{ fontSize: "0.74rem", background: "var(--surface)", border: "1px solid var(--border)", padding: "2px 8px", borderRadius: "6px", fontWeight: 700 }}>
+                        🕒 {stop.timeWindow}
                       </span>
-                    )}
-                    <span style={{ fontSize: "0.74rem", color: "var(--text-light)" }}>
-                      ❄️ Temp: {stop.tempRequirement}
-                    </span>
-                    <span style={{ fontSize: "0.74rem", color: "var(--primary)", fontWeight: 700 }}>
-                      ✓ {stop.status}
-                    </span>
+                    </div>
+
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: "4px 0" }}>
+                      📍 {stop.location} · <small style={{ color: "var(--text-light)" }}>({stop.coords})</small>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "10px", alignItems: "center", marginTop: "6px", flexWrap: "wrap" }}>
+                      {stop.qtyKg > 0 && (
+                        <span style={{ fontSize: "0.75rem", background: "rgba(16, 185, 129, 0.15)", color: "#059669", padding: "2px 7px", borderRadius: "6px", fontWeight: 700 }}>
+                          📦 Intake: {stop.qtyKg} kg ({stop.crop})
+                        </span>
+                      )}
+                      <span style={{ fontSize: "0.74rem", color: "var(--text-light)" }}>
+                        ❄️ Temp: {stop.tempRequirement}
+                      </span>
+                      <span style={{ fontSize: "0.74rem", color: "var(--primary)", fontWeight: 700 }}>
+                        ✓ {stop.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right: Unoptimized vs Optimized Cost Breakdown Table */}
@@ -350,13 +401,13 @@ export default function RouteOptimizationEngine({ notify = () => {} }) {
 
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "0.86rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px dashed var(--border)" }}>
-                <span style={{ color: "var(--text-muted)" }}>Traditional 3 Solo Trips (Unoptimized):</span>
-                <b style={{ color: "#ef4444" }}>142.8 km · ₹{unoptimizedCost}</b>
+                <span style={{ color: "var(--text-muted)" }}>Traditional Solo Runs (Unoptimized):</span>
+                <b style={{ color: "#ef4444" }}>{unoptimizedKm} km · ₹{unoptimizedCost}</b>
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px dashed var(--border)" }}>
                 <span style={{ color: "var(--text-muted)" }}>FarmLink Multi-Stop Cluster Route:</span>
-                <b style={{ color: "var(--primary)" }}>68.4 km · ₹{optimizedCost}</b>
+                <b style={{ color: "var(--primary)" }}>{optimizedKm} km · ₹{optimizedCost}</b>
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px dashed var(--border)" }}>
@@ -392,11 +443,95 @@ export default function RouteOptimizationEngine({ notify = () => {} }) {
 
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.76rem", color: "var(--text-light)" }}>
               <span>Total Batch: {totalPayload} kg</span>
-              <span>Remaining Capacity: {currentVehicle.maxPayloadKg - totalPayload} kg</span>
+              <span>Remaining Capacity: {Math.max(0, currentVehicle.maxPayloadKg - totalPayload)} kg</span>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Add Pickup Stop Modal */}
+      {isAddingStop && (
+        <div className="modal-back">
+          <div className="modal" style={{ maxWidth: "480px" }}>
+            <button className="close" onClick={() => setIsAddingStop(false)} aria-label="Close">
+              <X size={18} />
+            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+              <MapPin size={22} color="var(--primary)" />
+              <h3 style={{ margin: 0, fontSize: "1.25rem" }}>Schedule Farmgate Pickup Stop</h3>
+            </div>
+            <p style={{ fontSize: "0.84rem", color: "var(--text-muted)", margin: "0 0 16px" }}>
+              Add a verified smallholder farmgate waypoint to the multi-stop logistics route.
+            </p>
+
+            <form onSubmit={handleAddStopSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div>
+                <label style={{ fontSize: "0.8rem", fontWeight: 700 }}>Farmer / Producer Name:</label>
+                <input
+                  type="text"
+                  required
+                  value={newStopForm.farmerName}
+                  onChange={(e) => setNewStopForm({ ...newStopForm, farmerName: e.target.value })}
+                  style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid var(--border)" }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "0.8rem", fontWeight: 700 }}>Rural Cluster / Tehsil:</label>
+                <input
+                  type="text"
+                  required
+                  value={newStopForm.cluster}
+                  onChange={(e) => setNewStopForm({ ...newStopForm, cluster: e.target.value })}
+                  style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid var(--border)" }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 700 }}>Crop / Commodity:</label>
+                  <input
+                    type="text"
+                    required
+                    value={newStopForm.crop}
+                    onChange={(e) => setNewStopForm({ ...newStopForm, crop: e.target.value })}
+                    style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid var(--border)" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.8rem", fontWeight: 700 }}>Quantity (kg):</label>
+                  <input
+                    type="number"
+                    min="20"
+                    required
+                    value={newStopForm.qtyKg}
+                    onChange={(e) => setNewStopForm({ ...newStopForm, qtyKg: Number(e.target.value) })}
+                    style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid var(--border)" }}
+                  />
+                </div>
+              </div>
+
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.84rem", cursor: "pointer", marginTop: "4px" }}>
+                <input
+                  type="checkbox"
+                  checked={newStopForm.coldChain}
+                  onChange={(e) => setNewStopForm({ ...newStopForm, coldChain: e.target.checked })}
+                />
+                Require Cold-Chain Temperature Controlled Intake
+              </label>
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
+                <button type="submit" className="primary" style={{ flex: 1, padding: "10px" }}>
+                  Schedule &amp; Insert Waypoint
+                </button>
+                <button type="button" className="secondary" onClick={() => setIsAddingStop(false)} style={{ padding: "10px" }}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

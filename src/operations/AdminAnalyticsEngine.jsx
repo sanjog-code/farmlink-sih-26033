@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { subscribeToSync } from '../lib/dataSyncEngine';
 import {
   TrendingUp,
   DollarSign,
@@ -17,6 +18,14 @@ import {
 } from 'lucide-react';
 
 export default function AdminAnalyticsEngine({ lots = [], orders = [] }) {
+  const [, setLiveTick] = useState(0);
+
+  useEffect(() => {
+    const unsub = subscribeToSync(() => {
+      setLiveTick((t) => t + 1);
+    });
+    return unsub;
+  }, []);
   const [timeframe, setTimeframe] = useState('30D'); // 7D, 30D, QTD, FY
   const [clusterFilter, setClusterFilter] = useState('all');
 
@@ -141,6 +150,20 @@ export default function AdminAnalyticsEngine({ lots = [], orders = [] }) {
               </button>
             ))}
           </div>
+        </div>
+      </div>
+
+            {/* Real-Time Platform Activity Live Ribbon */}
+      <div style={{ background: 'rgba(5, 150, 105, 0.08)', border: '1px solid rgba(5, 150, 105, 0.25)', borderRadius: '12px', padding: '12px 18px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 8px #10b981' }} />
+          <strong style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>Live Synced Reactive Ledger:</strong>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            <b>{lots.length}</b> Active Farmer Listings · <b>{orders.length}</b> Live Consumer Orders · <b>{orders.reduce((sum, o) => sum + (Number(o.quantityKg || o.qty) || 0), 0) + lots.reduce((sum, l) => sum + (Number(l.qty || l.quantity_kg) || 0), 0)} kg</b> Volume Synced
+          </span>
+        </div>
+        <div style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 700 }}>
+          ⚡ Intra-Tab &amp; Cross-Window Broadcast Active
         </div>
       </div>
 

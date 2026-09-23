@@ -24,13 +24,13 @@ export default function FailureDisputeEngine({ notify = () => {} }) {
       id: "rejection",
       title: "Warehouse QC Grade Rejection",
       icon: <ShieldAlert size={20} color="#ef4444" />,
-      trigger: "Intake lot #FL-24091 moisture content 14.8% exceeds WDRA Grade-A standard (max 12.0%).",
+      trigger: "Intake lot moisture content (e.g. 14.8%) exceeds WDRA Grade-A standard (max 12.0%).",
       impact: "High risk of dispute or farmer distress selling.",
       failoverAction: "3-Way Digital Arbitration Protocol",
       steps: [
-        "1. Instant Notification: Mobile alert & SMS dispatched to farmer Ramesh Patel with digital moisture spectrometer telemetry evidence.",
+        "1. Instant Notification: Mobile alert & SMS dispatched to registered producer with digital NIR spectrometer telemetry evidence.",
         "2. Independent Assayer Inspection: 3rd party accredited assayer re-tests sample within 4 hours at government certified lab.",
-        "3. Automatic Secondary Diversion: If Grade-B confirmed, automated switch to regional food processing / bio-fuel off-taker at guaranteed floor price (₹62/kg), avoiding rejection return freight.",
+        "3. Automatic Secondary Diversion: If Grade-B confirmed, automated switch to regional food processing / bio-fuel off-taker at guaranteed floor price, avoiding rejection return freight.",
         "4. No Farmer Penalty: Zero storage charge levied during the 4-hour arbitration window."
       ],
       resolutionStatus: "Arbitration Protocol Verified & Active"
@@ -39,13 +39,13 @@ export default function FailureDisputeEngine({ notify = () => {} }) {
       id: "shortage",
       title: "Farmer Stock Shortage at Farmgate",
       icon: <BadgeAlert size={20} color="#f59e0b" />,
-      trigger: "Farmer listed 800 kg Mustard, but actual farmgate weighment yields only 620 kg (180 kg deficit due to pest loss).",
+      trigger: "Produce listed with target weight, but actual calibrated farmgate weighment yields deficit due to sorting/drying loss.",
       impact: "Buyer wholesale order delivery at risk of partial fulfillment.",
       failoverAction: "Automated Proximity Cluster Fulfillment",
       steps: [
-        "1. Real-Time Deficit Detection: Smart weighing scale auto-syncs actual net weight (620 kg) to digital dispatch ledger.",
-        "2. Cluster Auto-Fill: FarmLink matching engine immediately queries adjacent farmer cluster within 12 km (Phulera Cooperative).",
-        "3. Instant 180 kg Top-up: Reserve lot from verified farmer Suresh Meena is dynamically attached to the same transit vehicle.",
+        "1. Real-Time Deficit Detection: Smart electronic weighing scale auto-syncs actual net weight to digital dispatch ledger.",
+        "2. Cluster Auto-Fill: FarmLink matching engine immediately queries adjacent farmer cluster within 12 km radius.",
+        "3. Instant Cluster Top-up: Reserve lot from verified cluster producer is dynamically attached to the same transit vehicle.",
         "4. Buyer Order Unaffected: 100% of order fulfilled on schedule without delay or penalty."
       ],
       resolutionStatus: "Proximity Failover Auto-Triggered"

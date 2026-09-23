@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Building2,
   Users,
@@ -13,76 +13,73 @@ import {
   Scale,
   DollarSign,
   Truck,
-  Award
+  Award,
+  X
 } from "lucide-react";
+import {
+  getFpoBatches,
+  createFpoBatch,
+  subscribeToSync,
+  getUserListings
+} from "../lib/dataSyncEngine";
+import { getMspFloorForCrop } from "../lib/mspRates";
 
 export default function FpoCollectiveHub({ notify = () => {} }) {
   const [activeTab, setActiveTab] = useState("batches");
-  const [contractModal, setContractModal] = useState(null);
+  const [batches, setBatches] = useState(() => getFpoBatches());
+  const [isCreatingBatch, setIsCreatingBatch] = useState(false);
+  const [newBatch, setNewBatch] = useState({
+    crop: "Mustard",
+    totalQtyKg: "2500",
+    collectivePrice: "85.00",
+    warehouse: "Jaipur North Mandi WDRA Hub",
+    buyerContract: "BigBasket Regional Sourcing Hub"
+  });
+
+  useEffect(() => {
+    const unsub = subscribeToSync(() => {
+      setBatches(getFpoBatches());
+    });
+    return unsub;
+  }, []);
+
+  const activePoolKg = batches.reduce((sum, b) => sum + (Number(b.totalQtyKg) || 0), 0);
+  const totalMemberFarmers = batches.reduce((sum, b) => sum + (Number(b.contributingFarmersCount) || (b.farmers?.length || 1)), 0);
+
+  const handleCreateBatch = (e) => {
+    e.preventDefault();
+    const floor = getMspFloorForCrop(newBatch.crop)?.price || 25;
+    if (Number(newBatch.collectivePrice) < floor) {
+      return notify(`Collective price cannot be below official MSP floor of ₹${floor.toFixed(2)}/kg.`);
+    }
+    const created = createFpoBatch({
+      crop: newBatch.crop,
+      totalQtyKg: Number(newBatch.totalQtyKg),
+      targetMsp: floor,
+      collectivePrice: Number(newBatch.collectivePrice),
+      contributingFarmersCount: 1,
+      farmers: [
+        { name: "Verified Member Producer", land: "Phulera Cluster", qty: Number(newBatch.totalQtyKg), sharePercent: 100, payout: Number(newBatch.totalQtyKg) * Number(newBatch.collectivePrice) }
+      ],
+      warehouse: newBatch.warehouse,
+      status: "Aggregated & Certified",
+      buyerContract: newBatch.buyerContract
+    });
+    setBatches((prev) => [created, ...prev.filter(b => b.id !== created.id)]);
+    setIsCreatingBatch(false);
+    notify(`FPO Batch ${created.id} aggregated successfully and synced in real-time.`);
+  };
 
   // FPO Profile Data
   const fpoProfile = {
     name: "Kisan Samriddhi Farmer Producer Company Ltd (FPO)",
     regNo: "FPO-RJ-2024-8812 / SFAC Recognized",
     cluster: "Chomu - Phulera Rural Belt, Jaipur District",
-    totalMembers: 428,
-    activePoolKg: 15500,
+    totalMembers: Math.max(totalMemberFarmers, batches.length ? totalMemberFarmers : 0),
+    activePoolKg: activePoolKg,
     collectiveRealizationRate: "89.4%",
     bankEscrowAccount: "SBI A/C XXXXXX4821 (FPO Common Pool)"
   };
-
-  // Aggregated Collective Batches (Multiple smallholder farmers pooled together)
-  const [batches, setBatches] = useState([
-    {
-      id: "FPO-BATCH-01",
-      crop: "Mustard (Grade A)",
-      totalQtyKg: 4500,
-      targetMsp: 56.50,
-      collectivePrice: 88.00,
-      contributingFarmersCount: 14,
-      farmers: [
-        { name: "Ramesh Patel", qty: 450, sharePercent: 10.0, payout: 39600 },
-        { name: "Suresh Meena", qty: 600, sharePercent: 13.3, payout: 52800 },
-        { name: "Kailash Gurjar", qty: 350, sharePercent: 7.8, payout: 30800 },
-        { name: "Manoj Sharma", qty: 500, sharePercent: 11.1, payout: 44000 },
-        { name: "10 other smallholders", qty: 2600, sharePercent: 57.8, payout: 228800 }
-      ],
-      warehouse: "Jaipur North Mandi WDRA Hub",
-      status: "Aggregated & Certified",
-      buyerContract: "BigBasket Direct Supply Contract #BB-2026-99"
-    },
-    {
-      id: "FPO-BATCH-02",
-      crop: "Lokwan Wheat (Grade A)",
-      totalQtyKg: 8200,
-      targetMsp: 24.25,
-      collectivePrice: 28.50,
-      contributingFarmersCount: 22,
-      farmers: [
-        { name: "Bhanwar Singh", qty: 800, sharePercent: 9.8, payout: 22800 },
-        { name: "Deepak Yadav", qty: 650, sharePercent: 7.9, payout: 18525 },
-        { name: "20 other smallholders", qty: 6750, sharePercent: 82.3, payout: 192375 }
-      ],
-      warehouse: "Sanganer Cold & Grain Hub",
-      status: "In Transit to Warehouse",
-      buyerContract: "Taj Hospitality Bulk Supply Order"
-    },
-    {
-      id: "FPO-BATCH-03",
-      crop: "Desi Chickpea (Chana)",
-      totalQtyKg: 2800,
-      targetMsp: 54.40,
-      collectivePrice: 65.00,
-      contributingFarmersCount: 9,
-      farmers: [
-        { name: "Hukma Ram", qty: 500, sharePercent: 17.8, payout: 32500 },
-        { name: "8 other smallholders", qty: 2300, sharePercent: 82.2, payout: 149500 }
-      ],
-      warehouse: "Phulera Rural Depot",
-      status: "Ready for Dispatch",
-      buyerContract: "Awaiting Final Procurement Confirmation"
-    }
-  ]);
 
   // Bulk Buyer Institutional Contracts
   const institutionalContracts = [
@@ -238,93 +235,125 @@ export default function FpoCollectiveHub({ notify = () => {} }) {
       {/* Tab 1: Pooled Collective Batches */}
       {activeTab === "batches" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {batches.map((batch) => (
-            <div
-              key={batch.id}
-              style={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                borderRadius: "14px",
-                padding: "20px",
-                boxShadow: "var(--shadow-sm)"
-              }}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+            <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+              Aggregate fragmented member harvests into high-margin institutional lots.
+            </span>
+            <button
+              type="button"
+              className="primary"
+              style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "0.82rem" }}
+              onClick={() => setIsCreatingBatch(true)}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", marginBottom: "14px" }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: "var(--text-main)" }}>
-                      {batch.crop}
-                    </h3>
-                    <span style={{ fontSize: "0.75rem", background: "var(--primary-light)", color: "var(--primary)", padding: "3px 8px", borderRadius: "6px", fontWeight: 800 }}>
-                      {batch.id}
-                    </span>
-                    <span style={{ fontSize: "0.75rem", background: "rgba(16, 185, 129, 0.15)", color: "#059669", padding: "3px 8px", borderRadius: "6px", fontWeight: 700 }}>
-                      ✓ {batch.status}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: "0.84rem", color: "var(--text-muted)", marginTop: "4px" }}>
-                    🏛️ Storage: {batch.warehouse} · Contract: <b>{batch.buyerContract}</b>
-                  </div>
-                </div>
+              <Plus size={15} /> + Create Pooling Batch
+            </button>
+          </div>
 
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: "1.45rem", fontWeight: 900, color: "var(--primary)" }}>
-                    ₹{batch.collectivePrice}/kg
-                  </div>
-                  <small style={{ color: "var(--text-light)" }}>
-                    MSP Floor: ₹{batch.targetMsp}/kg (+₹{(batch.collectivePrice - batch.targetMsp).toFixed(2)} premium)
-                  </small>
-                </div>
-              </div>
-
-              {/* Aggregation Breakdown Pill Bar */}
-              <div style={{ background: "var(--surface-raised)", border: "1px solid var(--border)", borderRadius: "10px", padding: "12px 16px", marginBottom: "14px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
-                <div>
-                  <small style={{ color: "var(--text-light)", textTransform: "uppercase", fontSize: "0.7rem", fontWeight: 700 }}>Total Batch Quantity</small>
-                  <div style={{ fontWeight: 900, fontSize: "1.1rem", color: "var(--text-main)" }}>
-                    {batch.totalQtyKg.toLocaleString("en-IN")} kg
-                  </div>
-                </div>
-                <div>
-                  <small style={{ color: "var(--text-light)", textTransform: "uppercase", fontSize: "0.7rem", fontWeight: 700 }}>Total Batch Value</small>
-                  <div style={{ fontWeight: 900, fontSize: "1.1rem", color: "var(--primary)" }}>
-                    ₹{(batch.totalQtyKg * batch.collectivePrice).toLocaleString("en-IN")}
-                  </div>
-                </div>
-                <div>
-                  <small style={{ color: "var(--text-light)", textTransform: "uppercase", fontSize: "0.7rem", fontWeight: 700 }}>Pooled Farmers</small>
-                  <div style={{ fontWeight: 900, fontSize: "1.1rem", color: "var(--text-main)" }}>
-                    {batch.contributingFarmersCount} Smallholders
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => notify(`Generating full transparent audit manifest for ${batch.id}…`)}
-                  style={{ fontSize: "0.82rem", padding: "6px 14px", borderRadius: "8px" }}
-                >
-                  <FileCheck size={14} /> View Audit Manifest
-                </button>
-              </div>
-
-              {/* Member Farmers Mini Table */}
-              <div>
-                <b style={{ fontSize: "0.84rem", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
-                  Member Farmer Allocation &amp; Payout Share:
-                </b>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "8px" }}>
-                  {batch.farmers.map((farmer, fIdx) => (
-                    <div key={fIdx} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px", padding: "8px 12px", fontSize: "0.8rem" }}>
-                      <div style={{ fontWeight: 700, color: "var(--text-main)" }}>{farmer.name}</div>
-                      <div style={{ color: "var(--text-muted)", fontSize: "0.74rem" }}>
-                        {farmer.qty} kg ({farmer.sharePercent}%) ➔ <strong style={{ color: "var(--primary)" }}>₹{farmer.payout.toLocaleString("en-IN")}</strong>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+          {batches.length === 0 ? (
+            <div style={{ background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: "14px", padding: "32px", textAlign: "center", color: "var(--text-muted)" }}>
+              <PackageCheck size={36} color="var(--primary)" style={{ marginBottom: "8px" }} />
+              <h4 style={{ margin: "0 0 6px", color: "var(--text-main)" }}>No Pooled Collective Batches Yet</h4>
+              <p style={{ margin: "0 0 16px", fontSize: "0.86rem", maxWidth: "540px", marginLeft: "auto", marginRight: "auto" }}>
+                Farmers and FPO coordinators can pool individual harvest lots to meet institutional minimum order quantities (MOQs) and negotiate premium corporate pricing.
+              </p>
+              <button
+                type="button"
+                className="primary"
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "0.85rem" }}
+                onClick={() => setIsCreatingBatch(true)}
+              >
+                <Plus size={16} /> Create First Pooled Batch
+              </button>
             </div>
-          ))}
+          ) : (
+            batches.map((batch) => (
+              <div
+                key={batch.id}
+                style={{
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "14px",
+                  padding: "20px",
+                  boxShadow: "var(--shadow-sm)"
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", marginBottom: "14px" }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 900, color: "var(--text-main)" }}>
+                        {batch.crop}
+                      </h3>
+                      <span style={{ fontSize: "0.75rem", background: "var(--primary-light)", color: "var(--primary)", padding: "3px 8px", borderRadius: "6px", fontWeight: 800 }}>
+                        {batch.id}
+                      </span>
+                      <span style={{ fontSize: "0.75rem", background: "rgba(16, 185, 129, 0.15)", color: "#059669", padding: "3px 8px", borderRadius: "6px", fontWeight: 700 }}>
+                        ✓ {batch.status}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "0.84rem", color: "var(--text-muted)", marginTop: "4px" }}>
+                      🏛️ Storage: {batch.warehouse} · Contract: <b>{batch.buyerContract}</b>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "1.45rem", fontWeight: 900, color: "var(--primary)" }}>
+                      ₹{batch.collectivePrice}/kg
+                    </div>
+                    <small style={{ color: "var(--text-light)" }}>
+                      MSP Floor: ₹{batch.targetMsp || 25}/kg (+₹{((Number(batch.collectivePrice) || 0) - (Number(batch.targetMsp) || 25)).toFixed(2)} premium)
+                    </small>
+                  </div>
+                </div>
+
+                {/* Aggregation Breakdown Pill Bar */}
+                <div style={{ background: "var(--surface-raised)", border: "1px solid var(--border)", borderRadius: "10px", padding: "12px 16px", marginBottom: "14px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                  <div>
+                    <small style={{ color: "var(--text-light)", textTransform: "uppercase", fontSize: "0.7rem", fontWeight: 700 }}>Total Batch Quantity</small>
+                    <div style={{ fontWeight: 900, fontSize: "1.1rem", color: "var(--text-main)" }}>
+                      {(Number(batch.totalQtyKg) || 0).toLocaleString("en-IN")} kg
+                    </div>
+                  </div>
+                  <div>
+                    <small style={{ color: "var(--text-light)", textTransform: "uppercase", fontSize: "0.7rem", fontWeight: 700 }}>Total Batch Value</small>
+                    <div style={{ fontWeight: 900, fontSize: "1.1rem", color: "var(--primary)" }}>
+                      ₹{((Number(batch.totalQtyKg) || 0) * (Number(batch.collectivePrice) || 0)).toLocaleString("en-IN")}
+                    </div>
+                  </div>
+                  <div>
+                    <small style={{ color: "var(--text-light)", textTransform: "uppercase", fontSize: "0.7rem", fontWeight: 700 }}>Pooled Farmers</small>
+                    <div style={{ fontWeight: 900, fontSize: "1.1rem", color: "var(--text-main)" }}>
+                      {batch.contributingFarmersCount || (batch.farmers?.length || 1)} Smallholders
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => notify(`Generating full transparent audit manifest for ${batch.id}…`)}
+                    style={{ fontSize: "0.82rem", padding: "6px 14px", borderRadius: "8px" }}
+                  >
+                    <FileCheck size={14} /> View Audit Manifest
+                  </button>
+                </div>
+
+                {/* Member Farmers Mini Table */}
+                <div>
+                  <b style={{ fontSize: "0.84rem", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
+                    Member Farmer Allocation &amp; Payout Share:
+                  </b>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "8px" }}>
+                    {(batch.farmers || [{ name: "Verified Member Producer", qty: batch.totalQtyKg, sharePercent: 100, payout: (Number(batch.totalQtyKg) || 0) * (Number(batch.collectivePrice) || 0) }]).map((farmer, fIdx) => (
+                      <div key={fIdx} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px", padding: "8px 12px", fontSize: "0.8rem" }}>
+                        <div style={{ fontWeight: 700, color: "var(--text-main)" }}>{farmer.name}</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: "0.74rem" }}>
+                          {farmer.qty} kg ({farmer.sharePercent || 100}%) ➔ <strong style={{ color: "var(--primary)" }}>₹{(farmer.payout || ((Number(farmer.qty) || 0) * (Number(batch.collectivePrice) || 0))).toLocaleString("en-IN")}</strong>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
 
@@ -400,47 +429,129 @@ export default function FpoCollectiveHub({ notify = () => {} }) {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}><b>Ramesh Patel</b></td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>412/1 (Chomu)</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>450 kg</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", fontWeight: 700 }}>₹39,600</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "#0284c7" }}>₹19,800</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--primary)", fontWeight: 800 }}>₹19,800</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
-                    <span style={{ fontSize: "0.72rem", background: "rgba(16, 185, 129, 0.15)", color: "#059669", padding: "2px 7px", borderRadius: "6px", fontWeight: 700 }}>
-                      ✓ Paid via UPI
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}><b>Suresh Meena</b></td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>119/4 (Phulera)</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>600 kg</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", fontWeight: 700 }}>₹52,800</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "#0284c7" }}>₹26,400</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--primary)", fontWeight: 800 }}>₹26,400</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
-                    <span style={{ fontSize: "0.72rem", background: "rgba(16, 185, 129, 0.15)", color: "#059669", padding: "2px 7px", borderRadius: "6px", fontWeight: 700 }}>
-                      ✓ Paid via NEFT
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}><b>Kailash Gurjar</b></td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>88/2 (Jaitpura)</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>350 kg</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", fontWeight: 700 }}>₹30,800</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "#0284c7" }}>₹15,400</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--primary)", fontWeight: 800 }}>₹15,400</td>
-                  <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
-                    <span style={{ fontSize: "0.72rem", background: "rgba(16, 185, 129, 0.15)", color: "#059669", padding: "2px 7px", borderRadius: "6px", fontWeight: 700 }}>
-                      ✓ Paid via UPI
-                    </span>
-                  </td>
-                </tr>
+                {batches.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" style={{ padding: "28px", textAlign: "center", color: "var(--text-muted)" }}>
+                      No member allocations yet. Aggregate produce batches to view transparent dividend splits.
+                    </td>
+                  </tr>
+                ) : (
+                  batches.flatMap((b) => (b.farmers || [{ name: "Verified Member Producer", land: "Phulera Cluster", qty: b.totalQtyKg, payout: (Number(b.totalQtyKg) || 0) * (Number(b.collectivePrice) || 0) }]).map((f, i) => {
+                    const gross = f.payout || ((Number(f.qty) || 0) * (Number(b.collectivePrice) || 0));
+                    const advance = Math.round(gross * 0.5);
+                    const finalBal = gross - advance;
+                    return (
+                      <tr key={`${b.id}-${i}`}>
+                        <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}><b>{f.name}</b></td>
+                        <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>{f.land || "Verified Cluster Land"}</td>
+                        <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>{f.qty} kg</td>
+                        <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", fontWeight: 700 }}>₹{gross.toLocaleString("en-IN")}</td>
+                        <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "#0284c7" }}>₹{advance.toLocaleString("en-IN")}</td>
+                        <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", color: "var(--primary)", fontWeight: 800 }}>₹{finalBal.toLocaleString("en-IN")}</td>
+                        <td style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
+                          <span style={{ fontSize: "0.72rem", background: "rgba(16, 185, 129, 0.15)", color: "#059669", padding: "2px 7px", borderRadius: "6px", fontWeight: 700 }}>
+                            ✓ Direct Settlement Active
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  }))
+                )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Create Pooling Batch Modal */}
+      {isCreatingBatch && (
+        <div className="modal-backdrop" onClick={() => setIsCreatingBatch(false)}>
+          <div className="modal-content" style={{ maxWidth: "500px" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h3 style={{ margin: 0 }}>Create Pooled Harvest Batch</h3>
+              <button className="icon-button" onClick={() => setIsCreatingBatch(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateBatch} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <label style={{ fontSize: "0.82rem" }}>
+                Crop Commodity
+                <select
+                  value={newBatch.crop}
+                  onChange={(e) => setNewBatch({ ...newBatch, crop: e.target.value })}
+                  style={{ width: "100%", padding: "8px", marginTop: "4px" }}
+                >
+                  <option value="Mustard">Mustard (सरसों)</option>
+                  <option value="Wheat">Wheat (गेहूं)</option>
+                  <option value="Tomato">Tomato (टमाटर)</option>
+                  <option value="Gram (chickpea)">Gram / Chana (चना)</option>
+                  <option value="Soybean">Soybean (सोयाबीन)</option>
+                </select>
+              </label>
+
+              <label style={{ fontSize: "0.82rem" }}>
+                Total Pooled Volume (kg)
+                <input
+                  type="number"
+                  min="100"
+                  step="50"
+                  value={newBatch.totalQtyKg}
+                  onChange={(e) => setNewBatch({ ...newBatch, totalQtyKg: e.target.value })}
+                  style={{ width: "100%", padding: "8px", marginTop: "4px" }}
+                  required
+                />
+              </label>
+
+              <label style={{ fontSize: "0.82rem" }}>
+                Negotiated Collective Price (₹/kg)
+                <input
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  value={newBatch.collectivePrice}
+                  onChange={(e) => setNewBatch({ ...newBatch, collectivePrice: e.target.value })}
+                  style={{ width: "100%", padding: "8px", marginTop: "4px" }}
+                  required
+                />
+                <small style={{ color: "var(--text-muted)" }}>
+                  Must be at or above official Government MSP floor (₹{getMspFloorForCrop(newBatch.crop)?.price?.toFixed(2) || "25.00"}/kg)
+                </small>
+              </label>
+
+              <label style={{ fontSize: "0.82rem" }}>
+                Consolidation Warehouse Hub
+                <select
+                  value={newBatch.warehouse}
+                  onChange={(e) => setNewBatch({ ...newBatch, warehouse: e.target.value })}
+                  style={{ width: "100%", padding: "8px", marginTop: "4px" }}
+                >
+                  <option value="Jaipur North Mandi WDRA Hub">Jaipur North Mandi WDRA Hub</option>
+                  <option value="Sanganer Cold & Grain Hub">Sanganer Cold &amp; Grain Hub</option>
+                  <option value="Phulera Rural Depot">Phulera Rural Depot</option>
+                </select>
+              </label>
+
+              <label style={{ fontSize: "0.82rem" }}>
+                Target Institutional Buyer / Contract
+                <input
+                  type="text"
+                  value={newBatch.buyerContract}
+                  onChange={(e) => setNewBatch({ ...newBatch, buyerContract: e.target.value })}
+                  style={{ width: "100%", padding: "8px", marginTop: "4px" }}
+                  placeholder="e.g. BigBasket Regional Sourcing Hub"
+                  required
+                />
+              </label>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "12px" }}>
+                <button type="button" className="secondary" onClick={() => setIsCreatingBatch(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="primary">
+                  <CheckCircle2 size={16} /> Aggregate &amp; Certify Batch
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -243,15 +243,19 @@ export function tool_match_farmer_clusters({ crop = 'Mustard', totalDemandKg = 5
     });
   }
 
-  // If no lots in live state, provide pilot cluster lots (Phulera / Jaitpura)
   if (matchedFarmers.length === 0) {
-    const defaultLots = [
-      { lotId: 'LOT-JTP-01', lotCode: 'FL-JTP-2601', farmer: 'Ramesh Kumar', clusterLocation: 'Jaitpura Farm Cluster', grade: 'A', quantityKg: 1200, priceKg: 56.5 },
-      { lotId: 'LOT-PHL-02', lotCode: 'FL-PHL-2602', farmer: 'Kailash Meena', clusterLocation: 'Phulera Hub', grade: 'A', quantityKg: 1800, priceKg: 57.0 },
-      { lotId: 'LOT-JTP-03', lotCode: 'FL-JTP-2603', farmer: 'Santosh Devi', clusterLocation: 'Jaitpura Farm Cluster', grade: 'A', quantityKg: 2000, priceKg: 56.5 }
-    ];
-    accumulatedKg = 5000;
-    matchedFarmers.push(...defaultLots);
+    return {
+      tool: 'tool_match_farmer_clusters',
+      crop: normalizedCrop,
+      demandedQuantityKg: targetDemand,
+      totalAvailableKg: 0,
+      fulfillmentPercentage: 0,
+      participatingFarmersCount: 0,
+      weightedAvgPriceKg: 0,
+      matchedBatches: [],
+      isFulfillable: false,
+      summary: `No live farmer listings available for ${normalizedCrop} yet. Farmers can list their produce to be automatically matched.`
+    };
   }
 
   const fulfillmentPercent = Math.min(100, Math.round((accumulatedKg / targetDemand) * 100));
