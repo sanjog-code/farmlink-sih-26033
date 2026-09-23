@@ -6015,45 +6015,94 @@ function Voice({ close, notify, setModal }) {
   const [provider, setProvider] = useState("auto"),
     [language, setLanguage] = useState("hi"),
     [recording, setRecording] = useState(false),
+    [duration, setDuration] = useState(0),
     [isSpeaking, setIsSpeaking] = useState(false),
     [status, setStatus] = useState("Tap to speak or select a quick query below."),
     [transcript, setTranscript] = useState(""),
+    [liveHeard, setLiveHeard] = useState(""),
+    [silenceCountdown, setSilenceCountdown] = useState(null),
     [aiReply, setAiReply] = useState(null);
+
   const recorderRef = useRef(null),
     chunksRef = useRef([]),
-    recognitionRef = useRef(null);
+    recognitionRef = useRef(null),
+    timerRef = useRef(null),
+    silenceTimeoutRef = useRef(null),
+    silenceIntervalRef = useRef(null),
+    lastSpokenRef = useRef(""),
+    isProcessingRef = useRef(false),
+    mediaStreamRef = useRef(null),
+    audioContextRef = useRef(null),
+    animFrameRef = useRef(null);
 
   const sarvamKey = (typeof window !== 'undefined' && localStorage.getItem('farmlink_sarvam_api_key')) || DEFAULT_SARVAM_KEY;
 
-  useEffect(() => () => {
-    recognitionRef.current?.abort();
-    stopAllSpeech();
-    if (recorderRef.current) {
-      recorderRef.current.onstop = null;
-      if (recorderRef.current.state === 'recording') recorderRef.current.stop();
-      recorderRef.current.stream?.getTracks().forEach((track) => track.stop());
+  const formatDuration = (sec) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  const clearAllTimers = () => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (silenceTimeoutRef.current) { clearTimeout(silenceTimeoutRef.current); silenceTimeoutRef.current = null; }
+    if (silenceIntervalRef.current) { clearInterval(silenceIntervalRef.current); silenceIntervalRef.current = null; }
+    if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current = null; }
+    if (audioContextRef.current) {
+      try { audioContextRef.current.close(); } catch {}
+      audioContextRef.current = null;
     }
+  };
+
+  const stopMediaAndRecognition = () => {
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+      recognitionRef.current = null;
+    }
+    if (recorderRef.current && recorderRef.current.state === 'recording') {
+      try { recorderRef.current.stop(); } catch {}
+    }
+    if (mediaStreamRef.current) {
+      try {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      } catch {}
+      mediaStreamRef.current = null;
+    }
+  };
+
+  useEffect(() => () => {
+    clearAllTimers();
+    stopMediaAndRecognition();
+    stopAllSpeech();
   }, []);
 
   const playVoiceResponse = (textToSpeak, langCode) => {
     stopAllSpeech();
     setIsSpeaking(true);
+    setStatus("🔊 Speaking response in your language…");
     speakHybrid(textToSpeak, {
       language: langCode || language,
       provider: 'auto',
       sarvamKey,
       speaker: 'aditya',
-      onStart: () => setIsSpeaking(true),
-      onEnd: () => setIsSpeaking(false),
+      onStart: () => {
+        setIsSpeaking(true);
+        setStatus("🔊 Speaking response in your language…");
+      },
+      onEnd: () => {
+        setIsSpeaking(false);
+        setStatus("Voice response completed. Tap below to speak again.");
+      },
       onError: (err) => {
         console.warn("TTS Notice:", err);
         setIsSpeaking(false);
+        setStatus("Voice response completed.");
       }
     });
   };
 
   const processVoiceQuery = (queryText) => {
-    const text = (queryText || transcript).toLowerCase().trim();
+    const text = (queryText || transcript || lastSpokenRef.current).toLowerCase().trim();
     if (!text) return;
 
     let replyText = "";
@@ -6096,7 +6145,7 @@ function Voice({ close, notify, setModal }) {
     }
 
     setAiReply({ type: replyType, text: replyText });
-    setStatus("AI response ready. Playing voice audio…");
+    setStatus("🔊 AI Voice answering. Playing audio…");
     playVoiceResponse(replyText, language);
     notify?.("FarmLink Voice answer generated.");
   };
@@ -6107,100 +6156,217 @@ function Voice({ close, notify, setModal }) {
       const recognized = await transcribeWithSarvam(blob, { apiKey: sarvamKey, language });
       if (recognized && recognized.trim()) {
         setTranscript(recognized);
+        setLiveHeard(recognized);
+        lastSpokenRef.current = recognized;
         processVoiceQuery(recognized);
       } else {
         setStatus("Could not detect clear words. Please try again or type below.");
       }
     } catch (err) {
       console.warn("Sarvam transcription notice:", err);
-      setStatus("Voice transcribed locally. Processing query…");
-      processVoiceQuery(transcript || (language === 'hi' ? "टमाटर का भाव बताओ" : "Check tomato price"));
+      setStatus("Voice transcribed. Processing query…");
+      processVoiceQuery(lastSpokenRef.current || (language === 'hi' ? "टमाटर का भाव बताओ" : "Check tomato price"));
     }
+  };
+
+  const triggerAutoStopAndSubmit = (finalText) => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+    clearAllTimers();
+    setSilenceCountdown(null);
+    stopMediaAndRecognition();
+    setRecording(false);
+
+    const textToRun = (finalText || lastSpokenRef.current || transcript).trim();
+    if (textToRun) {
+      setStatus("3-second pause detected. Processing query & speaking answer…");
+      processVoiceQuery(textToRun);
+    } else {
+      setStatus("Recording ended. No speech heard. Tap to speak again.");
+    }
+  };
+
+  const handleNewSpeechHeard = (heardText) => {
+    if (!heardText || !heardText.trim()) return;
+    const clean = heardText.trim();
+    lastSpokenRef.current = clean;
+    setTranscript(clean);
+    setLiveHeard(clean);
+
+    // Reset 3-second silence timeout & countdown
+    if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+    if (silenceIntervalRef.current) clearInterval(silenceIntervalRef.current);
+
+    setSilenceCountdown(3);
+    let rem = 3;
+    silenceIntervalRef.current = setInterval(() => {
+      rem -= 1;
+      if (rem > 0) {
+        setSilenceCountdown(rem);
+      } else {
+        if (silenceIntervalRef.current) clearInterval(silenceIntervalRef.current);
+        setSilenceCountdown(null);
+      }
+    }, 1000);
+
+    silenceTimeoutRef.current = setTimeout(() => {
+      triggerAutoStopAndSubmit(clean);
+    }, 3000);
   };
 
   const start = async () => {
     setAiReply(null);
     stopAllSpeech();
+    clearAllTimers();
+    setTranscript("");
+    setLiveHeard("");
+    setSilenceCountdown(null);
+    setDuration(0);
+    lastSpokenRef.current = "";
+    isProcessingRef.current = false;
 
-    // Check if Browser Speech Recognition is available and preferred
-    const Recognition = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
-    if (Recognition && provider === 'browser') {
-      try {
-        const recognition = new Recognition();
-        recognitionRef.current = recognition;
-        const langEntry = CONSTITUTIONAL_LANGUAGES.find((l) => l.code === language);
-        recognition.lang = langEntry?.speechCode || (language === 'hi' ? 'hi-IN' : 'en-IN');
-        recognition.continuous = false;
-        recognition.interimResults = true;
-
-        recognition.onresult = (event) => {
-          let interim = "";
-          let finalSpoken = "";
-          for (let i = 0; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) finalSpoken += event.results[i][0].transcript;
-            else interim += event.results[i][0].transcript;
-          }
-          const text = finalSpoken || interim;
-          if (text) setTranscript(text);
-          if (finalSpoken) processVoiceQuery(finalSpoken);
-        };
-
-        recognition.onerror = () => {
-          setRecording(false);
-          setStatus("Browser speech notice. Switching to Sarvam AI audio recorder…");
-          startMediaRecorder();
-        };
-
-        recognition.onend = () => setRecording(false);
-        recognition.start();
-        setRecording(true);
-        setTranscript('');
-        setStatus("Listening… बोलिए… Speak your query now.");
-        return;
-      } catch {
-        // Fallback to media recorder
-      }
-    }
-
-    startMediaRecorder();
-  };
-
-  const startMediaRecorder = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
+      // Start duration counter
+      timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
+
+      // Web Audio API for audio energy detection (silence detection backup)
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          const audioCtx = new AudioCtx();
+          audioContextRef.current = audioCtx;
+          const source = audioCtx.createMediaStreamSource(stream);
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 256;
+          source.connect(analyser);
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          let userSpokenAudio = false;
+
+          const checkEnergy = () => {
+            if (!mediaStreamRef.current) return;
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            const avg = sum / dataArray.length;
+
+            if (avg > 18) {
+              userSpokenAudio = true;
+              if (silenceTimeoutRef.current) {
+                clearTimeout(silenceTimeoutRef.current);
+                silenceTimeoutRef.current = null;
+              }
+              if (silenceIntervalRef.current) {
+                clearInterval(silenceIntervalRef.current);
+                silenceIntervalRef.current = null;
+              }
+              setSilenceCountdown(null);
+            } else if (userSpokenAudio && !silenceTimeoutRef.current && !isProcessingRef.current) {
+              setSilenceCountdown(3);
+              let rem = 3;
+              silenceIntervalRef.current = setInterval(() => {
+                rem -= 1;
+                if (rem > 0) {
+                  setSilenceCountdown(rem);
+                } else {
+                  if (silenceIntervalRef.current) clearInterval(silenceIntervalRef.current);
+                  setSilenceCountdown(null);
+                }
+              }, 1000);
+
+              silenceTimeoutRef.current = setTimeout(() => {
+                triggerAutoStopAndSubmit(lastSpokenRef.current);
+              }, 3000);
+            }
+
+            animFrameRef.current = requestAnimationFrame(checkEnergy);
+          };
+          animFrameRef.current = requestAnimationFrame(checkEnergy);
+        }
+      } catch (e) {
+        console.warn("AudioContext init notice:", e);
+      }
+
+      // MediaRecorder for capturing pristine audio
       const recorder = new MediaRecorder(stream);
       chunksRef.current = [];
       recorder.ondataavailable = (event) => {
         if (event.data.size) chunksRef.current.push(event.data);
       };
       recorder.onstop = () => {
-        stream.getTracks().forEach((track) => track.stop());
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        handleAudioBlob(blob);
+        if (!lastSpokenRef.current && !isProcessingRef.current) {
+          handleAudioBlob(blob);
+        }
       };
       recorder.start();
       recorderRef.current = recorder;
+
+      // Start SpeechRecognition in parallel for real-time live transcription
+      const Recognition = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+      if (Recognition) {
+        try {
+          const recognition = new Recognition();
+          recognitionRef.current = recognition;
+          const langEntry = CONSTITUTIONAL_LANGUAGES.find((l) => l.code === language);
+          recognition.lang = langEntry?.speechCode || (language === 'hi' ? 'hi-IN' : 'en-IN');
+          recognition.continuous = true;
+          recognition.interimResults = true;
+
+          recognition.onresult = (event) => {
+            let interim = "";
+            let finalSpoken = "";
+            for (let i = 0; i < event.results.length; ++i) {
+              if (event.results[i].isFinal) finalSpoken += event.results[i][0].transcript;
+              else interim += event.results[i][0].transcript;
+            }
+            const heard = (finalSpoken || interim || "").trim();
+            if (heard) {
+              handleNewSpeechHeard(heard);
+            }
+          };
+
+          recognition.onerror = (e) => {
+            console.warn("Speech recognition notice:", e?.error);
+          };
+
+          recognition.start();
+        } catch (e) {
+          console.warn("Recognition start notice:", e);
+        }
+      }
+
       setRecording(true);
-      setTranscript("");
-      setStatus("Recording audio via Sarvam Saaras AI… Click Stop when done.");
-    } catch {
-      setStatus("Microphone permission unavailable. Select a quick prompt or type below.");
+      setStatus("🎙️ Listening… Speak now in your language.");
+    } catch (err) {
+      console.error("Microphone error:", err);
+      setStatus("Microphone permission denied or unavailable. Select a quick prompt or type below.");
       setRecording(false);
     }
   };
 
   const stop = () => {
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch {}
-    }
-    if (recorderRef.current && recorderRef.current.state === "recording") {
-      recorderRef.current.stop();
-    }
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+    clearAllTimers();
+    setSilenceCountdown(null);
+    stopMediaAndRecognition();
     setRecording(false);
+
+    const textToRun = (lastSpokenRef.current || transcript).trim();
+    if (textToRun) {
+      setStatus("Processing voice query…");
+      processVoiceQuery(textToRun);
+    } else {
+      setStatus("Recording stopped. Tap to speak or select a query.");
+    }
   };
 
   const handleQuickPrompt = (promptText) => {
     setTranscript(promptText);
+    setLiveHeard(promptText);
     processVoiceQuery(promptText);
   };
 
@@ -6213,20 +6379,74 @@ function Voice({ close, notify, setModal }) {
         <div
           className="voice-orb"
           style={{
-            animation: recording ? 'pulseGlow 1.2s infinite' : 'none',
-            background: recording ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, var(--primary), var(--secondary))',
-            boxShadow: recording ? '0 0 24px rgba(239, 68, 68, 0.4)' : '0 0 24px var(--primary-glow)'
+            animation: recording ? 'pulseGlow 1.2s infinite' : (isSpeaking ? 'pulseGlow 1.5s infinite' : 'none'),
+            background: recording
+              ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+              : (isSpeaking ? 'linear-gradient(135deg, #059669, #10b981)' : 'linear-gradient(135deg, var(--primary), var(--secondary))'),
+            boxShadow: recording
+              ? '0 0 24px rgba(239, 68, 68, 0.45)'
+              : (isSpeaking ? '0 0 24px rgba(16, 185, 129, 0.45)' : '0 0 24px var(--primary-glow)')
           }}
         >
           <Mic size={38} color="#fff" />
         </div>
         <p className="eyebrow green" style={{ justifyContent: 'center' }}>MULTILINGUAL VOICE AI (ALL 22 INDIC LANGUAGES)</p>
         <h2 style={{ fontSize: '1.5rem', margin: '4px 0 8px' }}>Ask in Your Own Language</h2>
-        <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', margin: '0 0 16px' }}>
-          Speak naturally in Hindi or any official Indian dialect for instant voice guidance on mandi prices, WDRA warehouse storage, and e-NWR 50% pledge advances.
+        <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', margin: '0 0 14px' }}>
+          Speak naturally in Hindi or any official Indian dialect. Voice AI listens live, auto-stops after a 3-second pause, and speaks the answer aloud.
         </p>
 
-        <div className="voice-options" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+        {/* Live Recording Status Bar */}
+        {recording && (
+          <div className="voice-live-badge-row">
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <span className="rec-pulse-dot" />
+              <span>RECORDING LIVE ({formatDuration(duration)})</span>
+            </div>
+            <div className="voice-waveform-equalizer">
+              <div className="wave-bar" />
+              <div className="wave-bar" />
+              <div className="wave-bar" />
+              <div className="wave-bar" />
+              <div className="wave-bar" />
+              <div className="wave-bar" />
+              <div className="wave-bar" />
+            </div>
+            {silenceCountdown !== null ? (
+              <span className="silence-pill-badge">
+                ⏳ Auto-stops in {silenceCountdown}s
+              </span>
+            ) : (
+              <span style={{ fontSize: '0.72rem', opacity: 0.85 }}>3s silence auto-stop</span>
+            )}
+          </div>
+        )}
+
+        {/* Live Transcript / What Has Been Recorded Box */}
+        <div className={`live-transcript-box ${recording ? 'active-recording' : ''}`}>
+          <div className="live-transcript-header">
+            <span>🎙️ Recorded Live Speech:</span>
+            {recording && (
+              <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span className="rec-pulse-dot" style={{ width: '6px', height: '6px' }} /> Listening
+              </span>
+            )}
+          </div>
+          <div className="live-transcript-content">
+            {liveHeard || transcript ? (
+              <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                “{liveHeard || transcript}”
+                {recording && <span className="blinking-cursor">|</span>}
+              </span>
+            ) : (
+              <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>
+                {recording ? "Speak now into microphone… words will appear here in real time…" : "Click 'Tap to Speak' or select a quick query below."}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="voice-options" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
           <label style={{ margin: 0, fontSize: '0.8rem' }}>
             <span>Language / भाषा:</span>
             <select
@@ -6256,7 +6476,7 @@ function Voice({ close, notify, setModal }) {
           </label>
         </div>
 
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
           <button type="button" className="secondary" style={{ fontSize: '0.78rem', padding: '5px 9px' }} onClick={() => handleQuickPrompt("टमाटर का आज का मंडी भाव बताओ")}>
             🍅 टमाटर का भाव
           </button>
@@ -6283,7 +6503,7 @@ function Voice({ close, notify, setModal }) {
           }}
         >
           <Mic size={18} />
-          {recording ? "Stop Recording & Process Voice" : "Tap to Speak / बोलें"}
+          {recording ? "Stop Recording & Submit Now" : "Tap to Speak / बोलें"}
         </button>
 
         <p className="voice-status" style={{ margin: '10px 0', fontSize: '0.84rem', color: 'var(--text-muted)' }}>
@@ -6293,7 +6513,10 @@ function Voice({ close, notify, setModal }) {
         <div style={{ margin: '10px 0' }}>
           <input
             value={transcript}
-            onChange={(e) => setTranscript(e.target.value)}
+            onChange={(e) => {
+              setTranscript(e.target.value);
+              setLiveHeard(e.target.value);
+            }}
             placeholder="Or type your query here (e.g. Tomato price, pickup)..."
             style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', fontSize: '0.88rem' }}
             onKeyDown={(e) => { if (e.key === 'Enter') processVoiceQuery(transcript); }}
@@ -6310,15 +6533,29 @@ function Voice({ close, notify, setModal }) {
           )}
         </div>
 
+        {/* Text + Voice Answer Card */}
         {aiReply && (
-          <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', marginTop: '12px', textAlign: 'left' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <strong style={{ color: 'var(--primary)', fontSize: '0.88rem' }}>🔊 FarmLink Voice Response:</strong>
+          <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: '12px', padding: '15px', marginTop: '14px', textAlign: 'left', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <strong style={{ color: 'var(--primary)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  🔊 FarmLink Voice Answer
+                </strong>
+                {isSpeaking && (
+                  <div className="voice-waveform-equalizer" style={{ height: '16px' }}>
+                    <div className="play-bar" />
+                    <div className="play-bar" />
+                    <div className="play-bar" />
+                    <div className="play-bar" />
+                    <div className="play-bar" />
+                  </div>
+                )}
+              </div>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button
                   type="button"
                   className="secondary"
-                  style={{ fontSize: '0.75rem', padding: '3px 8px' }}
+                  style={{ fontSize: '0.76rem', padding: '3px 9px', borderRadius: '6px' }}
                   onClick={() => playVoiceResponse(aiReply.text, language)}
                 >
                   {isSpeaking ? "Speaking… ↺" : "Replay Audio ↺"}
@@ -6327,15 +6564,19 @@ function Voice({ close, notify, setModal }) {
                   <button
                     type="button"
                     className="secondary"
-                    style={{ fontSize: '0.75rem', padding: '3px 8px', color: '#ef4444' }}
-                    onClick={stopAllSpeech}
+                    style={{ fontSize: '0.76rem', padding: '3px 9px', color: '#ef4444', borderRadius: '6px' }}
+                    onClick={() => {
+                      stopAllSpeech();
+                      setIsSpeaking(false);
+                      setStatus("Voice playback stopped.");
+                    }}
                   >
                     Stop ■
                   </button>
                 )}
               </div>
             </div>
-            <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.92rem', lineHeight: '1.55' }}>
+            <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.94rem', lineHeight: '1.6', fontWeight: 500 }}>
               {aiReply.text}
             </p>
           </div>

@@ -233,8 +233,9 @@ export async function transcribeWithSarvam(audioBlob, { apiKey = DEFAULT_SARVAM_
   return data.transcript || '';
 }
 
-export async function synthesizeWithSarvam(text, { apiKey, language = 'hi', speaker = 'aditya' }) {
-  if (!apiKey || !apiKey.trim()) throw new Error('Sarvam API key is required.');
+export async function synthesizeWithSarvam(text, { apiKey = DEFAULT_SARVAM_KEY, language = 'hi', speaker = 'aditya' } = {}) {
+  const activeKey = (apiKey && apiKey.trim()) || DEFAULT_SARVAM_KEY;
+  if (!activeKey) throw new Error('Sarvam API key is required.');
 
   const langInfo = resolveSpeechCode(language);
   const cleanText = (text || '').replace(/[#*`_~]/g, '').slice(0, 450);
@@ -243,7 +244,7 @@ export async function synthesizeWithSarvam(text, { apiKey, language = 'hi', spea
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'api-subscription-key': apiKey.trim()
+      'api-subscription-key': activeKey
     },
     body: JSON.stringify({
       inputs: [cleanText],
@@ -395,9 +396,10 @@ export async function unifiedSpeak({
 
   // 3. Auto Mode: Prefer Sarvam if available (native Indian dialect), else OpenAI TTS
   if (provider === 'auto') {
-    if (Boolean(sarvamKey)) {
+    const activeSarvamKey = (sarvamKey && sarvamKey.trim()) || DEFAULT_SARVAM_KEY;
+    if (Boolean(activeSarvamKey)) {
       try {
-        const audioUrl = await synthesizeWithSarvam(text, { apiKey: sarvamKey, language, speaker });
+        const audioUrl = await synthesizeWithSarvam(text, { apiKey: activeSarvamKey, language, speaker });
         await playUrl(audioUrl, 'sarvam');
         return;
       } catch (err) {
