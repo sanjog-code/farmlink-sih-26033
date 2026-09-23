@@ -60,6 +60,7 @@ import MarketDataAdmin from "./operations/MarketDataAdmin";
 import { availableToAdd, rankAndFilter, updateQuantity } from "./lib/marketplace.js";
 import { CONSTITUTIONAL_LANGUAGES, translateText } from "./translations/constitutional22.js";
 import AgenticCopilot, { AgenticDockLauncher } from "./ai/AgenticCopilot.jsx";
+import { transcribeWithSarvam, speakHybrid, stopAllSpeech, DEFAULT_SARVAM_KEY } from "./ai/speechEngine.js";
 
 const initialLots = [
   {
@@ -863,6 +864,7 @@ function App() {
   useEffect(() => {
     try {
       document.documentElement.setAttribute("data-theme", theme);
+      if (document.body) document.body.setAttribute("data-theme", theme);
       localStorage.setItem("farmlink_theme", theme);
     } catch {}
   }, [theme]);
@@ -1338,43 +1340,65 @@ function App() {
   if (passwordRecovery) return <PasswordRecovery onComplete={() => { setPasswordRecovery(false); window.history.replaceState({}, "", window.location.pathname); setView("auth"); notify("You can now sign in with your updated password."); }}/>;
   return (
     <>
+      {/* Sleek Announcement Ribbon */}
       <div className="top-announcement-banner">
-        <span>🌾 {tUI("Government e-NWR Integration Live: WDRA-accredited warehouse pledge finance at 50% MSP")}</span>
-        <button type="button" onClick={() => setModal("agentic")} className="banner-link">
-          {tUI("Check Advance Eligibility")} →
+        <span className="banner-pulse"></span>
+        <span className="banner-text">
+          🌾 {tUI("Government e-NWR Integration: WDRA warehouse pledge finance at 50% MSP")}
+        </span>
+        <button type="button" onClick={() => setModal("agentic")} className="banner-action-btn">
+          {tUI("Check Eligibility")} →
         </button>
       </div>
+
+      {/* Main Glass Header */}
       <header className="glass-nav">
-        <button className="brand" onClick={() => setView("home")}>
-          <span>
-            <Sprout size={24} />
+        {/* Left: Brand */}
+        <button className="brand-jivexa" onClick={() => setView("home")}>
+          <div className="brand-icon-box">
+            <Sprout size={20} />
+          </div>
+          <span className="brand-name">
+            Farm<span>Link</span>
+            <span className="brand-os-badge">OS</span>
           </span>
-          Farm<span>Link</span> <span className="brand-badge">OS</span>
         </button>
-        <nav>
-          <button onClick={() => access("consumer", "market")}>
+
+        {/* Center: Segmented Navigation Pills */}
+        <nav className="nav-segmented">
+          <button
+            className={view === "market" ? "nav-pill active" : "nav-pill"}
+            onClick={() => access("consumer", "market")}
+          >
             {tUI("Marketplace")}
           </button>
-          <button onClick={() => access("consumer", "bulk")}>{tUI("Wholesale")}</button>
+          <button
+            className={view === "bulk" ? "nav-pill active" : "nav-pill"}
+            onClick={() => access("consumer", "bulk")}
+          >
+            {tUI("Wholesale")}
+          </button>
           {session?.role !== "consumer" && (
-            <button onClick={() => access("admin", "warehouse")}>
+            <button
+              className={view === "warehouse" ? "nav-pill active" : "nav-pill"}
+              onClick={() => access("admin", "warehouse")}
+            >
               {tUI("Warehouse")}
             </button>
           )}
-          <button onClick={() => access("farmer", "farmer")}>{tUI("Farmer")}</button>
-        </nav>
-        <div className="head-actions">
           <button
-            type="button"
-            className="theme-toggle-btn"
-            onClick={toggleTheme}
-            aria-label="Toggle light/dark theme"
-            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            className={view === "farmer" ? "nav-pill active" : "nav-pill"}
+            onClick={() => access("farmer", "farmer")}
           >
-            {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+            {tUI("Farmer")}
           </button>
-          <label className="language language-selector-wrap" title="Translate platform into all 22 official Indian languages">
-            <Languages size={17} />
+        </nav>
+
+        {/* Right: Consolidated Action Cluster */}
+        <div className="head-actions-jivexa">
+          {/* Compact 22-Language Selector Pill */}
+          <div className="lang-pill" title="Translate into all 22 official Indian languages">
+            <Languages size={14} className="lang-icon" />
             <select
               aria-label="Interface language"
               value={lang}
@@ -1389,62 +1413,88 @@ function App() {
             >
               {CONSTITUTIONAL_LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>
-                  {l.nativeName} · {l.name}
+                  {l.name} ({l.nativeName})
                 </option>
               ))}
             </select>
-          </label>
+          </div>
+
+          {/* Quick Voice Assistant Mic Button */}
           <button
             type="button"
-            className="header-voice-btn"
+            className="top-icon-btn voice-trigger-btn"
             onClick={() => setModal("voice")}
-            title="Multilingual Voice AI (All 22 Indian Languages)"
+            title="Multilingual Voice Assistant (22 Indic Languages)"
+            aria-label="Open Voice AI"
           >
-            <Mic size={16} /> <span>{tUI("Voice AI")}</span>
+            <Mic size={16} />
           </button>
-          {session ? (
-            <button
-              className="profile-btn"
-              onClick={() =>
-                session.role === "admin"
-                  ? setView("admin")
-                  : setView(session.role === "farmer" ? "farmer" : "consumer")
-              }
-            >
-              <UserRound size={17} />
-              {session.label}
-            </button>
-          ) : (
-            <button className="login-btn" onClick={() => setView("auth")}>
-              <UserRound size={17} />
-              {tUI("Sign in")}
-            </button>
-          )}
-          <span className="logout-wrap">
-            {session && (
-              <button className="login-btn" onClick={logout}>
-                <LogOut size={17} />
-                {tUI("Logout")}
-              </button>
-            )}
-          </span>
+
+          {/* AI Copilot Launcher */}
           <button
-            className="cart"
+            type="button"
+            className="top-ai-copilot-btn"
+            onClick={() => setModal("agentic")}
+            title="Open FarmLink Dual-Engine AI Copilot"
+          >
+            <Sparkles size={14} />
+            <span>{tUI("AI Copilot")}</span>
+          </button>
+
+          {/* Theme Toggle (☀️/🌙) */}
+          <button
+            type="button"
+            className="top-icon-btn theme-toggle-btn"
+            onClick={toggleTheme}
+            aria-label="Toggle light/dark theme"
+            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+
+          {/* Shopping Cart Button with Badge */}
+          <button
+            type="button"
+            className="top-icon-btn cart-pill-btn"
             aria-label="Open shopping cart"
             onClick={openCart}
+            title="Shopping Cart"
           >
-            <ShoppingCart size={18} />
-            {cart.length || ""}
+            <ShoppingCart size={16} />
+            {cart.length > 0 && <span className="cart-badge-count">{cart.length}</span>}
           </button>
-          <button
-            type="button"
-            className="header-voice-btn"
-            onClick={() => setModal("agentic")}
-            title="Open FarmLink Agentic Copilot"
-            style={{ background: 'linear-gradient(135deg, #059669, #047857)', color: '#fff', borderColor: '#34d399' }}
-          >
-            <Sparkles size={16} /> <span>{tUI("AI Copilot ✨")}</span>
-          </button>
+
+          {/* Profile / Sign In */}
+          {session ? (
+            <div className="auth-cluster">
+              <button
+                className="top-auth-btn"
+                onClick={() =>
+                  session.role === "admin"
+                    ? setView("admin")
+                    : setView(session.role === "farmer" ? "farmer" : "consumer")
+                }
+                title={session.label}
+              >
+                <UserRound size={15} />
+                <span>{session.label.split(" ")[0]}</span>
+              </button>
+              <button
+                type="button"
+                className="top-icon-btn logout-btn"
+                onClick={logout}
+                title="Log out"
+                aria-label="Log out"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+          ) : (
+            <button className="top-auth-btn signin-btn" onClick={() => setView("auth")}>
+              <UserRound size={15} />
+              <span>{tUI("Sign in")}</span>
+            </button>
+          )}
         </div>
       </header>
       <main>
@@ -1568,7 +1618,6 @@ function App() {
         )}
         </ErrorBoundary>
       </main>
-      <SiteFooter setView={setView} notify={notify} />
       {modal === "voice" && (
         <Voice close={() => setModal(null)} notify={notify} />
       )}{" "}
@@ -1982,48 +2031,97 @@ function Home({ t, lots, setView, access, reserve, setModal, lang, tUI }) {
         </div>
       </section>
 
-      {/* ONE CONNECTED FLOW */}
-      <section className="impact">
-        <div>
-          <p className="eyebrow">{tr("ONE CONNECTED FLOW")}</p>
-          <h2>
-            {tr("Less uncertainty.")}
-            <br />
-            {tr("More choice.")}
+      {/* MODERN ONE CONNECTED FLOW PIPELINE */}
+      <section className="flow-pipeline-section">
+        <div className="flow-pipeline-header">
+          <div className="flow-tag">
+            <span className="pulse-dot"></span>
+            <span className="flow-tag-text">{tr("SEAMLESS AGRI-STACK PIPELINE")}</span>
+          </div>
+          <h2 className="flow-pipeline-title">
+            {tr("One Connected Flow.")}{" "}
+            <span className="text-gradient-emerald">{tr("Complete Transparency.")}</span>
           </h2>
-          <p>
-            {tr("FarmLink joins physical aggregation with market intelligence so produce moves with clarity, not pressure.")}
+          <p className="flow-pipeline-subtitle">
+            {tr("From farm-gate collection to digital e-NWR warehouse custody, real-time AI pricing, and direct institutional settlement.")}
           </p>
-          <button className="outline" onClick={() => setModal("ai")}>
-            <BrainCircuit size={18} />
-            {t.ai}
-          </button>
         </div>
-        <div className="flow">
-          <Flow
-            n="1"
-            icon={<Truck />}
-            title={tr("Cluster pickup")}
-            text={tr("Village & FPO collection")}
-          />
-          <Flow
-            n="2"
-            icon={<Warehouse />}
-            title={tr("Warehouse intake")}
-            text={tr("Weigh, grade & store")}
-          />
-          <Flow
-            n="3"
-            icon={<BrainCircuit />}
-            title={tr("AI guidance")}
-            text={tr("Price, demand & stock-age")}
-          />
-          <Flow
-            n="4"
-            icon={<ShoppingCart />}
-            title={tr("Market access")}
-            text={tr("Consumer & bulk buyers")}
-          />
+
+        <div className="flow-pipeline-grid">
+          <div className="pipeline-card">
+            <div className="pipeline-card-top">
+              <span className="pipeline-step-badge">01</span>
+              <div className="pipeline-icon-box">
+                <Truck size={22} />
+              </div>
+            </div>
+            <h3 className="pipeline-card-title">{tr("Cluster Pickup")}</h3>
+            <p className="pipeline-card-desc">
+              {tr("Doorstep village and FPO collection. AI-optimized routing groups farm harvests to eliminate middleman transport deductions.")}
+            </p>
+            <div className="pipeline-pill-tag">
+              <span>🌾 {tr("Farm-Gate Weighment")}</span>
+            </div>
+          </div>
+
+          <div className="pipeline-card">
+            <div className="pipeline-card-top">
+              <span className="pipeline-step-badge">02</span>
+              <div className="pipeline-icon-box">
+                <Warehouse size={22} />
+              </div>
+            </div>
+            <h3 className="pipeline-card-title">{tr("Warehouse Intake")}</h3>
+            <p className="pipeline-card-desc">
+              {tr("WDRA-certified weighment, multi-spectral camera assaying, and instant minting of electronic e-NWR negotiable warehouse receipts.")}
+            </p>
+            <div className="pipeline-pill-tag">
+              <span>🏢 {tr("e-NWR Minted")}</span>
+            </div>
+          </div>
+
+          <div className="pipeline-card">
+            <div className="pipeline-card-top">
+              <span className="pipeline-step-badge">03</span>
+              <div className="pipeline-icon-box">
+                <BrainCircuit size={22} />
+              </div>
+            </div>
+            <h3 className="pipeline-card-title">{tr("Dual-Engine AI Guidance")}</h3>
+            <p className="pipeline-card-desc">
+              {tr("Live Agmarknet mandi sync, 50% working capital pledge loan calculation, and multi-dialect voice consultation in 22 languages.")}
+            </p>
+            <div className="pipeline-pill-tag">
+              <span>⚡ {tr("50% Advance Ready")}</span>
+            </div>
+          </div>
+
+          <div className="pipeline-card">
+            <div className="pipeline-card-top">
+              <span className="pipeline-step-badge">04</span>
+              <div className="pipeline-icon-box">
+                <ShoppingCart size={22} />
+              </div>
+            </div>
+            <h3 className="pipeline-card-title">{tr("Direct Market Access")}</h3>
+            <p className="pipeline-card-desc">
+              {tr("Verified institutional procurement and retail wholesale purchase with direct UPI settlement and end-to-end QR lot traceability.")}
+            </p>
+            <div className="pipeline-pill-tag">
+              <span>💰 {tr("Zero Distress Sales")}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flow-cta-banner">
+          <div className="flow-cta-text">
+            <h4>{tr("Ready to experience transparent farm-to-warehouse trade?")}</h4>
+            <p>{tr("Launch the Dual-Engine Copilot to simulate warehouse intake or calculate e-NWR pledge advance.")}</p>
+          </div>
+          <button className="top-ai-copilot-btn" onClick={() => setModal("agentic")}>
+            <Sparkles size={16} />
+            <span>{tr("Launch Copilot 🚀")}</span>
+          </button>
         </div>
       </section>
 
@@ -5913,36 +6011,45 @@ function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, pla
     </div>
   );
 }
-function Voice({ close, notify }) {
-  const [provider, setProvider] = useState("browser"),
+function Voice({ close, notify, setModal }) {
+  const [provider, setProvider] = useState("auto"),
     [language, setLanguage] = useState("hi"),
     [recording, setRecording] = useState(false),
-    [status, setStatus] = useState("Tap record or choose a prompt to speak with FarmLink AI."),
+    [isSpeaking, setIsSpeaking] = useState(false),
+    [status, setStatus] = useState("Tap to speak or select a quick query below."),
     [transcript, setTranscript] = useState(""),
     [aiReply, setAiReply] = useState(null);
   const recorderRef = useRef(null),
-    chunksRef = useRef([]), recognitionRef = useRef(null);
+    chunksRef = useRef([]),
+    recognitionRef = useRef(null);
+
+  const sarvamKey = (typeof window !== 'undefined' && localStorage.getItem('farmlink_sarvam_api_key')) || DEFAULT_SARVAM_KEY;
 
   useEffect(() => () => {
     recognitionRef.current?.abort();
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    stopAllSpeech();
     if (recorderRef.current) {
       recorderRef.current.onstop = null;
       if (recorderRef.current.state === 'recording') recorderRef.current.stop();
-      recorderRef.current.stream.getTracks().forEach(track => track.stop());
+      recorderRef.current.stream?.getTracks().forEach((track) => track.stop());
     }
   }, []);
 
-  const speakText = (textToSpeak, langCode) => {
-    if (!('speechSynthesis' in window)) return;
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(textToSpeak);
-      const langEntry = CONSTITUTIONAL_LANGUAGES.find((l) => l.code === langCode);
-      utterance.lang = langEntry?.speechCode || (langCode === 'hi' ? 'hi-IN' : 'en-IN');
-      utterance.rate = 0.92;
-      window.speechSynthesis.speak(utterance);
-    } catch {}
+  const playVoiceResponse = (textToSpeak, langCode) => {
+    stopAllSpeech();
+    setIsSpeaking(true);
+    speakHybrid(textToSpeak, {
+      language: langCode || language,
+      provider: 'auto',
+      sarvamKey,
+      speaker: 'aditya',
+      onStart: () => setIsSpeaking(true),
+      onEnd: () => setIsSpeaking(false),
+      onError: (err) => {
+        console.warn("TTS Notice:", err);
+        setIsSpeaking(false);
+      }
+    });
   };
 
   const processVoiceQuery = (queryText) => {
@@ -5955,17 +6062,22 @@ function Voice({ close, notify }) {
     if (text.includes("टमाटर") || text.includes("tomato") || text.includes("भाव") || text.includes("price") || text.includes("rate") || text.includes("दाम") || text.includes("விலை") || text.includes("ధర")) {
       replyType = "price";
       replyText = language === "hi"
-        ? "टमाटर का आज का अनुमानित भाव छब्बीस से उनतीस रुपये प्रति किलो है। मांग आठ प्रतिशत बढ़ी है और शेल्फ लाइफ जोखिम कम है। आप फसल अभी बेच सकते हैं।"
-        : "Estimated tomato price is ₹26 to ₹29 per kg. Regional demand is up 8% this week. Low shelf-life risk; recommend selling this week.";
+        ? "टमाटर का आज का अनुमानित मंडी भाव छब्बीस से उनतीस रुपये प्रति किलो है। मांग आठ प्रतिशत बढ़ी है। शेल्फ लाइफ जोखिम कम है; आप अभी बेच सकते हैं।"
+        : "Estimated tomato price is ₹26 to ₹29 per kg with 8% increased regional demand. High market liquidity; recommended to trade now.";
     } else if (text.includes("सरसों") || text.includes("mustard") || text.includes("msp") || text.includes("एमएसपी") || text.includes("न्यूनतम")) {
       replyType = "price";
       replyText = language === "hi"
-        ? "सरसों का सरकारी न्यूनतम समर्थन मूल्य छप्पन रुपये पचास पैसे प्रति किलो है। फुलेरा और जयपुर मंडी में बिक्री भाव बयासी से अठानवे रुपये चालीस पैसे है। आप इसे होल्ड करके ई-एनडब्ल्यूआर एडवांस ले सकते हैं।"
-        : "Rapeseed & Mustard MSP floor is ₹56.50/kg. Regional selling price is ₹82 to ₹98.40/kg with 50% e-NWR pledge eligibility.";
+        ? "सरसों का सरकारी न्यूनतम समर्थन मूल्य छप्पन रुपये पचास पैसे प्रति किलो है। फुलेरा व जयपुर मंडी में भाव बयासी से अठानवे रुपये है। पचास प्रतिशत ई-एनडब्ल्यूआर अग्रिम उपलब्ध है।"
+        : "Mustard MSP floor is ₹56.50/kg. Mandi selling range is ₹82 to ₹98.40/kg with 50% e-NWR pledge loan eligibility.";
+    } else if (text.includes("गेहूं") || text.includes("wheat") || text.includes("कनक") || text.includes("अनाज")) {
+      replyType = "price";
+      replyText = language === "hi"
+        ? "गेहूं का सरकारी न्यूनतम समर्थन मूल्य चौबीस सौ पच्चीस रुपये प्रति क्विंटल है। जयपुर नॉर्थ मंडी में बिक्री दर चौबीस सौ पचास रुपये प्रति क्विंटल चल रही है।"
+        : "Wheat official MSP is ₹2,425/quintal. Jaipur North Mandi trades at ₹2,450/quintal with verified WDRA warehouse storage.";
     } else if (text.includes("स्टॉक") || text.includes("stock") || text.includes("गोदाम") || text.includes("warehouse") || text.includes("inventory")) {
       replyType = "stock";
       replyText = language === "hi"
-        ? "जयपुर नॉर्थ और सांगानेर गोदाम में आपकी फसल का सत्यापित डिजिटल लेजर रिकॉर्ड मौजूद है। सभी लॉट सुरक्षित हैं।"
+        ? "जयपुर नॉर्थ और सांगानेर गोदाम में आपकी फसल का सत्यापित डिजिटल लेजर रिकॉर्ड मौजूद है। सभी लॉट सुरक्षित और ग्रेड-ए प्रमाणित हैं।"
         : "Your verified crop batches are securely recorded on the FarmLink warehouse digital ledger with active lot tracking.";
     } else if (text.includes("पिकअप") || text.includes("pickup") || text.includes("गाड़ी") || text.includes("गाड़ी") || text.includes("वाहन") || text.includes("collection") || text.includes("transport")) {
       replyType = "pickup";
@@ -5976,38 +6088,31 @@ function Voice({ close, notify }) {
       replyType = "finance";
       replyText = language === "hi"
         ? "गोदाम में जमा सत्यापित फसल के आधार पर आप पचास प्रतिशत तक अग्रिम कार्यशील पूंजी का लाभ उठा सकते हैं। सहमति दर्ज करके आवेदन करें।"
-        : "Your stored warehouse stock is eligible for up to 50% working capital pledge advance under e-NWR. Proceed with consent review.";
+        : "Your stored warehouse stock is eligible for up to 50% working capital pledge advance under e-NWR.";
     } else {
       replyText = language === "hi"
-        ? "नमस्ते! मैं फार्मलिंक एआई सहायक हूँ। आप फसल के भाव, गोदाम स्टॉक, वाहन पिकअप या ई-एनडब्ल्यूआर एडवांस के बारे में पूछ सकते हैं।"
-        : "Namaste! I am the FarmLink AI voice assistant. Ask about live mandi prices, stock holding, cluster pickups, or e-NWR advance.";
+        ? "नमस्ते! मैं फार्मलिंक एआई सहायक हूँ। आप फसल के भाव, गोदाम स्टॉक, वाहन पिकअप या ई-एनडब्ल्यूआर 50% एडवांस के बारे में पूछ सकते हैं।"
+        : "Namaste! I am the FarmLink Voice Assistant. Ask about live mandi prices, stock holding, cluster pickups, or e-NWR 50% advance.";
     }
 
     setAiReply({ type: replyType, text: replyText });
-    setStatus("AI response ready. Audio playing…");
-    speakText(replyText, language);
-    notify("FarmLink AI response generated.");
+    setStatus("AI response ready. Playing voice audio…");
+    playVoiceResponse(replyText, language);
+    notify?.("FarmLink Voice answer generated.");
   };
 
-  const transcribe = async (blob) => {
-    if (!isSupabaseConfigured) {
-      setStatus("Processing voice audio locally…");
-      processVoiceQuery(transcript || "टमाटर का भाव");
-      return;
-    }
-    setStatus("Transcribing securely…");
+  const handleAudioBlob = async (blob) => {
+    setStatus("Transcribing audio with Sarvam Saaras AI…");
     try {
-      const form = new FormData();
-      const audio = blob instanceof File ? blob : new File([blob], "farmlink-recording.webm", { type: blob.type || "audio/webm" });
-      form.append("audio", audio);
-      form.append("provider", provider);
-      form.append("language", language);
-      const { data, error } = await supabase.functions.invoke("transcribe-audio", { body: form });
-      if (error) throw new Error(error.message);
-      if (!data?.text) throw new Error("No transcript returned.");
-      setTranscript(data.text);
-      processVoiceQuery(data.text);
-    } catch (error) {
+      const recognized = await transcribeWithSarvam(blob, { apiKey: sarvamKey, language });
+      if (recognized && recognized.trim()) {
+        setTranscript(recognized);
+        processVoiceQuery(recognized);
+      } else {
+        setStatus("Could not detect clear words. Please try again or type below.");
+      }
+    } catch (err) {
+      console.warn("Sarvam transcription notice:", err);
       setStatus("Voice transcribed locally. Processing query…");
       processVoiceQuery(transcript || (language === 'hi' ? "टमाटर का भाव बताओ" : "Check tomato price"));
     }
@@ -6015,58 +6120,52 @@ function Voice({ close, notify }) {
 
   const start = async () => {
     setAiReply(null);
-    if (provider === 'browser') {
-      const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!Recognition) {
-        setStatus('Browser speech recognition not active in this environment. Type below or select a quick question.');
-        return;
-      }
-      const recognition = new Recognition();
-      recognitionRef.current = recognition;
-      const langEntry = CONSTITUTIONAL_LANGUAGES.find((l) => l.code === language);
-      recognition.lang = langEntry?.speechCode || (language === 'hi' ? 'hi-IN' : 'en-IN');
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.onresult = event => {
-        let interim = "";
-        let finalSpoken = "";
-        for (let i = 0; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalSpoken += event.results[i][0].transcript;
-          } else {
-            interim += event.results[i][0].transcript;
-          }
-        }
-        const text = finalSpoken || interim;
-        if (text) setTranscript(text);
-        if (finalSpoken) {
-          processVoiceQuery(finalSpoken);
-        }
-      };
-      recognition.onerror = event => {
-        let msg = `Speech notice: ${event.error}.`;
-        if (event.error === 'not-allowed' || event.error === 'permission-denied') {
-          msg = "Microphone access blocked. Please enable mic permissions in your browser or type below.";
-        } else if (event.error === 'no-speech') {
-          msg = "No speech detected. Tap to speak again or use quick prompts.";
-        } else if (event.error === 'network') {
-          msg = "Speech recognition network error. You can type below.";
-        }
-        setStatus(msg);
-        setRecording(false);
-      };
-      recognition.onend = () => setRecording(false);
+    stopAllSpeech();
+
+    // Check if Browser Speech Recognition is available and preferred
+    const Recognition = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+    if (Recognition && provider === 'browser') {
       try {
+        const recognition = new Recognition();
+        recognitionRef.current = recognition;
+        const langEntry = CONSTITUTIONAL_LANGUAGES.find((l) => l.code === language);
+        recognition.lang = langEntry?.speechCode || (language === 'hi' ? 'hi-IN' : 'en-IN');
+        recognition.continuous = false;
+        recognition.interimResults = true;
+
+        recognition.onresult = (event) => {
+          let interim = "";
+          let finalSpoken = "";
+          for (let i = 0; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) finalSpoken += event.results[i][0].transcript;
+            else interim += event.results[i][0].transcript;
+          }
+          const text = finalSpoken || interim;
+          if (text) setTranscript(text);
+          if (finalSpoken) processVoiceQuery(finalSpoken);
+        };
+
+        recognition.onerror = () => {
+          setRecording(false);
+          setStatus("Browser speech notice. Switching to Sarvam AI audio recorder…");
+          startMediaRecorder();
+        };
+
+        recognition.onend = () => setRecording(false);
         recognition.start();
         setRecording(true);
         setTranscript('');
-        setStatus('Listening… बोलिए… Speak your query now.');
+        setStatus("Listening… बोलिए… Speak your query now.");
+        return;
       } catch {
-        setStatus('Speech recognition could not start. Please try again or type directly.');
+        // Fallback to media recorder
       }
-      return;
     }
 
+    startMediaRecorder();
+  };
+
+  const startMediaRecorder = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
@@ -6076,28 +6175,28 @@ function Voice({ close, notify }) {
       };
       recorder.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
-        transcribe(new Blob(chunksRef.current, { type: "audio/webm" }));
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        handleAudioBlob(blob);
       };
       recorder.start();
       recorderRef.current = recorder;
       setRecording(true);
       setTranscript("");
-      setStatus("Recording audio… speak your request now.");
+      setStatus("Recording audio via Sarvam Saaras AI… Click Stop when done.");
     } catch {
-      setStatus("Microphone access unavailable. Choose a quick prompt or type below.");
+      setStatus("Microphone permission unavailable. Select a quick prompt or type below.");
+      setRecording(false);
     }
   };
 
   const stop = () => {
-    if (provider === 'browser') {
-      recognitionRef.current?.stop();
-      setRecording(false);
-      return;
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
     }
-    if (recorderRef.current?.state === "recording") {
+    if (recorderRef.current && recorderRef.current.state === "recording") {
       recorderRef.current.stop();
-      setRecording(false);
     }
+    setRecording(false);
   };
 
   const handleQuickPrompt = (promptText) => {
@@ -6108,81 +6207,102 @@ function Voice({ close, notify }) {
   return (
     <div className="modal-back">
       <div className="modal voice-modal" style={{ maxWidth: '540px' }}>
-        <button className="close" onClick={close}>
-          <X />
+        <button className="close" onClick={() => { stopAllSpeech(); close(); }} aria-label="Close">
+          <X size={18} />
         </button>
-        <div className="voice-orb" style={{ animation: recording ? 'pulse 1.2s infinite' : 'none' }}>
-          <Mic size={42} />
+        <div
+          className="voice-orb"
+          style={{
+            animation: recording ? 'pulseGlow 1.2s infinite' : 'none',
+            background: recording ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, var(--primary), var(--secondary))',
+            boxShadow: recording ? '0 0 24px rgba(239, 68, 68, 0.4)' : '0 0 24px var(--primary-glow)'
+          }}
+        >
+          <Mic size={38} color="#fff" />
         </div>
-        <p className="eyebrow green">MULTILINGUAL VOICE AI (ALL 22 INDIAN LANGUAGES)</p>
-        <h2>Ask in your own language · अपनी भाषा में पूछें</h2>
-        <p style={{ fontSize: '0.9rem', color: '#555' }}>
-          Speak or select a query in any of India's 22 official constitutional languages for instant AI guidance on mandi rates, MSP, warehouse lots, and logistics.
+        <p className="eyebrow green" style={{ justifyContent: 'center' }}>MULTILINGUAL VOICE AI (ALL 22 INDIC LANGUAGES)</p>
+        <h2 style={{ fontSize: '1.5rem', margin: '4px 0 8px' }}>Ask in Your Own Language</h2>
+        <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', margin: '0 0 16px' }}>
+          Speak naturally in Hindi or any official Indian dialect for instant voice guidance on mandi prices, WDRA warehouse storage, and e-NWR 50% pledge advances.
         </p>
 
-        <div className="voice-options" style={{ margin: '10px 0' }}>
-          <label>
-            Language / भाषा:
+        <div className="voice-options" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+          <label style={{ margin: 0, fontSize: '0.8rem' }}>
+            <span>Language / भाषा:</span>
             <select
               value={language}
               disabled={recording}
               onChange={(e) => setLanguage(e.target.value)}
+              style={{ padding: '8px', fontSize: '0.82rem' }}
             >
               {CONSTITUTIONAL_LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>
-                  {l.nativeName} · {l.name}
+                  {l.name} ({l.nativeName})
                 </option>
               ))}
             </select>
           </label>
-          <label>
-            Input Mode:
+          <label style={{ margin: 0, fontSize: '0.8rem' }}>
+            <span>Speech Engine:</span>
             <select
               value={provider}
               disabled={recording}
               onChange={(e) => setProvider(e.target.value)}
+              style={{ padding: '8px', fontSize: '0.82rem' }}
             >
-              <option value="browser">Real-Time Voice Assistant</option>
-              <option value="auto">Audio Record & Transcribe</option>
+              <option value="auto">Auto (Sarvam Saaras + Bulbul)</option>
+              <option value="browser">Browser Web Speech</option>
             </select>
           </label>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '8px 0 12px' }}>
-          <button type="button" className="secondary" style={{ fontSize: '0.8rem', padding: '4px 8px' }} onClick={() => handleQuickPrompt("टमाटर का भाव बताओ (Tomato price today)")}>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          <button type="button" className="secondary" style={{ fontSize: '0.78rem', padding: '5px 9px' }} onClick={() => handleQuickPrompt("टमाटर का आज का मंडी भाव बताओ")}>
             🍅 टमाटर का भाव
           </button>
-          <button type="button" className="secondary" style={{ fontSize: '0.8rem', padding: '4px 8px' }} onClick={() => handleQuickPrompt("सरसों का एमएसपी और बिक्री मूल्य (Mustard price & MSP)")}>
+          <button type="button" className="secondary" style={{ fontSize: '0.78rem', padding: '5px 9px' }} onClick={() => handleQuickPrompt("सरसों का सरकारी एमएसपी और बिक्री मूल्य क्या है?")}>
             🌾 सरसों मूल्य व MSP
           </button>
-          <button type="button" className="secondary" style={{ fontSize: '0.8rem', padding: '4px 8px' }} onClick={() => handleQuickPrompt("गोदाम में मेरा स्टॉक कितना है? (Check stock balance)")}>
+          <button type="button" className="secondary" style={{ fontSize: '0.78rem', padding: '5px 9px' }} onClick={() => handleQuickPrompt("गोदाम में मेरा कितना स्टॉक जमा है?")}>
             📦 मेरा स्टॉक
           </button>
-          <button type="button" className="secondary" style={{ fontSize: '0.8rem', padding: '4px 8px' }} onClick={() => handleQuickPrompt("50% e-NWR एडवांस की पात्रता (50% e-NWR advance)")}>
-            💰 50% एडवांस
+          <button type="button" className="secondary" style={{ fontSize: '0.78rem', padding: '5px 9px' }} onClick={() => handleQuickPrompt("e-NWR 50% अग्रिम लोन की पात्रता बताओ")}>
+            💰 50% e-NWR एडवांस
           </button>
         </div>
 
-        <button className="primary" onClick={recording ? stop : start} style={{ width: '100%', padding: '12px' }}>
+        <button
+          className={recording ? "primary" : "hero-btn-primary"}
+          onClick={recording ? stop : start}
+          style={{
+            width: '100%',
+            padding: '12px',
+            fontSize: '0.95rem',
+            background: recording ? '#dc2626' : undefined,
+            justifyContent: 'center'
+          }}
+        >
           <Mic size={18} />
-          {recording ? "Stop & Process Voice" : "Tap to Speak / बोलें"}
+          {recording ? "Stop Recording & Process Voice" : "Tap to Speak / बोलें"}
         </button>
 
-        <p className="voice-status" style={{ margin: '8px 0', fontSize: '0.85rem' }}>{status}</p>
+        <p className="voice-status" style={{ margin: '10px 0', fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+          {status}
+        </p>
 
-        <div style={{ margin: '8px 0' }}>
+        <div style={{ margin: '10px 0' }}>
           <input
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
             placeholder="Or type your query here (e.g. Tomato price, pickup)..."
-            style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #ccc' }}
+            style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', fontSize: '0.88rem' }}
             onKeyDown={(e) => { if (e.key === 'Enter') processVoiceQuery(transcript); }}
           />
           {transcript && (
             <button
               className="secondary"
               type="button"
-              style={{ marginTop: '6px', width: '100%', padding: '6px' }}
+              style={{ marginTop: '8px', width: '100%', padding: '8px', fontWeight: 700 }}
               onClick={() => processVoiceQuery(transcript)}
             >
               Ask FarmLink AI ➔
@@ -6191,21 +6311,50 @@ function Voice({ close, notify }) {
         </div>
 
         {aiReply && (
-          <div style={{ background: '#eef7f2', border: '1px solid #b7e0c7', borderRadius: '8px', padding: '12px', marginTop: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <strong style={{ color: '#1a4e2e', fontSize: '0.9rem' }}>🔊 FarmLink Voice Answer:</strong>
-              <button
-                type="button"
-                className="secondary"
-                style={{ fontSize: '0.75rem', padding: '2px 8px' }}
-                onClick={() => speakText(aiReply.text, language)}
-              >
-                Replay Audio ↺
-              </button>
+          <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', marginTop: '12px', textAlign: 'left' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <strong style={{ color: 'var(--primary)', fontSize: '0.88rem' }}>🔊 FarmLink Voice Response:</strong>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  className="secondary"
+                  style={{ fontSize: '0.75rem', padding: '3px 8px' }}
+                  onClick={() => playVoiceResponse(aiReply.text, language)}
+                >
+                  {isSpeaking ? "Speaking… ↺" : "Replay Audio ↺"}
+                </button>
+                {isSpeaking && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    style={{ fontSize: '0.75rem', padding: '3px 8px', color: '#ef4444' }}
+                    onClick={stopAllSpeech}
+                  >
+                    Stop ■
+                  </button>
+                )}
+              </div>
             </div>
-            <p style={{ margin: '6px 0 0', color: '#203929', fontSize: '0.95rem', lineHeight: '1.5' }}>
+            <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.92rem', lineHeight: '1.55' }}>
               {aiReply.text}
             </p>
+          </div>
+        )}
+
+        {setModal && (
+          <div style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+            <button
+              type="button"
+              className="text-btn"
+              style={{ width: '100%', justifyContent: 'center', fontSize: '0.85rem' }}
+              onClick={() => {
+                stopAllSpeech();
+                close();
+                setModal("agentic");
+              }}
+            >
+              <Sparkles size={15} /> Switch to Full Dual-Engine AI Copilot 🚀
+            </button>
           </div>
         )}
       </div>

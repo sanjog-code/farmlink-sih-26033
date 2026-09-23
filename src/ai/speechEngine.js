@@ -201,8 +201,11 @@ export async function convertBlobToWav(blob) {
 
 // ─── 3. SARVAM AI SAARAS ASR & BULBUL TTS ───────────────────────────────────
 
-export async function transcribeWithSarvam(audioBlob, { apiKey, language = 'hi' }) {
-  if (!apiKey || !apiKey.trim()) throw new Error('Sarvam API key is required.');
+export const DEFAULT_SARVAM_KEY = 'sk_v9yrxpg0_ZzIdidU18EjUTGEFfkajp7OZ';
+
+export async function transcribeWithSarvam(audioBlob, { apiKey = DEFAULT_SARVAM_KEY, language = 'hi' } = {}) {
+  const activeKey = (apiKey && apiKey.trim()) || DEFAULT_SARVAM_KEY;
+  if (!activeKey) throw new Error('Sarvam API key is required.');
 
   // Transcode to 16kHz PCM WAV for Sarvam Saaras
   const wavBlob = await convertBlobToWav(audioBlob);
@@ -455,3 +458,6 @@ export function stopAllSpeech() {
     currentAudioInstance = null;
   }
 }
+
+export const speakHybrid = unifiedSpeak;
+
