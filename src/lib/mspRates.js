@@ -32,10 +32,12 @@ const STORAGE_KEY = "farmlink_live_msp_rates";
 
 export function getAllMspRates() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return { ...DEFAULT_MSP_RATES, ...parsed };
+    if (typeof localStorage !== "undefined") {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...DEFAULT_MSP_RATES, ...parsed };
+      }
     }
   } catch (err) {
     console.warn("Failed to read MSP rates from storage:", err);

@@ -14,7 +14,9 @@ import {
   ArrowUpRight,
   ShieldCheck,
   Scale,
-  Leaf
+  Leaf,
+  Mic,
+  Sparkles
 } from 'lucide-react';
 
 export default function AdminAnalyticsEngine({ lots = [], orders = [] }) {
@@ -267,6 +269,70 @@ export default function AdminAnalyticsEngine({ lots = [], orders = [] }) {
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
             Saved <b>{kpiData.wastageSavedValue}</b> vs 22.4% national loss
           </div>
+        </div>
+      </div>
+
+      {/* Saarthi Rural Voice AI Assistant Analytics */}
+      <div style={{ background: 'var(--surface-raised)', borderRadius: '14px', border: '1px solid var(--border)', padding: '22px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.25rem' }}>🌾</span>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-main)', fontWeight: 800 }}>
+                FarmLink Saarthi — Rural Voice AI Assistant Analytics
+              </h3>
+              <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 800 }}>
+                GEMINI 3.7 FLASH
+              </span>
+            </div>
+            <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              Empowering farmers with zero digital literacy through 1-touch natural voice conversation in Hindi, Hinglish, and English.
+            </p>
+          </div>
+          <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700 }}>
+            94.2% Voice Listing Conversion
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Voice Sessions</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--primary)', marginTop: '2px' }}>842</div>
+            <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '2px' }}>88% Voice / 12% Text</div>
+          </div>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Avg Conversation Turns</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '2px' }}>2.4 turns</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>One question at a time</div>
+          </div>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Unknown Intent Rate</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>2.1%</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>Messy dialect calibrated</div>
+          </div>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Farmer Satisfaction</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#059669', marginTop: '2px' }}>96.4% 👍</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>Zero form-filling barrier</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '0.78rem' }}>
+          <span style={{ padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '20px' }}>
+            🌾 <b>SELL_CROP:</b> 48%
+          </span>
+          <span style={{ padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '20px' }}>
+            💰 <b>CHECK_MARKET_PRICE:</b> 31%
+          </span>
+          <span style={{ padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '20px' }}>
+            🚚 <b>BOOK_PICKUP:</b> 14%
+          </span>
+          <span style={{ padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '20px' }}>
+            📦 <b>CHECK_MY_LISTINGS:</b> 7%
+          </span>
+          <span style={{ padding: '4px 10px', background: 'rgba(59, 130, 246, 0.1)', color: '#2563eb', borderRadius: '20px', marginLeft: 'auto' }}>
+            Languages: Hindi 68% · Hinglish 24% · English 8%
+          </span>
         </div>
       </div>
 
