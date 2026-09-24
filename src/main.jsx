@@ -951,25 +951,34 @@ function App() {
           return;
         }
         if (active && data) {
-          setOrders(data.map((order) => ({
-            id: order.order_code,
-            dbId: order.id,
-            quantity: Number(order.total_kg || 0),
-            totalAmount: Number(order.total_amount || 0),
-            items: 0,
-            status: (order.status || "pending_verification")
-              .split("_")
-              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(" "),
-            cancellationDeadline: order.cancellation_expires_at
-              ? new Date(order.cancellation_expires_at).getTime()
-              : null,
-            pickupWarehouse: order.warehouse_name || order.warehouses?.name || "Warehouse",
-            consumerName: order.consumer_name || "",
-            consumerAddress: order.consumer_address || "",
-            consumerMobile: order.consumer_mobile || "",
-            createdAt: order.created_at,
-          })));
+          const localOrders = getUserOrders();
+          const localMap = new Map((localOrders || []).map((o) => [o.id || o.order_code, o]));
+          setOrders(data.map((order) => {
+            const local = localMap.get(order.order_code) || {};
+            return {
+              id: order.order_code,
+              dbId: order.id,
+              quantity: Number(order.total_kg || 0),
+              totalAmount: local.totalAmount || Number(order.total_amount || 0),
+              subtotal: local.subtotal || Number(order.total_amount || 0),
+              doorstepFee: local.doorstepFee || 0,
+              coldChainFee: local.coldChainFee || 0,
+              deliveryMode: local.deliveryMode || "pickup",
+              items: local.items || 0,
+              status: (order.status || "pending_verification")
+                .split("_")
+                .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(" "),
+              cancellationDeadline: order.cancellation_expires_at
+                ? new Date(order.cancellation_expires_at).getTime()
+                : null,
+              pickupWarehouse: order.warehouse_name || order.warehouses?.name || local.pickupWarehouse || "Warehouse",
+              consumerName: order.consumer_name || local.consumerName || "",
+              consumerAddress: order.consumer_address || local.consumerAddress || "",
+              consumerMobile: order.consumer_mobile || local.consumerMobile || "",
+              createdAt: order.created_at,
+            };
+          }));
         }
       } catch (err) {
         console.warn("loadOrders exception:", err);
@@ -2686,7 +2695,14 @@ function ConsumerHub({
                 <div className="tracking" key={order.id}>
                   <b>{order.id}</b>
                   <span>{order.status}</span>
-                  <span>Pickup at {order.pickupWarehouse}</span>
+                  <span>
+                    {order.deliveryMode === "doorstep"
+                      ? `🚚 Doorstep Delivery · ${order.consumerAddress || order.deliveryAddress || "Home Address"}`
+                      : `🏬 Pickup at ${order.pickupWarehouse}`}
+                  </span>
+                  <span style={{ fontWeight: 800, color: "var(--primary)" }}>
+                    Grand Total: ₹{Number(order.totalAmount || order.total_amount || 0).toFixed(2)}
+                  </span>
                   {canCancel ? (
                     <>
                       <strong>
@@ -2801,7 +2817,7 @@ function ConsumerHub({
           </button>
         </div>
       )}
-      {confirmingOrder && <div className="confirm-order-back" role="dialog" aria-modal="true" aria-labelledby="confirm-order-title"><div className="confirm-order-card"><p className="eyebrow green">CONFIRM ORDER NOW</p><h2 id="confirm-order-title">Skip the cancellation window?</h2><p>You are confirming <b>{confirmingOrder.id}</b> for pickup at <b>{confirmingOrder.pickupWarehouse}</b>. Once confirmed, this order cannot be cancelled from your account and fulfillment can begin immediately.</p><div><button className="secondary" onClick={() => setConfirmingOrder(null)}>Keep cancellation window</button><button className="primary" onClick={async () => { if (await confirmOrderNow(confirmingOrder.id)) setConfirmingOrder(null); }}>Yes, confirm order</button></div></div></div>}
+      {confirmingOrder && <div className="confirm-order-back" role="dialog" aria-modal="true" aria-labelledby="confirm-order-title"><div className="confirm-order-card"><p className="eyebrow green">CONFIRM ORDER NOW</p><h2 id="confirm-order-title">Skip the cancellation window?</h2><p>You are confirming <b>{confirmingOrder.id}</b> for {confirmingOrder.deliveryMode === "doorstep" ? `doorstep delivery to ${confirmingOrder.consumerAddress || confirmingOrder.deliveryAddress}` : `pickup at ${confirmingOrder.pickupWarehouse}`} (Grand Total: ₹{Number(confirmingOrder.totalAmount || confirmingOrder.total_amount || 0).toFixed(2)}). Once confirmed, this order cannot be cancelled from your account and fulfillment can begin immediately.</p><div><button className="secondary" onClick={() => setConfirmingOrder(null)}>Keep cancellation window</button><button className="primary" onClick={async () => { if (await confirmOrderNow(confirmingOrder.id)) setConfirmingOrder(null); }}>Yes, confirm order</button></div></div></div>}
       {collectingOrder && <div className="confirm-order-back" role="dialog" aria-modal="true" aria-labelledby="collect-order-title"><div className="confirm-order-card"><p className="eyebrow green">PICKUP CONFIRMATION</p><h2 id="collect-order-title">Have you collected this order?</h2><p>Confirm only after receiving <b>{collectingOrder.id}</b> from <b>{collectingOrder.pickupWarehouse}</b>. This records the completed handoff for the warehouse and FarmLink admin team.</p><div><button className="secondary" onClick={() => setCollectingOrder(null)}>Not yet</button><button className="primary" onClick={async () => { if (await confirmOrderCollection(collectingOrder.id)) setCollectingOrder(null); }}>Yes, I collected it</button></div></div></div>}
     </section>
   );
@@ -6408,7 +6424,7 @@ function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, pla
   const [addressLine, setAddressLine] = useState("Flat 402, Royal Greens, Sikar Road");
   const [district, setDistrict] = useState("Jaipur");
   const [pincode, setPincode] = useState("302013");
-  const [coldChain, setColdChain] = useState(true);
+  const [coldChain, setColdChain] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState(null);
 
   useEffect(() => {
@@ -6424,7 +6440,10 @@ function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, pla
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!cart.length) return;
-    const order = await placeOrder(warehouse, {
+    const designatedWarehouse = deliveryMode === "pickup"
+      ? warehouse
+      : (warehouse || warehouses[0]?.name || "Jaipur North WDRA Hub (CWC)");
+    const order = await placeOrder(designatedWarehouse, {
       deliveryMode,
       consumerName,
       consumerMobile,
@@ -6526,6 +6545,11 @@ function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, pla
 
   // ─── VIEW 2: DOORSTEP DELIVERY CONFIRMED ─────────────────────────────────────
   if (confirmedOrder && confirmedOrder.deliveryMode === "doorstep") {
+    const confirmedSubtotal = Number(confirmedOrder.subtotal || (confirmedOrder.totalAmount - (confirmedOrder.doorstepFee || 0) - (confirmedOrder.coldChainFee || 0)) || 0);
+    const confirmedDoorstepFee = Number(confirmedOrder.doorstepFee || (confirmedOrder.deliveryMode === "doorstep" ? Math.round(confirmedSubtotal * 0.05 * 100) / 100 : 0));
+    const confirmedColdChainFee = Number(confirmedOrder.coldChainFee || (confirmedOrder.coldChain ? Math.round(confirmedSubtotal * 0.04 * 100) / 100 : 0));
+    const confirmedGrandTotal = Number(confirmedOrder.totalAmount || (confirmedSubtotal + confirmedDoorstepFee + confirmedColdChainFee));
+
     return (
       <div className="modal-back">
         <div className="modal checkout-modal" style={{ maxWidth: "540px", maxHeight: "90vh", overflowY: "auto", textAlign: "center" }}>
@@ -6535,14 +6559,34 @@ function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, pla
           <div style={{ fontSize: "3rem", margin: "10px 0 4px" }}>🚚</div>
           <h2 style={{ margin: "2px 0 6px" }}>Doorstep Delivery Scheduled</h2>
           <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "0 auto 16px", maxWidth: "440px" }}>
-            Your order <b>{confirmedOrder.id}</b> is being packed at {confirmedOrder.pickupWarehouse}.
+            Your order <b>{confirmedOrder.id}</b> is registered in escrow and dispatched from {confirmedOrder.pickupWarehouse}.
           </p>
 
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "10px", padding: "14px", textAlign: "left", fontSize: "0.84rem", marginBottom: "16px" }}>
             <p style={{ margin: "0 0 6px" }}><b>Recipient:</b> {confirmedOrder.consumerName} ({confirmedOrder.consumerMobile})</p>
-            <p style={{ margin: "0 0 6px" }}><b>Address:</b> {confirmedOrder.consumerAddress}</p>
-            <p style={{ margin: "0 0 6px" }}><b>Produce:</b> {confirmedOrder.quantity} kg ({confirmedOrder.items} lots)</p>
-            <p style={{ margin: "0", color: "var(--primary)", fontWeight: 700 }}><b>Total Settled:</b> ₹{Number(confirmedOrder.totalAmount || 0).toFixed(2)} (inc. 5% delivery charge)</p>
+            <p style={{ margin: "0 0 6px" }}><b>Delivery Destination:</b> {confirmedOrder.consumerAddress || confirmedOrder.deliveryAddress}</p>
+            <p style={{ margin: "0 0 8px" }}><b>Produce Weight:</b> {confirmedOrder.quantity} kg ({confirmedOrder.items} lots)</p>
+
+            <div style={{ paddingTop: "8px", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "4px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                <span>Produce Items Subtotal:</span>
+                <b>₹{confirmedSubtotal.toFixed(2)}</b>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", color: "#b45309", fontSize: "0.82rem" }}>
+                <span>Doorstep Farm Delivery Charge (+5%):</span>
+                <b>+₹{confirmedDoorstepFee.toFixed(2)}</b>
+              </div>
+              {confirmedColdChainFee > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", color: "#0284c7", fontSize: "0.82rem" }}>
+                  <span>Cold Storage &amp; Reefer Fee (+4%):</span>
+                  <b>+₹{confirmedColdChainFee.toFixed(2)}</b>
+                </div>
+              )}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "6px", marginTop: "4px", borderTop: "1.5px solid var(--border)", fontSize: "0.95rem" }}>
+                <b>Grand Total Settled (Escrow):</b>
+                <b style={{ color: "var(--primary)", fontSize: "1.15rem" }}>₹{confirmedGrandTotal.toFixed(2)}</b>
+              </div>
+            </div>
           </div>
 
           <button type="button" className="primary" onClick={close} style={{ width: "100%", padding: "11px" }}>
@@ -6620,22 +6664,57 @@ function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, pla
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           {/* Delivery Mode Toggle */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", background: "var(--surface-raised)", padding: "4px", borderRadius: "10px", border: "1px solid var(--border)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", margin: "2px 0 4px" }}>
             <button
               type="button"
               className={deliveryMode === "pickup" ? "primary" : "secondary"}
-              style={{ padding: "8px", fontSize: "0.82rem", borderRadius: "8px", border: "none" }}
+              style={{
+                padding: "10px 12px",
+                fontSize: "0.84rem",
+                borderRadius: "10px",
+                border: deliveryMode === "pickup" ? "2px solid var(--primary)" : "1.5px solid var(--border)",
+                cursor: "pointer",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: "3px",
+                textAlign: "left",
+                background: deliveryMode === "pickup" ? "var(--primary)" : "var(--surface-raised)",
+                color: deliveryMode === "pickup" ? "#ffffff" : "var(--text-main)"
+              }}
               onClick={() => setDeliveryMode("pickup")}
             >
-              🏬 WDRA Warehouse Pickup (Free)
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 800 }}>
+                <span>🏬 WDRA Pickup</span>
+                <span style={{ fontSize: "0.7rem", padding: "1px 6px", borderRadius: "10px", background: deliveryMode === "pickup" ? "rgba(255,255,255,0.25)" : "var(--surface)", border: "1px solid currentColor" }}>FREE</span>
+              </div>
+              <small style={{ fontSize: "0.73rem", opacity: deliveryMode === "pickup" ? 0.9 : 0.7 }}>Collect at state warehouse terminal</small>
             </button>
+
             <button
               type="button"
               className={deliveryMode === "doorstep" ? "primary" : "secondary"}
-              style={{ padding: "8px", fontSize: "0.82rem", borderRadius: "8px", border: "none" }}
+              style={{
+                padding: "10px 12px",
+                fontSize: "0.84rem",
+                borderRadius: "10px",
+                border: deliveryMode === "doorstep" ? "2px solid #b45309" : "1.5px solid var(--border)",
+                cursor: "pointer",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: "3px",
+                textAlign: "left",
+                background: deliveryMode === "doorstep" ? "#b45309" : "var(--surface-raised)",
+                color: deliveryMode === "doorstep" ? "#ffffff" : "var(--text-main)"
+              }}
               onClick={() => setDeliveryMode("doorstep")}
             >
-              🚚 Doorstep Farm Delivery (+5%)
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 800 }}>
+                <span>🚚 Doorstep Delivery</span>
+                <span style={{ fontSize: "0.7rem", padding: "1px 6px", borderRadius: "10px", background: deliveryMode === "doorstep" ? "rgba(255,255,255,0.25)" : "rgba(234,179,8,0.2)", border: "1px solid currentColor" }}>+5% FEE</span>
+              </div>
+              <small style={{ fontSize: "0.73rem", opacity: deliveryMode === "doorstep" ? 0.9 : 0.7 }}>Direct farmgate truck to doorstep</small>
             </button>
           </div>
 
@@ -6674,26 +6753,28 @@ function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, pla
             </div>
           </div>
 
-          {/* Destination Warehouse */}
-          <div>
-            <label style={{ fontSize: "0.78rem", fontWeight: 700, display: "block", marginBottom: "4px" }}>
-              Intake / Pickup WDRA Registered Warehouse:
-            </label>
-            <select
-              value={warehouse}
-              onChange={(e) => setWarehouse(e.target.value)}
-              style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid var(--border)", background: "var(--surface)" }}
-            >
-              {warehouses.map((item) => (
-                <option key={item.id || item.name} value={item.name}>
-                  {item.name} {item.wdraRegNo ? `(${item.wdraRegNo})` : ""} · {item.district || "Rajasthan"}
-                </option>
-              ))}
-            </select>
-            <small style={{ color: "var(--text-muted)", display: "block", marginTop: "3px", fontSize: "0.74rem" }}>
-              {warehouses.find(w => w.name === warehouse)?.address || "WDRA accredited state warehousing terminal"}
-            </small>
-          </div>
+          {/* Destination Warehouse (ONLY for WDRA Warehouse Pickup - removed from Doorstep Delivery) */}
+          {deliveryMode === "pickup" && (
+            <div>
+              <label style={{ fontSize: "0.78rem", fontWeight: 700, display: "block", marginBottom: "4px" }}>
+                Intake / Pickup WDRA Registered Warehouse:
+              </label>
+              <select
+                value={warehouse}
+                onChange={(e) => setWarehouse(e.target.value)}
+                style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid var(--border)", background: "var(--surface)" }}
+              >
+                {warehouses.map((item) => (
+                  <option key={item.id || item.name} value={item.name}>
+                    {item.name} {item.wdraRegNo ? `(${item.wdraRegNo})` : ""} · {item.district || "Rajasthan"}
+                  </option>
+                ))}
+              </select>
+              <small style={{ color: "var(--text-muted)", display: "block", marginTop: "3px", fontSize: "0.74rem" }}>
+                {warehouses.find(w => w.name === warehouse)?.address || "WDRA accredited state warehousing terminal"}
+              </small>
+            </div>
+          )}
 
           {/* Address Line (Mandatory if doorstep delivery) */}
           {deliveryMode === "doorstep" && (
@@ -6757,27 +6838,41 @@ function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, pla
             </label>
           </div>
 
-          {/* Itemized Price Breakdown */}
-          <div style={{ margin: "4px 0", padding: "10px 14px", background: "var(--surface-raised)", borderRadius: "10px", border: "1px solid var(--border)", fontSize: "0.83rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+          {/* Itemized Price Breakdown & Grand Total */}
+          <div style={{ margin: "4px 0", padding: "12px 14px", background: "var(--surface-raised)", borderRadius: "10px", border: "1.5px solid var(--border)", fontSize: "0.83rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
               <span style={{ color: "var(--text-muted)" }}>Produce Items Subtotal ({totalKg} kg):</span>
               <b>₹{subtotal.toFixed(2)}</b>
             </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px", color: deliveryMode === "doorstep" ? "#b45309" : "var(--text-muted)" }}>
+              <span>Doorstep Delivery Charge (DSD +5%):</span>
+              <b>{deliveryMode === "doorstep" ? `+₹${doorstepFee.toFixed(2)}` : "₹0.00 (Self-Pickup Free)"}</b>
+            </div>
+
             {coldChain && (
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", color: "#0284c7" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px", color: "#0284c7" }}>
                 <span>Cold Storage &amp; Reefer Fee (+4%):</span>
                 <b>+₹{coldChainFee.toFixed(2)}</b>
               </div>
             )}
-            {deliveryMode === "doorstep" && (
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", color: "#b45309" }}>
-                <span>Doorstep Farmgate Delivery (+5%):</span>
-                <b>+₹{doorstepFee.toFixed(2)}</b>
+
+            {(doorstepFee > 0 || coldChainFee > 0) && (
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "0.78rem", color: "var(--text-muted)", borderTop: "1px dashed var(--border)", paddingTop: "5px" }}>
+                <span>Total Added Surcharges:</span>
+                <b>+₹{(doorstepFee + coldChainFee).toFixed(2)}</b>
               </div>
             )}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "6px", marginTop: "4px", borderTop: "1px solid var(--border)" }}>
-              <span style={{ fontWeight: 700 }}>Total Payable:</span>
-              <b style={{ fontSize: "1.25rem", color: "var(--primary)" }}>₹{grandTotal.toFixed(2)}</b>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "8px", marginTop: "4px", borderTop: "1.5px solid var(--border)" }}>
+              <div>
+                <span style={{ fontWeight: 800, fontSize: "0.94rem", display: "block" }}>Grand Total:</span>
+                <small style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                  {deliveryMode === "doorstep" ? "Subtotal + 5% Doorstep Delivery" : "Subtotal + Free Warehouse Pickup"}
+                  {coldChain ? " + 4% Cold Storage" : ""}
+                </small>
+              </div>
+              <b style={{ fontSize: "1.35rem", color: "var(--primary)" }}>₹{grandTotal.toFixed(2)}</b>
             </div>
           </div>
 
@@ -6785,10 +6880,10 @@ function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, pla
             type="submit"
             className="primary checkout-confirm"
             disabled={placingOrder || !cart.length}
-            style={{ padding: "11px", fontWeight: 800, fontSize: "0.95rem" }}
+            style={{ padding: "12px", fontWeight: 800, fontSize: "0.95rem" }}
           >
             <PackageCheck size={18} />
-            {placingOrder ? "Recording Escrow Order…" : `Confirm Order · ₹${grandTotal.toFixed(2)}`}
+            {placingOrder ? "Recording Escrow Order…" : `Confirm Order · Grand Total ₹${grandTotal.toFixed(2)}`}
           </button>
         </form>
       </div>
