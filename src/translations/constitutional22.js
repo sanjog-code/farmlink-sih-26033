@@ -1,34 +1,196 @@
 // Comprehensive dictionary for all 22 official languages recognized by the
 // Eighth Schedule of the Constitution of India + English (base).
+// Fully supports Indic typography, bidirectional text (RTL/LTR), and dynamic interpolation.
 
 export const CONSTITUTIONAL_LANGUAGES = [
-  { code: "en", name: "English", nativeName: "English", speechCode: "en-IN" },
-  { code: "as", name: "Assamese", nativeName: "অসমীয়া", speechCode: "as-IN" },
-  { code: "bn", name: "Bengali", nativeName: "বাংলা", speechCode: "bn-IN" },
-  { code: "brx", name: "Bodo", nativeName: "बड़ो", speechCode: "brx-IN" },
-  { code: "doi", name: "Dogri", nativeName: "डोगरी", speechCode: "doi-IN" },
-  { code: "gu", name: "Gujarati", nativeName: "ગુજરાતી", speechCode: "gu-IN" },
-  { code: "hi", name: "Hindi", nativeName: "हिन्दी", speechCode: "hi-IN" },
-  { code: "kn", name: "Kannada", nativeName: "ಕನ್ನಡ", speechCode: "kn-IN" },
-  { code: "ks", name: "Kashmiri", nativeName: "کٲشُر", speechCode: "ks-IN" },
-  { code: "kok", name: "Konkani", nativeName: "कोंकणी", speechCode: "kok-IN" },
-  { code: "mai", name: "Maithili", nativeName: "मैथिली", speechCode: "mai-IN" },
-  { code: "ml", name: "Malayalam", nativeName: "മലയാളം", speechCode: "ml-IN" },
-  { code: "mni", name: "Manipuri", nativeName: "মৈতৈলোন্", speechCode: "mni-IN" },
-  { code: "mr", name: "Marathi", nativeName: "मराठी", speechCode: "mr-IN" },
-  { code: "ne", name: "Nepali", nativeName: "नेपाली", speechCode: "ne-NP" },
-  { code: "or", name: "Odia", nativeName: "ଓଡ଼ିଆ", speechCode: "or-IN" },
-  { code: "pa", name: "Punjabi", nativeName: "ਪੰਜਾਬੀ", speechCode: "pa-IN" },
-  { code: "sa", name: "Sanskrit", nativeName: "संस्कृतम्", speechCode: "sa-IN" },
-  { code: "sat", name: "Santali", nativeName: "ᱥᱟᱱᱛᱟᱲᱤ", speechCode: "sat-IN" },
-  { code: "sd", name: "Sindhi", nativeName: "سنڌي", speechCode: "sd-IN" },
-  { code: "ta", name: "Tamil", nativeName: "தமிழ்", speechCode: "ta-IN" },
-  { code: "te", name: "Telugu", nativeName: "తెలుగు", speechCode: "te-IN" },
-  { code: "ur", name: "Urdu", nativeName: "اُردُو", speechCode: "ur-IN" }
+  {
+    "code": "en",
+    "name": "English",
+    "nativeName": "English",
+    "speechCode": "en-IN",
+    "dir": "ltr",
+    "region": "National / Business"
+  },
+  {
+    "code": "hi",
+    "name": "Hindi",
+    "nativeName": "हिन्दी",
+    "speechCode": "hi-IN",
+    "dir": "ltr",
+    "region": "North & Central India"
+  },
+  {
+    "code": "pa",
+    "name": "Punjabi",
+    "nativeName": "ਪੰਜਾਬੀ",
+    "speechCode": "pa-IN",
+    "dir": "ltr",
+    "region": "Punjab, Haryana, Delhi"
+  },
+  {
+    "code": "bn",
+    "name": "Bengali",
+    "nativeName": "বাংলা",
+    "speechCode": "bn-IN",
+    "dir": "ltr",
+    "region": "West Bengal, Tripura, Assam"
+  },
+  {
+    "code": "te",
+    "name": "Telugu",
+    "nativeName": "తెలుగు",
+    "speechCode": "te-IN",
+    "dir": "ltr",
+    "region": "Andhra Pradesh, Telangana"
+  },
+  {
+    "code": "ta",
+    "name": "Tamil",
+    "nativeName": "தமிழ்",
+    "speechCode": "ta-IN",
+    "dir": "ltr",
+    "region": "Tamil Nadu, Puducherry"
+  },
+  {
+    "code": "mr",
+    "name": "Marathi",
+    "nativeName": "मराठी",
+    "speechCode": "mr-IN",
+    "dir": "ltr",
+    "region": "Maharashtra, Goa"
+  },
+  {
+    "code": "gu",
+    "name": "Gujarati",
+    "nativeName": "ગુજરાતી",
+    "speechCode": "gu-IN",
+    "dir": "ltr",
+    "region": "Gujarat"
+  },
+  {
+    "code": "kn",
+    "name": "Kannada",
+    "nativeName": "ಕನ್ನಡ",
+    "speechCode": "kn-IN",
+    "dir": "ltr",
+    "region": "Karnataka"
+  },
+  {
+    "code": "ml",
+    "name": "Malayalam",
+    "nativeName": "മലയാളം",
+    "speechCode": "ml-IN",
+    "dir": "ltr",
+    "region": "Kerala"
+  },
+  {
+    "code": "or",
+    "name": "Odia",
+    "nativeName": "ଓଡ଼ିଆ",
+    "speechCode": "or-IN",
+    "dir": "ltr",
+    "region": "Odisha"
+  },
+  {
+    "code": "as",
+    "name": "Assamese",
+    "nativeName": "অসমীয়া",
+    "speechCode": "as-IN",
+    "dir": "ltr",
+    "region": "Assam"
+  },
+  {
+    "code": "ur",
+    "name": "Urdu",
+    "nativeName": "اُردُو",
+    "speechCode": "ur-IN",
+    "dir": "rtl",
+    "region": "Pan-India / J&K, UP, Telangana"
+  },
+  {
+    "code": "ks",
+    "name": "Kashmiri",
+    "nativeName": "کٲشُر",
+    "speechCode": "ks-IN",
+    "dir": "rtl",
+    "region": "Jammu & Kashmir"
+  },
+  {
+    "code": "doi",
+    "name": "Dogri",
+    "nativeName": "डोगरी",
+    "speechCode": "doi-IN",
+    "dir": "ltr",
+    "region": "Jammu & Kashmir, HP"
+  },
+  {
+    "code": "kok",
+    "name": "Konkani",
+    "nativeName": "कोंकणी",
+    "speechCode": "kok-IN",
+    "dir": "ltr",
+    "region": "Goa, Konkan"
+  },
+  {
+    "code": "mai",
+    "name": "Maithili",
+    "nativeName": "मैथिली",
+    "speechCode": "mai-IN",
+    "dir": "ltr",
+    "region": "Bihar, Jharkhand"
+  },
+  {
+    "code": "ne",
+    "name": "Nepali",
+    "nativeName": "नेपाली",
+    "speechCode": "ne-NP",
+    "dir": "ltr",
+    "region": "Sikkim, North Bengal"
+  },
+  {
+    "code": "sa",
+    "name": "Sanskrit",
+    "nativeName": "संस्कृतम्",
+    "speechCode": "sa-IN",
+    "dir": "ltr",
+    "region": "Pan-India Classical"
+  },
+  {
+    "code": "sd",
+    "name": "Sindhi",
+    "nativeName": "سنڌي",
+    "speechCode": "sd-IN",
+    "dir": "rtl",
+    "region": "Gujarat, Maharashtra, Rajasthan"
+  },
+  {
+    "code": "sat",
+    "name": "Santali",
+    "nativeName": "ᱥᱟᱱᱛᱟᱲᱤ",
+    "speechCode": "sat-IN",
+    "dir": "ltr",
+    "region": "Jharkhand, Odisha, Bengal"
+  },
+  {
+    "code": "brx",
+    "name": "Bodo",
+    "nativeName": "बड़ो",
+    "speechCode": "brx-IN",
+    "dir": "ltr",
+    "region": "Bodoland, Assam"
+  },
+  {
+    "code": "mni",
+    "name": "Manipuri",
+    "nativeName": "মৈতৈলোন্",
+    "speechCode": "mni-IN",
+    "dir": "ltr",
+    "region": "Manipur"
+  }
 ];
 
 export const LANGUAGE_DICTIONARIES = {
-  hi: {
+  "hi": {
     "Home": "होम",
     "Marketplace": "बाज़ार",
     "Farmer": "किसान",
@@ -75,9 +237,14 @@ export const LANGUAGE_DICTIONARIES = {
     "Pickup warehouse": "पिकअप गोदाम",
     "Pending verification": "सत्यापन लंबित",
     "Confirmed": "पुष्ट",
-    "Cancelled": "रद्द"
+    "Cancelled": "रद्द",
+    "Search crops, mandi, lots...": "फसल, मंडी, लॉट खोजें...",
+    "Checkout": "चेकआउट",
+    "Ready": "तैयार",
+    "Today": "आज",
+    "Close": "बंद करें"
   },
-  bn: {
+  "bn": {
     "Home": "হোম",
     "Marketplace": "বাজার",
     "Farmer": "কৃষক",
@@ -98,7 +265,7 @@ export const LANGUAGE_DICTIONARIES = {
     "Grains": "শস্য",
     "Pulses": "ডাল",
     "Oilseeds": "তৈলবীজ",
-    "Fruits": "ফল",
+    "Fruits": "ফলমূল",
     "Spices": "মশলা",
     "Max price": "সর্বোচ্চ দাম",
     "Reserve": "সংরক্ষণ করুন",
@@ -119,36 +286,41 @@ export const LANGUAGE_DICTIONARIES = {
     "Try voice demo": "ভয়েস ডেমো চেষ্টা করুন",
     "Your produce. Your decision.": "আপনার ফসল। আপনার সিদ্ধান্ত।",
     "Estimated stock value": "আনুমানিক স্টক মূল্য",
-    "Order now": "এখনই অর্ডার করুন",
+    "Order now": "এখন অর্ডার করুন",
     "Order confirmation": "অর্ডার নিশ্চিতকরণ",
     "Pickup warehouse": "পিকআপ গুদাম",
-    "Pending verification": "যাচাইকরণ অপেক্ষমাণ",
+    "Pending verification": "যাচাই অপেক্ষমান",
     "Confirmed": "নিশ্চিত",
-    "Cancelled": "বাতিল"
+    "Cancelled": "বাতিল",
+    "Search crops, mandi, lots...": "ফসল, মান্ডি, লট খুঁজুন...",
+    "Checkout": "চেকআউট",
+    "Ready": "প্রস্তুত",
+    "Today": "আজ",
+    "Close": "বন্ধ করুন"
   },
-  ta: {
+  "ta": {
     "Home": "முகப்பு",
     "Marketplace": "சந்தை",
     "Farmer": "விவசாயி",
     "Consumer Hub": "நுகர்வோர் மையம்",
-    "Wholesale": "மொத்த விற்பனை",
+    "Wholesale": "மொத்த சந்தை",
     "Warehouse": "கிடங்கு",
     "Admin": "நிர்வாகி",
     "Sign in": "உள்நுழைக",
     "Sign out": "வெளியேறு",
-    "My Account": "என் கணக்கு",
+    "My Account": "எனது கணக்கு",
     "Cart": "கூடை",
     "Better value for every harvest.": "ஒவ்வொரு அறுவடைக்கும் சிறந்த மதிப்பு.",
     "Direct from verified storage": "சரிபார்க்கப்பட்ட சேமிப்பிலிருந்து நேரடியாக",
     "Search produce by name, region or grade": "பயிர் பெயர், பகுதி அல்லது தரம் மூலம் தேடுங்கள்",
-    "Search produce...": "விளைபொருட்களைத் தேடுங்கள்...",
-    "All Crops": "அனைத்து பயிர்கள்",
+    "Search produce...": "பயிர்களைத் தேடுங்கள்...",
+    "All Crops": "அனைத்துப் பயிர்கள்",
     "Vegetables": "காய்கறிகள்",
     "Grains": "தானியங்கள்",
     "Pulses": "பருப்பு வகைகள்",
     "Oilseeds": "எண்ணெய் வித்துக்கள்",
     "Fruits": "பழங்கள்",
-    "Spices": "மசாலாப் பொருட்கள்",
+    "Spices": "மசாலா பொருட்கள்",
     "Max price": "அதிகபட்ச விலை",
     "Reserve": "முன்பதிவு செய்",
     "Quality report": "தர அறிக்கை",
@@ -170,17 +342,22 @@ export const LANGUAGE_DICTIONARIES = {
     "Estimated stock value": "மதிப்பிடப்பட்ட இருப்பு மதிப்பு",
     "Order now": "இப்போதே ஆர்டர் செய்",
     "Order confirmation": "ஆர்டர் உறுதிப்படுத்தல்",
-    "Pickup warehouse": "பிக்கப் கிடங்கு",
+    "Pickup warehouse": "எடுக்கும் கிடங்கு",
     "Pending verification": "சரிபார்ப்பு நிலுவையில் உள்ளது",
     "Confirmed": "உறுதிப்படுத்தப்பட்டது",
-    "Cancelled": "ரத்து செய்யப்பட்டது"
+    "Cancelled": "ரத்து செய்யப்பட்டது",
+    "Search crops, mandi, lots...": "பயிர்கள், மண்டி, தொகுதிகளைத் தேடுங்கள்...",
+    "Checkout": "செக்அவுட்",
+    "Ready": "தயார்",
+    "Today": "இன்று",
+    "Close": "மூடு"
   },
-  te: {
+  "te": {
     "Home": "హోమ్",
-    "Marketplace": "మార్కెట్‌ప్లేస్",
+    "Marketplace": "మార్కెట్",
     "Farmer": "రైతు",
     "Consumer Hub": "వినియోగదారు కేంద్రం",
-    "Wholesale": "టోకు మార్కెట్",
+    "Wholesale": "హోల్‌సేల్",
     "Warehouse": "గిడ్డంగి",
     "Admin": "అడ్మిన్",
     "Sign in": "సైన్ ఇన్",
@@ -190,16 +367,16 @@ export const LANGUAGE_DICTIONARIES = {
     "Better value for every harvest.": "ప్రతి పంటకు ఉత్తమ విలువ.",
     "Direct from verified storage": "ధృవీకరించబడిన నిల్వ నుండి నేరుగా",
     "Search produce by name, region or grade": "పంట పేరు, ప్రాంతం లేదా గ్రేడ్ ద్వారా వెతకండి",
-    "Search produce...": "పంటను వెతకండి...",
+    "Search produce...": "పంటలను శోధించండి...",
     "All Crops": "అన్ని పంటలు",
     "Vegetables": "కూరగాయలు",
     "Grains": "ధాన్యాలు",
-    "Pulses": "పప్పుధాన్యాలు",
-    "Oilseeds": "నూనెగింజలు",
+    "Pulses": "పప్పులు",
+    "Oilseeds": "నూనె గింజలు",
     "Fruits": "పండ్లు",
     "Spices": "మసాలాలు",
     "Max price": "గరిష్ట ధర",
-    "Reserve": "రిజర్వ్ చేయండి",
+    "Reserve": "రిజర్వ్ చేసుకోండి",
     "Quality report": "నాణ్యత నివేదిక",
     "Grade": "గ్రేడ్",
     "Freshness": "తాజాదనం",
@@ -221,10 +398,15 @@ export const LANGUAGE_DICTIONARIES = {
     "Order confirmation": "ఆర్డర్ నిర్ధారణ",
     "Pickup warehouse": "పికప్ గిడ్డంగి",
     "Pending verification": "ధృవీకరణ పెండింగ్‌లో ఉంది",
-    "Confirmed": "నిర్ధారించబడింది",
-    "Cancelled": "రద్దు చేయబడింది"
+    "Confirmed": "ధృవీకరించబడింది",
+    "Cancelled": "రద్దు చేయబడింది",
+    "Search crops, mandi, lots...": "పంటలు, మండీ, లాట్లు శోధించండి...",
+    "Checkout": "చెక్‌అవుట్",
+    "Ready": "సిద్ధంగా ఉంది",
+    "Today": "ఈ రోజు",
+    "Close": "మూసివేయి"
   },
-  mr: {
+  "mr": {
     "Home": "मुख्यपृष्ठ",
     "Marketplace": "बाजारपेठ",
     "Farmer": "शेतकरी",
@@ -239,16 +421,16 @@ export const LANGUAGE_DICTIONARIES = {
     "Better value for every harvest.": "प्रत्येक पिकाला उत्तम भाव.",
     "Direct from verified storage": "थेट प्रमाणित गोदामातून",
     "Search produce by name, region or grade": "पिकाचे नाव, विभाग किंवा प्रतवारीनुसार शोधा",
-    "Search produce...": "शेतमाल शोधा...",
+    "Search produce...": "पिके शोधा...",
     "All Crops": "सर्व पिके",
     "Vegetables": "भाज्या",
-    "Grains": "धान्ये",
-    "Pulses": "कडधान्ये",
+    "Grains": "धान्य",
+    "Pulses": "डाळी",
     "Oilseeds": "गळित धान्य",
     "Fruits": "फळे",
     "Spices": "मसाले",
     "Max price": "कमाल किंमत",
-    "Reserve": "राखून ठेवा",
+    "Reserve": "राखीव करा",
     "Quality report": "गुणवत्ता अहवाल",
     "Grade": "प्रतवारी (ग्रेड)",
     "Freshness": "ताजेपणा",
@@ -266,38 +448,43 @@ export const LANGUAGE_DICTIONARIES = {
     "Try voice demo": "व्हॉइस डेमो वापरून पहा",
     "Your produce. Your decision.": "तुमचा शेतमाल. तुमचा निर्णय.",
     "Estimated stock value": "अंदाजित साठा मूल्य",
-    "Order now": "आत्ताच ऑर्डर करा",
+    "Order now": "आता ऑर्डर करा",
     "Order confirmation": "ऑर्डर पुष्टीकरण",
     "Pickup warehouse": "पिकअप गोदाम",
     "Pending verification": "पडताळणी प्रलंबित",
     "Confirmed": "पुष्टी झाली",
-    "Cancelled": "रद्द केले"
+    "Cancelled": "रद्द केले",
+    "Search crops, mandi, lots...": "पिके, बाजार, लॉट्स शोधा...",
+    "Checkout": "ऑर्डर पूर्ण करा",
+    "Ready": "तयार",
+    "Today": "आज",
+    "Close": "बंद करा"
   },
-  gu: {
+  "gu": {
     "Home": "હોમ",
     "Marketplace": "બજાર",
     "Farmer": "ખેડૂત",
     "Consumer Hub": "ગ્રાહક કેન્દ્ર",
     "Wholesale": "જથ્થાબંધ બજાર",
-    "Warehouse": "ગોદામ",
-    "Admin": "એડમિન",
-    "Sign in": "સાઇન ઇન",
-    "Sign out": "સાઇન આઉટ",
+    "Warehouse": "ગોડાઉન",
+    "Admin": "સંચાલક",
+    "Sign in": "પ્રવેશ કરો",
+    "Sign out": "બહાર નીકળો",
     "My Account": "મારું એકાઉન્ટ",
     "Cart": "કાર્ટ",
     "Better value for every harvest.": "દરેક પાક માટે શ્રેષ્ઠ ભાવ.",
     "Direct from verified storage": "પ્રમાણિત સ્ટોરેજમાંથી સીધું",
     "Search produce by name, region or grade": "પાકનું નામ, વિસ્તાર અથવા ગ્રેડ દ્વારા શોધો",
     "Search produce...": "પાક શોધો...",
-    "All Crops": "બધા પાકો",
+    "All Crops": "બધા પાક",
     "Vegetables": "શાકભાજી",
     "Grains": "અનાજ",
-    "Pulses": "કઠોળ",
+    "Pulses": "કઠોળ / દાળ",
     "Oilseeds": "તેલીબિયાં",
     "Fruits": "ફળો",
     "Spices": "મસાલા",
     "Max price": "મહત્તમ કિંમત",
-    "Reserve": "બુક કરો",
+    "Reserve": "અનામત રાખો",
     "Quality report": "ગુણવત્તા અહેવાલ",
     "Grade": "ગ્રેડ",
     "Freshness": "તાજગી",
@@ -315,33 +502,38 @@ export const LANGUAGE_DICTIONARIES = {
     "Try voice demo": "વોઇસ ડેમો અજમાવો",
     "Your produce. Your decision.": "તમારો પાક. તમારો નિર્ણય.",
     "Estimated stock value": "અંદાજિત સ્ટોક મૂલ્ય",
-    "Order now": "હમણાં જ ઓર્ડર કરો",
+    "Order now": "હમણાં ઓર્ડર કરો",
     "Order confirmation": "ઓર્ડર પુષ્ટિ",
-    "Pickup warehouse": "પિકઅપ ગોદામ",
+    "Pickup warehouse": "પિકઅપ ગોડાઉન",
     "Pending verification": "ચકાસણી બાકી",
-    "Confirmed": "પુષ્ટિ થયેલ",
-    "Cancelled": "રદ કરેલ"
+    "Confirmed": "પુષ્ટ થયેલ",
+    "Cancelled": "રદ થયેલ",
+    "Search crops, mandi, lots...": "પાક, મંડી, લોટ શોધો...",
+    "Checkout": "ચેકઆઉટ",
+    "Ready": "તૈયાર",
+    "Today": "આજે",
+    "Close": "બંધ કરો"
   },
-  kn: {
+  "kn": {
     "Home": "ಮುಖಪುಟ",
     "Marketplace": "ಮಾರುಕಟ್ಟೆ",
     "Farmer": "ರೈತ",
     "Consumer Hub": "ಗ್ರಾಹಕ ಕೇಂದ್ರ",
     "Wholesale": "ಸಗಟು ಮಾರುಕಟ್ಟೆ",
-    "Warehouse": "ಗೋದಾಮು",
+    "Warehouse": "ಉಗ್ರಾಣ",
     "Admin": "ನಿರ್ವಾಹಕ",
     "Sign in": "ಸೈನ್ ಇನ್",
     "Sign out": "ಸೈನ್ ಔಟ್",
     "My Account": "ನನ್ನ ಖಾತೆ",
-    "Cart": "ಕಾರ್ಟ್",
+    "Cart": "ಬುಟ್ಟಿ",
     "Better value for every harvest.": "ಪ್ರತಿ ಸುಗ್ಗಿಗೂ ಉತ್ತಮ ಬೆಲೆ.",
     "Direct from verified storage": "ದೃಢೀಕರಿಸಿದ ಗೋದಾಮಿನಿಂದ ನೇರವಾಗಿ",
     "Search produce by name, region or grade": "ಬೆಳೆ ಹೆಸರು, ಪ್ರದೇಶ ಅಥವಾ ಗ್ರೇಡ್ ಮೂಲಕ ಹುಡುಕಿ",
-    "Search produce...": "ಬೆಳೆಯನ್ನು ಹುಡುಕಿ...",
+    "Search produce...": "ಬೆಳೆಗಳನ್ನು ಹುಡುಕಿ...",
     "All Crops": "ಎಲ್ಲಾ ಬೆಳೆಗಳು",
     "Vegetables": "ತರಕಾರಿಗಳು",
     "Grains": "ಧಾನ್ಯಗಳು",
-    "Pulses": "ದ್ವಿದಳ ಧಾನ್ಯಗಳು",
+    "Pulses": "ಬೇಳೆಕಾಳುಗಳು",
     "Oilseeds": "ಎಣ್ಣೆಕಾಳುಗಳು",
     "Fruits": "ಹಣ್ಣುಗಳು",
     "Spices": "ಮಸಾಲೆ ಪದಾರ್ಥಗಳು",
@@ -366,18 +558,23 @@ export const LANGUAGE_DICTIONARIES = {
     "Estimated stock value": "ಅಂದಾಜು ದಾಸ್ತಾನು ಮೌಲ್ಯ",
     "Order now": "ಈಗಲೇ ಆರ್ಡರ್ ಮಾಡಿ",
     "Order confirmation": "ಆರ್ಡರ್ ದೃಢೀಕರಣ",
-    "Pickup warehouse": "ಪಿಕಪ್ ಗೋದಾಮು",
+    "Pickup warehouse": "ಪಿಕಪ್ ಉಗ್ರಾಣ",
     "Pending verification": "ಪರಿಶೀಲನೆ ಬಾಕಿ ಇದೆ",
-    "Confirmed": "ದೃಢಪಟ್ಟಿದೆ",
-    "Cancelled": "ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ"
+    "Confirmed": "ದೃಢೀಕರಿಸಲಾಗಿದೆ",
+    "Cancelled": "ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ",
+    "Search crops, mandi, lots...": "ಬೆಳೆಗಳು, ಮಂಡಿ, ಲಾಟ್‌ಗಳನ್ನು ಹುಡುಕಿ...",
+    "Checkout": "ಖರೀದಿ ಪೂರ್ಣಗೊಳಿಸಿ",
+    "Ready": "ಸಿದ್ಧವಾಗಿದೆ",
+    "Today": "ಇಂದು",
+    "Close": "ಮುಚ್ಚಿ"
   },
-  ml: {
+  "ml": {
     "Home": "ഹോം",
     "Marketplace": "വിപണി",
     "Farmer": "കർഷകൻ",
     "Consumer Hub": "ഉപഭോക്തൃ കേന്ദ്രം",
     "Wholesale": "മൊത്തവ്യാപാരം",
-    "Warehouse": "വെയർഹൗസ്",
+    "Warehouse": "സംഭരണശാല",
     "Admin": "അഡ്മിൻ",
     "Sign in": "സൈൻ ഇൻ",
     "Sign out": "സൈൻ ഔട്ട്",
@@ -416,18 +613,23 @@ export const LANGUAGE_DICTIONARIES = {
     "Order now": "ഇപ്പോൾ ഓർഡർ ചെയ്യുക",
     "Order confirmation": "ഓർഡർ സ്ഥിരീകരണം",
     "Pickup warehouse": "പിക്കപ്പ് വെയർഹൗസ്",
-    "Pending verification": "പരിശോധന കാത്തിരിക്കുന്നു",
+    "Pending verification": "പരിശോധന ബാക്കി",
     "Confirmed": "സ്ഥിരീകരിച്ചു",
-    "Cancelled": "റദ്ദാക്കി"
+    "Cancelled": "റദ്ദാക്കി",
+    "Search crops, mandi, lots...": "വിളകൾ, മണ്ടി, ലോട്ടുകൾ തിരയുക...",
+    "Checkout": "ചെക്ക്ഔട്ട്",
+    "Ready": "തയ്യാർ",
+    "Today": "ഇന്ന്",
+    "Close": "അടയ്ക്കുക"
   },
-  pa: {
+  "pa": {
     "Home": "ਮੁੱਖ ਪੰਨਾ",
-    "Marketplace": "ਮਾਰਕੀਟ",
+    "Marketplace": "ਮੰਡੀ / ਬਾਜ਼ਾਰ",
     "Farmer": "ਕਿਸਾਨ",
     "Consumer Hub": "ਖਪਤਕਾਰ ਕੇਂਦਰ",
     "Wholesale": "ਥੋਕ ਮੰਡੀ",
     "Warehouse": "ਗੋਦਾਮ",
-    "Admin": "ਐਡਮਿਨ",
+    "Admin": "ਪ੍ਰਬੰਧਕ",
     "Sign in": "ਸਾਈਨ ਇਨ",
     "Sign out": "ਸਾਈਨ ਆਊਟ",
     "My Account": "ਮੇਰਾ ਖਾਤਾ",
@@ -435,7 +637,7 @@ export const LANGUAGE_DICTIONARIES = {
     "Better value for every harvest.": "ਹਰ ਫ਼ਸਲ ਦਾ ਵਧੀਆ ਮੁੱਲ।",
     "Direct from verified storage": "ਪ੍ਰਮਾਣਿਤ ਗੋਦਾਮ ਤੋਂ ਸਿੱਧਾ",
     "Search produce by name, region or grade": "ਫ਼ਸਲ ਦੇ ਨਾਮ, ਖੇਤਰ ਜਾਂ ਗ੍ਰੇਡ ਅਨੁਸਾਰ ਖੋਜੋ",
-    "Search produce...": "ਉਪਜ ਖੋਜੋ...",
+    "Search produce...": "ਫ਼ਸਲ ਲੱਭੋ...",
     "All Crops": "ਸਾਰੀਆਂ ਫ਼ਸਲਾਂ",
     "Vegetables": "ਸਬਜ਼ੀਆਂ",
     "Grains": "ਅਨਾਜ",
@@ -444,7 +646,7 @@ export const LANGUAGE_DICTIONARIES = {
     "Fruits": "ਫਲ",
     "Spices": "ਮਸਾਲੇ",
     "Max price": "ਵੱਧ ਤੋਂ ਵੱਧ ਕੀਮਤ",
-    "Reserve": "ਬੁੱਕ ਕਰੋ",
+    "Reserve": "ਰਾਖਵਾਂ ਕਰੋ",
     "Quality report": "ਗੁਣਵੱਤਾ ਰਿਪੋਰਟ",
     "Grade": "ਗ੍ਰੇਡ",
     "Freshness": "ਤਾਜ਼ਗੀ",
@@ -465,11 +667,16 @@ export const LANGUAGE_DICTIONARIES = {
     "Order now": "ਹੁਣੇ ਆਰਡਰ ਕਰੋ",
     "Order confirmation": "ਆਰਡਰ ਪੁਸ਼ਟੀ",
     "Pickup warehouse": "ਪਿਕਅੱਪ ਗੋਦਾਮ",
-    "Pending verification": "ਤਸਦੀਕ ਬਕਾਇਆ",
+    "Pending verification": "ਪੜਤਾਲ ਬਾਕੀ",
     "Confirmed": "ਪੁਸ਼ਟੀ ਹੋਈ",
-    "Cancelled": "ਰੱਦ ਕੀਤਾ"
+    "Cancelled": "ਰੱਦ",
+    "Search crops, mandi, lots...": "ਫ਼ਸਲ, ਮੰਡੀ, ਲਾਟ ਲੱਭੋ...",
+    "Checkout": "ਚੈੱਕਆਊਟ",
+    "Ready": "ਤਿਆਰ",
+    "Today": "ਅੱਜ",
+    "Close": "ਬੰਦ ਕਰੋ"
   },
-  or: {
+  "or": {
     "Home": "ମୂଳପୃଷ୍ଠା",
     "Marketplace": "ବଜାର",
     "Farmer": "କୃଷକ",
@@ -477,10 +684,10 @@ export const LANGUAGE_DICTIONARIES = {
     "Wholesale": "ପାଇକାରୀ ବଜାର",
     "Warehouse": "ଗୋଦାମ",
     "Admin": "ପ୍ରଶାସକ",
-    "Sign in": "ସାଇନ୍ ଇନ୍",
-    "Sign out": "ସାଇନ୍ ଆଉଟ୍",
-    "My Account": "ମୋ ଖାତା",
-    "Cart": "କାର୍ଟ",
+    "Sign in": "ସାଇନ ଇନ",
+    "Sign out": "ସାଇନ ଆଉଟ",
+    "My Account": "ମୋର ଖାତା",
+    "Cart": "ଟୋକେଇ",
     "Better value for every harvest.": "ପ୍ରତ୍ୟେକ ଫସଲ ପାଇଁ ଉତ୍ତମ ମୂଲ୍ୟ।",
     "Direct from verified storage": "ପ୍ରମାଣିତ ଗୋଦାମରୁ ସିଧାସଳଖ",
     "Search produce by name, region or grade": "ଫସଲ ନାମ, ଅଞ୍ଚଳ କିମ୍ବା ଗ୍ରେଡ୍ ଅନୁଯାୟୀ ଖୋଜନ୍ତୁ",
@@ -511,14 +718,19 @@ export const LANGUAGE_DICTIONARIES = {
     "Try voice demo": "ଭଏସ୍ ଡେମୋ ଚେଷ୍ଟା କରନ୍ତୁ",
     "Your produce. Your decision.": "ଆପଣଙ୍କ ଫସଲ। ଆପଣଙ୍କ ନିଷ୍ପତ୍ତି।",
     "Estimated stock value": "ଆନୁମାନିକ ଷ୍ଟକ୍ ମୂଲ୍ୟ",
-    "Order now": "ବର୍ତ୍ତମାନ ଅର୍ଡର କରନ୍ତୁ",
-    "Order confirmation": "ଅର୍ଡର ନିଶ୍ଚିତକରଣ",
+    "Order now": "ଏବେ ଅର୍ଡର କରନ୍ତୁ",
+    "Order confirmation": "ଅର୍ଡର ନିଶ୍ଚିତତା",
     "Pickup warehouse": "ପିକଅପ୍ ଗୋଦାମ",
-    "Pending verification": "ଯାଞ୍ଚ ବିଚାରାଧୀନ",
-    "Confirmed": "ନିଶ୍ଚିତ ହୋଇଛି",
-    "Cancelled": "ବାତିଲ ହୋଇଛି"
+    "Pending verification": "ଯାଞ୍ଚ ବାକି",
+    "Confirmed": "ନିଶ୍ଚିତ",
+    "Cancelled": "ବାତିଲ",
+    "Search crops, mandi, lots...": "ଫସଲ, ମଣ୍ଡି, ଲଟ ଖୋଜନ୍ତୁ...",
+    "Checkout": "ଚେକଆଉଟ",
+    "Ready": "ପ୍ରସ୍ତୁତ",
+    "Today": "ଆଜି",
+    "Close": "ବନ୍ଦ କରନ୍ତୁ"
   },
-  as: {
+  "as": {
     "Home": "গৃহপৃষ্ঠা",
     "Marketplace": "বজাৰ",
     "Farmer": "কৃষক",
@@ -528,7 +740,7 @@ export const LANGUAGE_DICTIONARIES = {
     "Admin": "প্ৰশাসক",
     "Sign in": "ছাইন ইন",
     "Sign out": "ছাইন আউট",
-    "My Account": "মোৰ একাউণ্ট",
+    "My Account": "মোৰ একাউন্ট",
     "Cart": "কাৰ্ট",
     "Better value for every harvest.": "প্ৰতিটো শস্যৰ বাবে সঠিক মূল্য।",
     "Direct from verified storage": "প্ৰমাণিত গুদামৰ পৰা পোনপটীয়াকৈ",
@@ -536,9 +748,9 @@ export const LANGUAGE_DICTIONARIES = {
     "Search produce...": "শস্য সন্ধান কৰক...",
     "All Crops": "সকলো শস্য",
     "Vegetables": "শাক-পাচলি",
-    "Grains": "শস্যজাতীয়",
+    "Grains": "শস্য",
     "Pulses": "দাইল",
-    "Oilseeds": "তেলবীজ",
+    "Oilseeds": "তৈলবীজ",
     "Fruits": "ফল-মূল",
     "Spices": "মচলা",
     "Max price": "সৰ্বোচ্চ মূল্য",
@@ -563,16 +775,21 @@ export const LANGUAGE_DICTIONARIES = {
     "Order now": "এতিয়াই অৰ্ডাৰ কৰক",
     "Order confirmation": "অৰ্ডাৰ নিশ্চিতকৰণ",
     "Pickup warehouse": "পিকআপ গুদাম",
-    "Pending verification": "পৰীক্ষণ বাকী আছে",
-    "Confirmed": "নিশ্চিত কৰা হ'ল",
-    "Cancelled": "বাতিল কৰা হ'ল"
+    "Pending verification": "যাচাই বাকী আছে",
+    "Confirmed": "নিশ্চিত",
+    "Cancelled": "বাতিল কৰা হ’ল",
+    "Search crops, mandi, lots...": "শস্য, মান্ডি, লট সন্ধান কৰক...",
+    "Checkout": "চেকআউট",
+    "Ready": "প্ৰস্তুত",
+    "Today": "আজি",
+    "Close": "বন্ধ কৰক"
   },
-  ur: {
+  "ur": {
     "Home": "ہوم",
-    "Marketplace": "منڈی",
+    "Marketplace": "مارکیٹ",
     "Farmer": "کسان",
-    "Consumer Hub": "صارفین کا مرکز",
-    "Wholesale": "تھوک منڈی",
+    "Consumer Hub": "صارف مرکز",
+    "Wholesale": "تھوک مارکیٹ",
     "Warehouse": "گودام",
     "Admin": "ایڈمن",
     "Sign in": "سائن ان",
@@ -582,16 +799,16 @@ export const LANGUAGE_DICTIONARIES = {
     "Better value for every harvest.": "ہر فصل کی بہتر قیمت۔",
     "Direct from verified storage": "تصدیق شدہ گودام سے براہ راست",
     "Search produce by name, region or grade": "فصل کے نام، علاقے یا گریڈ سے تلاش کریں",
-    "Search produce...": "پیداوار تلاش کریں...",
+    "Search produce...": "فصل تلاش کریں...",
     "All Crops": "تمام فصلیں",
     "Vegetables": "سبزیاں",
     "Grains": "اناج",
     "Pulses": "دالیں",
-    "Oilseeds": "تیل کے بیج",
+    "Oilseeds": "تلہن",
     "Fruits": "پھل",
-    "Spices": "مصالحے",
+    "Spices": "مصالحہ جات",
     "Max price": "زیادہ سے زیادہ قیمت",
-    "Reserve": "محفوظ کریں",
+    "Reserve": "ریزرو کریں",
     "Quality report": "معیار کی رپورٹ",
     "Grade": "گریڈ",
     "Freshness": "تازگی",
@@ -614,9 +831,14 @@ export const LANGUAGE_DICTIONARIES = {
     "Pickup warehouse": "پک اپ گودام",
     "Pending verification": "تصدیق زیر التواء",
     "Confirmed": "تصدیق شدہ",
-    "Cancelled": "منسوخ"
+    "Cancelled": "منسوخ",
+    "Search crops, mandi, lots...": "فصل، منڈی، لاٹ تلاش کریں...",
+    "Checkout": "چیک آؤٹ",
+    "Ready": "تیار",
+    "Today": "آج",
+    "Close": "بند کریں"
   },
-  sa: {
+  "sa": {
     "Home": "गृहम्",
     "Marketplace": "विपणिः",
     "Farmer": "कृषकः",
@@ -624,23 +846,23 @@ export const LANGUAGE_DICTIONARIES = {
     "Wholesale": "स्थूलविपणिः",
     "Warehouse": "धान्यागारम्",
     "Admin": "प्रशासकः",
-    "Sign in": "प्रवेशः",
-    "Sign out": "निर्गमः",
-    "My Account": "मम वृत्तम्",
+    "Sign in": "प्रविशतु",
+    "Sign out": "निर्गच्छतु",
+    "My Account": "मम विवरणम्",
     "Cart": "पेटिका",
     "Better value for every harvest.": "प्रत्येकसस्यस्य श्रेष्ठमूल्यम्।",
     "Direct from verified storage": "प्रमाणीकृतागारात् साक्षात्",
     "Search produce by name, region or grade": "सस्यनाम-प्रदेश-श्रेणीभिः अन्विष्यताम्",
-    "Search produce...": "सस्यम् अन्विष्यताम्...",
+    "Search produce...": "सस्यम् अन्विष्यतु...",
     "All Crops": "सर्वाणि सस्यानि",
     "Vegetables": "शाकानि",
     "Grains": "धान्यानि",
     "Pulses": "द्विदळानि",
-    "Oilseeds": "तैलबीजानि",
+    "Oilseeds": "स्नेहबीजानि",
     "Fruits": "फलानि",
     "Spices": "उपस्कराः",
     "Max price": "अधिकतममूल्यम्",
-    "Reserve": "आरक्षयतु",
+    "Reserve": "आरक्षतु",
     "Quality report": "गुणवत्तावृत्तान्तः",
     "Grade": "श्रेणी",
     "Freshness": "नूतनता",
@@ -658,14 +880,19 @@ export const LANGUAGE_DICTIONARIES = {
     "Try voice demo": "वाणीप्रदर्शनं प्रयुज्यताम्",
     "Your produce. Your decision.": "भवतः सस्यम्। भवतः निर्णयः।",
     "Estimated stock value": "अनुमानितसङ्ग्रहधनम्",
-    "Order now": "इदानीम् आदिशतु",
-    "Order confirmation": "आदेशदृढीकरणम्",
-    "Pickup warehouse": "स्वीकरणागारम्",
-    "Pending verification": "प्रमाणनं प्रतीक्षते",
-    "Confirmed": "दृढीकृतम्",
-    "Cancelled": "निरस्तम्"
+    "Order now": "इदानीम् आज्ञापयतु",
+    "Order confirmation": "आज्ञादृढीकरणम्",
+    "Pickup warehouse": "स्वीकरणधान्यागारम्",
+    "Pending verification": "प्रमाणीकरणं प्रलम्बितम्",
+    "Confirmed": "दृढीभूतम्",
+    "Cancelled": "निरस्तम्",
+    "Search crops, mandi, lots...": "सस्यं विपणिं च अन्विष्यतु...",
+    "Checkout": "निष्क्रमणम्",
+    "Ready": "सज्जम्",
+    "Today": "अद्य",
+    "Close": "पिदधातु"
   },
-  ne: {
+  "ne": {
     "Home": "गृहपृष्ठ",
     "Marketplace": "बजार",
     "Farmer": "किसान",
@@ -676,20 +903,20 @@ export const LANGUAGE_DICTIONARIES = {
     "Sign in": "साइन इन",
     "Sign out": "साइन आउट",
     "My Account": "मेरो खाता",
-    "Cart": "कार्ट",
+    "Cart": "झोला / कार्ट",
     "Better value for every harvest.": "प्रत्येक बालीको उचित मूल्य।",
     "Direct from verified storage": "प्रमाणित गोदामबाट सिधै",
     "Search produce by name, region or grade": "बालीको नाम, क्षेत्र वा ग्रेड अनुसार खोज्नुहोस्",
     "Search produce...": "बाली खोज्नुहोस्...",
     "All Crops": "सबै बालीहरू",
     "Vegetables": "तरकारीहरू",
-    "Grains": "अन्न",
+    "Grains": "अन्नहरू",
     "Pulses": "दालहरू",
     "Oilseeds": "तेलहन",
     "Fruits": "फलफूल",
-    "Spices": "मसाला",
+    "Spices": "मसलाहरू",
     "Max price": "अधिकतम मूल्य",
-    "Reserve": "रिजर्भ गर्नुहोस्",
+    "Reserve": "आरक्षित गर्नुहोस्",
     "Quality report": "गुणस्तर रिपोर्ट",
     "Grade": "ग्रेड",
     "Freshness": "ताजापन",
@@ -712,26 +939,31 @@ export const LANGUAGE_DICTIONARIES = {
     "Pickup warehouse": "पिकअप गोदाम",
     "Pending verification": "प्रमाणीकरण बाँकी",
     "Confirmed": "पुष्टि भयो",
-    "Cancelled": "रद्द गरियो"
+    "Cancelled": "रद्द गरियो",
+    "Search crops, mandi, lots...": "बाली, मण्डी, लट खोज्नुहोस्...",
+    "Checkout": "चेकआउट",
+    "Ready": "तयार",
+    "Today": "आज",
+    "Close": "बन्द गर्नुहोस्"
   },
-  kok: {
+  "kok": {
     "Home": "घर",
     "Marketplace": "बाजार",
     "Farmer": "शेतकार",
-    "Consumer Hub": "गिरायकांचे केंद्र",
+    "Consumer Hub": "गिराय्क केंद्र",
     "Wholesale": "घाऊक बाजार",
     "Warehouse": "गोदाम",
     "Admin": "प्रशासक",
     "Sign in": "साइन इन",
     "Sign out": "साइन आउट",
-    "My Account": "म्हाजे खाते",
+    "My Account": "म्हजें खातें",
     "Cart": "कार्ट",
     "Better value for every harvest.": "दर पिकाक बरो मोल.",
     "Direct from verified storage": "प्रमाणीत गोदामांतल्यान सरळ",
     "Search produce by name, region or grade": "पिकाचें नांव वा वर्गान सोदात",
     "Search produce...": "पीक सोदात...",
     "All Crops": "सगळीं पिकां",
-    "Vegetables": "भाज्यो",
+    "Vegetables": "भाजी",
     "Grains": "धान्य",
     "Pulses": "दाळी",
     "Oilseeds": "तेलबियां",
@@ -756,38 +988,43 @@ export const LANGUAGE_DICTIONARIES = {
     "Try voice demo": "आवाज डेमो पळयात",
     "Your produce. Your decision.": "तुमचें पीक. तुमचो निर्णय.",
     "Estimated stock value": "अंदाजित साठो मोल",
-    "Order now": "आताच ऑर्डर करात",
-    "Order confirmation": "ऑर्डर पुष्टीकरण",
+    "Order now": "आताच ऑर्डर करा",
+    "Order confirmation": "ऑर्डर खात्री",
     "Pickup warehouse": "पिकअप गोदाम",
-    "Pending verification": "तपासणी बाकी आसा",
-    "Confirmed": "निश्चीत जाले",
-    "Cancelled": "रद्द जाले"
+    "Pending verification": "तपासणी बाकी",
+    "Confirmed": "खात्री जाली",
+    "Cancelled": "रद्द",
+    "Search crops, mandi, lots...": "पीक, मंडी, लॉट सोदात...",
+    "Checkout": "चेकआउट",
+    "Ready": "तयार",
+    "Today": "आयज",
+    "Close": "बंद करा"
   },
-  ks: {
+  "ks": {
     "Home": "ہوم",
-    "Marketplace": "منڈی",
-    "Farmer": "زمیندار",
-    "Consumer Hub": "صارف مرکز",
-    "Wholesale": "تھوک منڈی",
+    "Marketplace": "مارکیٹ",
+    "Farmer": "کٔشیکار",
+    "Consumer Hub": "صارفین مرکز",
+    "Wholesale": "تھوک مارکیٹ",
     "Warehouse": "گودام",
-    "Admin": "ایڈمن",
-    "Sign in": "سائن اِن",
+    "Admin": "منتظم",
+    "Sign in": "سائن ان",
     "Sign out": "سائن آؤٹ",
-    "My Account": "میون کھاتہ",
+    "My Account": "میون اکاؤنٹ",
     "Cart": "ٹوکری",
     "Better value for every harvest.": "پرؠتھ فصلی ہُنٛد اصل ਮੁੱਲ۔",
     "Direct from verified storage": "تصدیق شُدہ گودام منزٕ براہِ راست",
     "Search produce by name, region or grade": "فصل، علاقہ یا گریڈ کٔنۍ وچھِو",
-    "Search produce...": "پیداوار ژھانٛڈِو...",
-    "All Crops": "سٲری فصلہٕ",
-    "Vegetables": "ਸਬਜ਼ੀ",
-    "Grains": "ਅਨਾਜ",
+    "Search produce...": "فصل تلاش کریو...",
+    "All Crops": "ساری فصلہٕ",
+    "Vegetables": "سبزی",
+    "Grains": "اناج",
     "Pulses": "دالہٕ",
-    "Oilseeds": "تیل بیول",
+    "Oilseeds": "تیل دار بیول",
     "Fruits": "میوہٕ",
     "Spices": "مصالحہٕ",
     "Max price": "زیادہ کھوتہٕ زیادہ قیمت",
-    "Reserve": "محفوظ تھٲوِو",
+    "Reserve": "محفوظ تھویو",
     "Quality report": "معیار رپورٹ",
     "Grade": "گریڈ",
     "Freshness": "تازگی",
@@ -805,14 +1042,19 @@ export const LANGUAGE_DICTIONARIES = {
     "Try voice demo": "آواز ڈیمو وچھِو",
     "Your produce. Your decision.": "تُہنٛز فصل۔ تُہنٛد فٲصلہٕ۔",
     "Estimated stock value": "اندازاً مال قیمت",
-    "Order now": "وۄنۍ آرڈر کٔਰਿਵ",
+    "Order now": "ونکیہنہ آرڈر کریو",
     "Order confirmation": "آرڈر تصدیق",
     "Pickup warehouse": "پک اپ گودام",
     "Pending verification": "تصدیق باقی",
-    "Confirmed": "پکا گۆو",
-    "Cancelled": "منسوخ"
+    "Confirmed": "تصدیق شدہ",
+    "Cancelled": "منسوخ",
+    "Search crops, mandi, lots...": "فصل، منڈی تلاش کریو...",
+    "Checkout": "چیک آؤٹ",
+    "Ready": "تیار",
+    "Today": "از",
+    "Close": "بند کریو"
   },
-  mai: {
+  "mai": {
     "Home": "होम",
     "Marketplace": "हाट-बाजार",
     "Farmer": "किसान",
@@ -827,16 +1069,16 @@ export const LANGUAGE_DICTIONARIES = {
     "Better value for every harvest.": "प्रत्येक उपजाऊक उचित मूल्य।",
     "Direct from verified storage": "सत्यापित गोदाम सं सोझे",
     "Search produce by name, region or grade": "फसलक नाम, इलाका वा ग्रेड सं ताकू",
-    "Search produce...": "फसल ताकू...",
-    "All Crops": "सभटा फसल",
+    "Search produce...": "फसल खोजू...",
+    "All Crops": "सब फसल",
     "Vegetables": "तरकारी",
-    "Grains": "अन्न",
+    "Grains": "अनाज",
     "Pulses": "दालि",
-    "Oilseeds": "तेहन",
+    "Oilseeds": "तिलहन",
     "Fruits": "फल",
     "Spices": "मसाला",
     "Max price": "अधिकतम दाम",
-    "Reserve": "बुक करू",
+    "Reserve": "आरक्षित करू",
     "Quality report": "गुणवत्ता रिपोर्ट",
     "Grade": "ग्रेड",
     "Freshness": "ताजगी",
@@ -857,31 +1099,36 @@ export const LANGUAGE_DICTIONARIES = {
     "Order now": "एखने ऑर्डर करू",
     "Order confirmation": "ऑर्डर पुष्टि",
     "Pickup warehouse": "पिकअप गोदाम",
-    "Pending verification": "सत्यापन बाँकी",
+    "Pending verification": "सत्यापन बाकी",
     "Confirmed": "पुष्ट",
-    "Cancelled": "रद्द"
+    "Cancelled": "रद्द",
+    "Search crops, mandi, lots...": "फसल, मंडी खोजू...",
+    "Checkout": "चेकआउट",
+    "Ready": "तैयार",
+    "Today": "आइब",
+    "Close": "बंद करू"
   },
-  doi: {
+  "doi": {
     "Home": "घर",
     "Marketplace": "मंडी",
     "Farmer": "किसान",
-    "Consumer Hub": "ग्राहक केंद्र",
+    "Consumer Hub": "उपभोक्ता केंद्र",
     "Wholesale": "थोक मंडी",
     "Warehouse": "गोदाम",
     "Admin": "प्रशासक",
-    "Sign in": "साइन इन",
-    "Sign out": "साइन आउट",
+    "Sign in": "दाखल होओ",
+    "Sign out": "बाहर आओ",
     "My Account": "मेरा खाता",
-    "Cart": "कार्ट",
+    "Cart": "टोकरी",
     "Better value for every harvest.": "हर फसल दा चंगा मुल्ल।",
     "Direct from verified storage": "सत्यापित गोदामै थमां सीधा",
     "Search produce by name, region or grade": "फसल दे नांअ, इलाके जां ग्रेड कन्नै लब्भो",
-    "Search produce...": "फसल लब्भो...",
+    "Search produce...": "फसल खोजो...",
     "All Crops": "सारियां फसलां",
     "Vegetables": "सब्जियां",
     "Grains": "अनाज",
     "Pulses": "दालां",
-    "Oilseeds": "तेल बीज",
+    "Oilseeds": "तिलहन",
     "Fruits": "फल",
     "Spices": "मसाले",
     "Max price": "बद्धो-बद्ध मुल्ल",
@@ -903,38 +1150,43 @@ export const LANGUAGE_DICTIONARIES = {
     "Try voice demo": "आवाज डेमो परखो",
     "Your produce. Your decision.": "तुंदी फसल। तुंदा फैसला।",
     "Estimated stock value": "अंदाजन स्टॉक मुल्ल",
-    "Order now": "हुने आर्डर करो",
+    "Order now": "हुणै आर्डर करो",
     "Order confirmation": "आर्डर पुष्टि",
     "Pickup warehouse": "पिकअप गोदाम",
-    "Pending verification": "सत्यापन बाकी",
+    "Pending verification": "पड़ताल बाकी",
     "Confirmed": "पुष्ट",
-    "Cancelled": "रद्द"
+    "Cancelled": "रद्द",
+    "Search crops, mandi, lots...": "फसल, मंडी खोजो...",
+    "Checkout": "चेकआउट",
+    "Ready": "तयार",
+    "Today": "अज्ज",
+    "Close": "बंद करो"
   },
-  brx: {
+  "brx": {
     "Home": "नखर",
-    "Marketplace": "हाथाय",
+    "Marketplace": "हाट",
     "Farmer": "आबादारी",
-    "Consumer Hub": "बाहायग्रा मिरु",
-    "Wholesale": "थोक हाथाय",
-    "Warehouse": "बाखार",
-    "Admin": "सामलायग्रा",
+    "Consumer Hub": "बायग्रा फिफान",
+    "Wholesale": "गाहाय हाट",
+    "Warehouse": "बाख्रि",
+    "Admin": "सामलायगिरि",
     "Sign in": "हाबनाय",
     "Sign out": "ओंखारनाय",
     "My Account": "आंनि एकाउन्ट",
-    "Cart": "थालि",
+    "Cart": "थाम्फ्ला",
     "Better value for every harvest.": "गासै फसलनि मोजां बेसेन।",
     "Direct from verified storage": "थार बाखारनिफ्राय थोंजों",
     "Search produce by name, region or grade": "फसल मुं, ओनसोल एबा ग्रेडजों नागिर",
     "Search produce...": "फसल नागिर...",
     "All Crops": "गासै फसलफोर",
-    "Vegetables": "थाइगं-मैगं",
-    "Grains": "माय-गं",
+    "Vegetables": "थास' बेगर",
+    "Grains": "माइ-गंग",
     "Pulses": "दालिफोर",
-    "Oilseeds": "थाव बेगर",
-    "Fruits": "फिथाइफोर",
-    "Spices": "मसलाफोर",
+    "Oilseeds": "थाव बिबार",
+    "Fruits": "फिथाइ",
+    "Spices": "मसालाफोर",
     "Max price": "बांसिन बेसेन",
-    "Reserve": "दोनथुम",
+    "Reserve": "थिसना दोन",
     "Quality report": "गुन रिपर्ट",
     "Grade": "ग्रेड",
     "Freshness": "गोदानथि",
@@ -952,38 +1204,43 @@ export const LANGUAGE_DICTIONARIES = {
     "Try voice demo": "राव डेमो नाजा",
     "Your produce. Your decision.": "नोंनि फसल। नोंनि थिरांथा।",
     "Estimated stock value": "अन्दास बाखार बेसेन",
-    "Order now": "दानो अर्डर खालाम",
-    "Order confirmation": "अर्डर थारथि",
-    "Pickup warehouse": "लानाय बाखार",
-    "Pending verification": "नायबिजिरनो दं",
-    "Confirmed": "थार जाबाय",
-    "Cancelled": "बातिल जाबाय"
+    "Order now": "दासानो आर्डर खालाम",
+    "Order confirmation": "आर्डर रोखा खालामनाय",
+    "Pickup warehouse": "लांनाय बाख्रि",
+    "Pending verification": "नायबिजिरनाय थाबाय",
+    "Confirmed": "रोखा जाबाय",
+    "Cancelled": "खारबिजाय",
+    "Search crops, mandi, lots...": "फसल आरो हाथि नागिर...",
+    "Checkout": "फायनाल खालाम",
+    "Ready": "थियारि",
+    "Today": "दिनै",
+    "Close": "फोजोब"
   },
-  mni: {
+  "mni": {
     "Home": "য়ুম",
     "Marketplace": "কৈথেল",
     "Farmer": "লৌউ-শিংউবা",
-    "Consumer Hub": "শিয়েনবা মীওইগী মফম",
+    "Consumer Hub": "লৈবা মীয়ামগী কাংলুপ",
     "Wholesale": "হোলসেল কৈথেল",
-    "Warehouse": "পোৎশং",
-    "Admin": "মকোক",
-    "Sign in": "চঙবা",
+    "Warehouse": "পোৎশঙ",
+    "Admin": "এডমিন",
+    "Sign in": "চঙশিনবা",
     "Sign out": "থোকপা",
     "My Account": "ঐগী একাউন্ট",
-    "Cart": "পোৎলম থম্বা",
+    "Cart": "কার্ট",
     "Better value for every harvest.": "লৌউ-শিংউগী পোৎথোক খুদিংগী অফবা মমল।",
     "Direct from verified storage": "শেংদোক্লবা পোৎশংদগী হকথেংননা",
     "Search produce by name, region or grade": "পোৎথোক মিং, লমদম নত্রগা গ্রেডনা থিবা",
-    "Search produce...": "পোৎথোক থিবা...",
-    "All Crops": "পোৎথোক খুদিংমক",
-    "Vegetables": "হৱাই-চেংৱাই অমসুং হৌদোং",
-    "Grains": "চেং অমসুং হৱাই",
-    "Pulses": "হৱাই মখল",
-    "Oilseeds": "থাউ থোকপা মরু",
-    "Fruits": "উহৈ-ৱাহৈ",
-    "Spices": "মশলা",
+    "Search produce...": "পোথোক থিবীয়ু...",
+    "All Crops": "মহৈ-মরোং পুম্নমক",
+    "Vegetables": "হৌদোং-নাপী",
+    "Grains": "চেং-হৱাই",
+    "Pulses": "হৱাই-চেং",
+    "Oilseeds": "থাউগী মরূ",
+    "Fruits": "হৈশিং",
+    "Spices": "মরূক-মখা",
     "Max price": "খ্বাইদগী ৱাংবা মমল",
-    "Reserve": "থম্বা",
+    "Reserve": "রিজার্ভ তৌবা",
     "Quality report": "গুণগী পাউদম",
     "Grade": "গ্রেড",
     "Freshness": "অরুবা",
@@ -1001,38 +1258,43 @@ export const LANGUAGE_DICTIONARIES = {
     "Try voice demo": "খোনথোক ডেমো য়েংবা",
     "Your produce. Your decision.": "নহাক্কী পোৎથোক। নহাক্কী ৱারেপ।",
     "Estimated stock value": "থম্বা পোৎকী মমল",
-    "Order now": "হৌজিক ওর্ডর তৌবা",
-    "Order confirmation": "ওর্ডর শেংদোকপা",
-    "Pickup warehouse": "পোৎ লৌবগী পোৎশং",
-    "Pending verification": "শেংদোকপা ঙাইরি",
-    "Confirmed": "শেংদোক্লে",
-    "Cancelled": "তোক্লে"
+    "Order now": "হৌজিক ওর্দর তৌবীয়ু",
+    "Order confirmation": "ওর্দর চুনবা",
+    "Pickup warehouse": "লৌথোকপগী পোৎশঙ",
+    "Pending verification": "য়ান্নবা ঙাইরি",
+    "Confirmed": "চুনরে",
+    "Cancelled": "লেপথোকপা",
+    "Search crops, mandi, lots...": "মহৈ-মরোং, কৈথেল থিবীয়ু...",
+    "Checkout": "চেকআউট",
+    "Ready": "শেম-শাবা লোইরে",
+    "Today": "ঙসি",
+    "Close": "থিংশিনবা"
   },
-  sat: {
+  "sat": {
     "Home": "ᱚᱲᱟᱜ",
     "Marketplace": "ᱦᱟᱴ",
     "Farmer": "ᱪᱟᱹᱥᱤ",
-    "Consumer Hub": "ᱵᱮᱵᱷᱟᱨᱤᱭᱟᱹ ᱛᱟᱞᱢᱟ",
-    "Wholesale": "ᱛᱷᱳᱠ ᱦᱟᱴ",
-    "Warehouse": "ᱜᱩᱫᱟᱢ",
+    "Consumer Hub": "ᱠᱤᱨᱤᱧᱤᱭᱟᱹ ᱛᱟᱞᱢᱟ",
+    "Wholesale": "ᱛᱷᱚᱠ ᱦᱟᱴ",
+    "Warehouse": "ᱜᱩᱫᱟᱹᱢ",
     "Admin": "ᱥᱟᱥᱚᱱᱤᱭᱟᱹ",
-    "Sign in": "ᱵᱚᱞᱚᱱ",
-    "Sign out": "ᱚᱰᱚᱠ",
+    "Sign in": "ᱵᱚᱞᱚᱱ ᱢᱮ",
+    "Sign out": "ᱚᱰᱚᱠᱚᱜ ᱢᱮ",
     "My Account": "ᱤᱧᱟᱜ ᱠᱷᱟᱛᱟ",
-    "Cart": "ᱴᱷᱤᱞᱟᱹ",
+    "Cart": "ᱴᱩᱠᱤ",
     "Better value for every harvest.": "ᱡᱚᱛᱚ ᱟᱨᱡᱟᱣ ᱞᱟᱹᱜᱤᱫ ᱵᱷᱟᱹᱜᱤ ᱜᱚᱱᱚᱝ।",
     "Direct from verified storage": "ᱥᱟᱹᱨᱤ ᱟᱠᱟᱱ ᱜᱩᱫᱟᱢ ᱠᱷᱚᱱ ᱥᱚᱡᱷᱮ",
     "Search produce by name, region or grade": "ᱯᱷᱚᱥᱚᱞ ᱧᱩᱛᱩᱢ ᱛᱮ ᱥᱮᱸᱫᱽᱨᱟᱭ ᱢᱮ",
-    "Search produce...": "ᱯᱷᱚᱥᱚᱞ ᱥᱮᱸᱫᱽᱨᱟᱭ ᱢᱮ...",
-    "All Crops": "ᱡᱚᱛᱚ ᱯᱷᱚᱥᱚᱞ",
+    "Search produce...": "ᱯᱷᱟᱹᱥᱤᱞ ᱥᱮᱸᱫᱽᱨᱟᱭ ᱢᱮ...",
+    "All Crops": "ᱡᱚᱛᱚ ᱯᱷᱟᱹᱥᱤᱞ",
     "Vegetables": "ᱩᱛᱩ ᱟᱲᱟᱜ",
-    "Grains": "ᱜᱩᱦᱩᱢ ᱪᱟᱣᱞᱮ",
+    "Grains": "ᱜᱩᱦᱩᱢ ᱦᱳᱲᱳ",
     "Pulses": "ᱫᱟᱹᱞ",
     "Oilseeds": "ᱥᱩᱱᱩᱢ ᱡᱟᱝ",
-    "Fruits": "ᱡᱚ ᱵᱤᱞᱤ",
+    "Fruits": "ᱡᱚ",
     "Spices": "ᱢᱚᱥᱞᱟ",
     "Max price": "ᱡᱟᱹᱥᱛᱤ ᱜᱚᱱᱚᱝ",
-    "Reserve": "ᱫᱚᱦᱚᱭ ᱢᱮ",
+    "Reserve": "ᱥᱟᱸᱵᱽᱲᱟᱣ ᱢᱮ",
     "Quality report": "ᱜᱩᱱ ᱨᱤᱯᱳᱨᱴ",
     "Grade": "ᱜᱨᱮᱰ",
     "Freshness": "ᱵᱮᱨᱮᱞ ᱜᱮ",
@@ -1050,21 +1312,26 @@ export const LANGUAGE_DICTIONARIES = {
     "Try voice demo": "ᱟᱲᱟᱝ ᱰᱮᱢᱳ ᱵᱤᱰᱟᱹᱣ ᱢᱮ",
     "Your produce. Your decision.": "ᱟᱢᱟᱜ ᱯᱷᱚᱥᱚᱞ। ᱟᱢᱟᱜ ᱜᱚᱴᱟ।",
     "Estimated stock value": "ᱟᱱᱫᱟᱡᱽ ᱜᱚᱱᱚᱝ",
-    "Order now": "ᱱᱤᱛ ᱜᱮ ᱚᱰᱚᱨ ᱢᱮ",
-    "Order confirmation": "ᱚᱰᱚᱨ ᱴᱷᱟᱹᱣᱠᱟᱹ",
-    "Pickup warehouse": "ᱤᱫᱤ ᱜᱩᱫᱟᱢ",
+    "Order now": "ᱱᱤᱛᱜᱮ ᱚᱰᱚᱨ ᱢᱮ",
+    "Order confirmation": "ᱚᱰᱚᱨ ᱯᱩᱥᱴᱟᱹᱣ",
+    "Pickup warehouse": "ᱦᱟᱛᱟᱣ ᱜᱩᱫᱟᱹᱢ",
     "Pending verification": "ᱯᱟᱹᱨᱠᱷᱟᱹᱣ ᱵᱟᱹᱠᱤ",
-    "Confirmed": "ᱴᱷᱟᱹᱣᱠᱟᱹᱭᱮᱱᱟ",
-    "Cancelled": "ᱵᱟᱹᱛᱤᱞᱮᱱᱟ"
+    "Confirmed": "ᱯᱩᱥᱴᱟᱹᱣ ᱮᱱᱟ",
+    "Cancelled": "ᱵᱟᱹᱛᱤᱞ",
+    "Search crops, mandi, lots...": "ᱯᱷᱟᱹᱥᱤᱞ, ᱦᱟᱴ ᱥᱮᱸᱫᱽᱨᱟᱭ ᱢᱮ...",
+    "Checkout": "ᱪᱮᱠᱟᱣᱩᱴ",
+    "Ready": "ᱥᱟᱯᱲᱟᱣ",
+    "Today": "ᱛᱮᱦᱮᱧ",
+    "Close": "ᱵᱚᱸᱫᱽ ᱢᱮ"
   },
-  sd: {
+  "sd": {
     "Home": "گھر",
     "Marketplace": "مارڪيٽ",
-    "Farmer": "هاري",
-    "Consumer Hub": "صارف مرڪز",
-    "Wholesale": "ٿوڪ مارڪيٽ",
+    "Farmer": "هارِي",
+    "Consumer Hub": "واپارين جو مرڪز",
+    "Wholesale": "ٿوڪ واپار",
     "Warehouse": "گودام",
-    "Admin": "ايڊمن",
+    "Admin": "انتظاميه",
     "Sign in": "سائن ان",
     "Sign out": "سائن آئوٽ",
     "My Account": "منهنجو اڪائونٽ",
@@ -1073,10 +1340,10 @@ export const LANGUAGE_DICTIONARIES = {
     "Direct from verified storage": "تصديق ٿيل گودام مان سڌو",
     "Search produce by name, region or grade": "فصل جي نالي، علائقي يا گريڊ سان ڳوليو",
     "Search produce...": "فصل ڳوليو...",
-    "All Crops": "سڀ فصل",
+    "All Crops": "سمورا فصل",
     "Vegetables": "ڀاڄيون",
     "Grains": "اناج",
-    "Pulses": "دالون",
+    "Pulses": "داليون",
     "Oilseeds": "تیل وارا ٻج",
     "Fruits": "ميوا",
     "Spices": "مصالحا",
@@ -1100,15 +1367,53 @@ export const LANGUAGE_DICTIONARIES = {
     "Your produce. Your decision.": "توهان جو فصل. توهان جو فيصلو.",
     "Estimated stock value": "اندازي مطابق اسٽاڪ قيمت",
     "Order now": "هاڻي آرڊر ڪريو",
-    "Order confirmation": "آرڊر جي تصديق",
-    "Pickup warehouse": "پڪ اپ گودام",
-    "Pending verification": "تصديق باقي آهي",
-    "Confirmed": "پڪو ٿيو",
+    "Order confirmation": "آرڊر پڪ",
+    "Pickup warehouse": "پک اپ گودام",
+    "Pending verification": "تصديق باقي",
+    "Confirmed": "پڪ ٿيل",
+    "Search crops, mandi, lots...": "فصل، منڊي ڳوليو...",
+    "Checkout": "چيڪ آئوٽ",
+    "Cancelled": "رد ٿيل",
+    "Ready": "تيار",
+    "Today": "اڄ",
+    "Close": "بند ڪريو"
+  },
+  "en": {
+    "Marketplace": "बाज़ार",
+    "Wholesale": "थोक बाज़ार",
+    "Warehouse": "गोदाम",
+    "Farmer": "किसान",
+    "Consumer Hub": "उपभोक्ता केंद्र",
+    "Admin": "प्रशासक",
+    "Sign in": "साइन इन",
+    "Sign out": "साइन आउट",
+    "Cart": "कार्ट",
+    "My Account": "मेरा खाता",
+    "Search produce...": "उपज खोजें...",
+    "Search crops, mandi, lots...": "फसल, मंडी, लॉट खोजें...",
+    "All Crops": "सभी फसलें",
+    "Vegetables": "सब्जियां",
+    "Grains": "अनाज",
+    "Pulses": "दालें",
+    "Oilseeds": "तिलहन",
+    "Fruits": "फल",
+    "Spices": "मसाले",
+    "Reserve": "आरक्षित करें",
+    "Checkout": "चेकआउट",
+    "Order now": "अभी ऑर्डर करें",
+    "Order confirmation": "ऑर्डर पुष्टि",
+    "Pickup warehouse": "पिकअप गोदाम",
+    "Confirmed": "पुष्ट",
+    "Pending verification": "सत्यापन लंबित",
+    "Cancelled": "रद्द",
+    "Ready": "तैयार",
+    "Today": "आज",
+    "Close": "बंद करें"
   }
 };
 
 export const EXTENDED_UI_TRANSLATIONS = {
-  hi: {
+  "hi": {
     "Agricultural Trade Works Better": "कृषि व्यापार बेहतर काम करता है",
     "When It's Connected": "जब यह आपस में जुड़ा हो",
     "Next-Gen Agri-Fintech & AI Copilot Platform": "अगली पीढ़ी का एग्री-फिनटेक और एआई कोपायलट प्लेटफॉर्म",
@@ -1140,7 +1445,7 @@ export const EXTENDED_UI_TRANSLATIONS = {
     "Light Mode": "लाइट मोड",
     "Back to top": "शीर्ष पर वापस"
   },
-  bn: {
+  "bn": {
     "Agricultural Trade Works Better": "কৃষি বাণিজ্য আরও ভালো হয়",
     "When It's Connected": "যখন এটি সংযুক্ত থাকে",
     "Next-Gen Agri-Fintech & AI Copilot Platform": "নেক্সট-জেন এগ্রি-ফিনটেক ও এআই কোপাইলট প্ল্যাটফর্ম",
@@ -1172,7 +1477,7 @@ export const EXTENDED_UI_TRANSLATIONS = {
     "Light Mode": "লাইট মোড",
     "Back to top": "উপরে যান"
   },
-  te: {
+  "te": {
     "Agricultural Trade Works Better": "వ్యవసాయ వాణిజ్యం మెరుగ్గా పనిచేస్తుంది",
     "When It's Connected": "ఇది అనుసంధానించబడినప్పుడు",
     "Next-Gen Agri-Fintech & AI Copilot Platform": "నెక్స్ట్-జెన్ అగ్రి-ఫిన్‌టెక్ & AI కోపైలట్ ప్లాట్‌ఫారమ్",
@@ -1204,7 +1509,7 @@ export const EXTENDED_UI_TRANSLATIONS = {
     "Light Mode": "లైట్ మోడ్",
     "Back to top": "పైకి వెళ్ళండి"
   },
-  mr: {
+  "mr": {
     "Agricultural Trade Works Better": "कृषी व्यापार अधिक चांगला चालतो",
     "When It's Connected": "जेव्हा तो जोडलेला असतो",
     "Next-Gen Agri-Fintech & AI Copilot Platform": "पुढील पिढीचे अ‍ॅग्री-फिनटेक आणि AI कोपायलट प्लॅटफॉर्म",
@@ -1236,7 +1541,7 @@ export const EXTENDED_UI_TRANSLATIONS = {
     "Light Mode": "लाइट मोड",
     "Back to top": "वर जा"
   },
-  ta: {
+  "ta": {
     "Agricultural Trade Works Better": "விவசாய வர்த்தகம் சிறப்பாக செயல்படுகிறது",
     "When It's Connected": "இணைக்கப்படும் போது",
     "Next-Gen Agri-Fintech & AI Copilot Platform": "அடுத்த தலைமுறை அக்ரி-ஃபின்டெக் & AI கோபிலட் தளம்",
@@ -1268,7 +1573,7 @@ export const EXTENDED_UI_TRANSLATIONS = {
     "Light Mode": "ஒளி பயன்முறை",
     "Back to top": "மேலே செல்லவும்"
   },
-  gu: {
+  "gu": {
     "Agricultural Trade Works Better": "કૃષિ વેપાર વધુ સારો બને છે",
     "When It's Connected": "જ્યારે તે જોડાયેલું હોય",
     "Next-Gen Agri-Fintech & AI Copilot Platform": "નેક્સ્ટ-જનન એગ્રી-ફિનટેક અને AI કોપાયલટ પ્લેટફોર્મ",
@@ -1300,7 +1605,7 @@ export const EXTENDED_UI_TRANSLATIONS = {
     "Light Mode": "લાઇટ મોડ",
     "Back to top": "ટોચ પર જાઓ"
   },
-  kn: {
+  "kn": {
     "Agricultural Trade Works Better": "ಕೃಷಿ ವ್ಯಾಪಾರವು ಉತ್ತಮವಾಗಿ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತದೆ",
     "When It's Connected": "ಅದು ಸಂಪರ್ಕಗೊಂಡಾಗ",
     "Next-Gen Agri-Fintech & AI Copilot Platform": "ಮುಂದಿನ ಪೀಳಿಗೆಯ ಅಗ್ರಿ-ಫಿನ್‌ಟೆಕ್ ಮತ್ತು AI ಕೊಪೈಲಟ್ ಪ್ಲಾಟ್‌ಫಾರ್ಮ್",
@@ -1332,7 +1637,7 @@ export const EXTENDED_UI_TRANSLATIONS = {
     "Light Mode": "ಲೈಟ್ ಮೋಡ್",
     "Back to top": "ಮೇಲಕ್ಕೆ ಹೋಗಿ"
   },
-  pa: {
+  "pa": {
     "Agricultural Trade Works Better": "ਖੇਤੀਬਾੜੀ ਵਪਾਰ ਬਿਹਤਰ ਕੰਮ ਕਰਦਾ ਹੈ",
     "When It's Connected": "ਜਦੋਂ ਇਹ ਆਪਸ ਵਿੱਚ ਜੁੜਿਆ ਹੋਵੇ",
     "Next-Gen Agri-Fintech & AI Copilot Platform": "ਅਗਲੀ ਪੀੜ੍ਹੀ ਦਾ ਐਗਰੀ-ਫਿਨਟੈਕ ਅਤੇ ਏਆਈ ਕੋਪਾਇਲਟ ਪਲੇਟਫਾਰਮ",
@@ -1364,7 +1669,7 @@ export const EXTENDED_UI_TRANSLATIONS = {
     "Light Mode": "ਲਾਈਟ ਮੋਡ",
     "Back to top": "ਉੱਪਰ ਜਾਓ"
   },
-  ml: {
+  "ml": {
     "Agricultural Trade Works Better": "കാർഷിക വ്യാപാരം കൂടുതൽ മികച്ച രീതിയിൽ പ്രവർത്തിക്കുന്നു",
     "When It's Connected": "ഇത് പരസ്പരം ബന്ധിപ്പിക്കപ്പെടുമ്പോൾ",
     "Next-Gen Agri-Fintech & AI Copilot Platform": "നെക്സ്റ്റ്-ജെൻ അഗ്രി-ഫിൻടെക് & AI കോപൈലറ്റ് പ്ലാറ്റ്‌ഫോം",
@@ -1396,7 +1701,7 @@ export const EXTENDED_UI_TRANSLATIONS = {
     "Light Mode": "ലൈറ്റ് മോഡ്",
     "Back to top": "മുകളിലേക്ക് പോകുക"
   },
-  or: {
+  "or": {
     "Agricultural Trade Works Better": "କୃଷି ବାଣିଜ୍ୟ ଅଧିକ ଭଲ ଭାବରେ କାର୍ଯ୍ୟ କରେ",
     "When It's Connected": "ଯେତେବେଳେ ଏହା ସଂଯୁକ୍ତ ଥାଏ",
     "Next-Gen Agri-Fintech & AI Copilot Platform": "ପରବର୍ତ୍ତୀ ପିଢ଼ିର ଏଗ୍ରି-ଫିନଟେକ୍ ଏବଂ AI କୋପାଇଲଟ୍ ପ୍ଲାଟଫର୍ମ",
@@ -1428,7 +1733,7 @@ export const EXTENDED_UI_TRANSLATIONS = {
     "Light Mode": "ଲାଇଟ୍ ମୋଡ୍",
     "Back to top": "ଉପରକୁ ଯାଆନ୍ତୁ"
   },
-  ur: {
+  "ur": {
     "Agricultural Trade Works Better": "زرعی تجارت بہتر کام کرتی ہے",
     "When It's Connected": "جب یہ آپس میں جڑی ہو",
     "Next-Gen Agri-Fintech & AI Copilot Platform": "اگلی نسل کا ایگری-فن ٹیک اور اے آئی کوپائلٹ پلیٹ فارم",
@@ -1462,34 +1767,69 @@ export const EXTENDED_UI_TRANSLATIONS = {
   }
 };
 
-// Lossless translation helper that translates a text string from English to the target language
-export function translateText(englishText, targetLang) {
-  if (!englishText || !targetLang || targetLang === "en") return englishText;
+// RTL check helper for Urdu, Sindhi, and Kashmiri
+export function isRtlLanguage(langCode) {
+  const lang = CONSTITUTIONAL_LANGUAGES.find((l) => l.code === langCode);
+  return lang ? lang.dir === "rtl" : false;
+}
 
-  const trimmed = englishText.trim();
+// Get full language metadata
+export function getLanguageMeta(langCode) {
+  return CONSTITUTIONAL_LANGUAGES.find((l) => l.code === langCode) || CONSTITUTIONAL_LANGUAGES[0];
+}
+
+// Lossless translation helper that translates an English text string to the target language
+// Supports dynamic interpolation: translateText("items · {kg} kg", lang, { kg: 25 })
+export function translateText(englishText, targetLang = "en", params = null) {
+  if (!englishText || !targetLang || targetLang === "en") {
+    let result = englishText || "";
+    if (params && typeof params === "object") {
+      for (const [key, val] of Object.entries(params)) {
+        result = result.split(`{${key}}`).join(String(val));
+      }
+    }
+    return result;
+  }
+
+  const trimmed = String(englishText).trim();
 
   // 1. Check extended UI translations first
   const extDict = EXTENDED_UI_TRANSLATIONS[targetLang];
+  let translated = null;
   if (extDict && extDict[trimmed]) {
-    return englishText.replace(trimmed, extDict[trimmed]);
+    translated = englishText.replace(trimmed, extDict[trimmed]);
   }
 
-  // 2. Check main language dictionary (or fallback to Hindi cognates for Indic dialects)
-  const dict = LANGUAGE_DICTIONARIES[targetLang] || LANGUAGE_DICTIONARIES.hi;
-  if (!dict) return englishText;
-
-  // Direct key match
-  if (dict[trimmed]) {
-    return englishText.replace(trimmed, dict[trimmed]);
-  }
-
-  // Substring replacement for longer matches first
-  const sortedKeys = Object.keys(dict).sort((a, b) => b.length - a.length);
-  let result = englishText;
-  for (const key of sortedKeys) {
-    if (result.includes(key)) {
-      result = result.split(key).join(dict[key]);
+  // 2. Check main language dictionary (or fallback through dialect tree)
+  if (!translated) {
+    const dict = LANGUAGE_DICTIONARIES[targetLang] || LANGUAGE_DICTIONARIES.hi;
+    if (dict) {
+      if (dict[trimmed]) {
+        translated = englishText.replace(trimmed, dict[trimmed]);
+      } else {
+        // Substring replacement for longer matches first
+        const sortedKeys = Object.keys(dict).sort((a, b) => b.length - a.length);
+        let replaced = englishText;
+        let didMatch = false;
+        for (const key of sortedKeys) {
+          if (replaced.includes(key)) {
+            replaced = replaced.split(key).join(dict[key]);
+            didMatch = true;
+          }
+        }
+        if (didMatch) translated = replaced;
+      }
     }
   }
-  return result;
+
+  let finalResult = translated || englishText;
+
+  // 3. Interpolate dynamic variables if provided
+  if (params && typeof params === "object") {
+    for (const [key, val] of Object.entries(params)) {
+      finalResult = finalResult.split(`{${key}}`).join(String(val));
+    }
+  }
+
+  return finalResult;
 }

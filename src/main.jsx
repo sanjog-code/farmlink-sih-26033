@@ -76,7 +76,8 @@ import RouteOptimizationEngine from "./operations/RouteOptimizationEngine";
 import FpoCollectiveHub from "./operations/FpoCollectiveHub";
 import FailureDisputeEngine from "./operations/FailureDisputeEngine";
 import { availableToAdd, rankAndFilter, updateQuantity } from "./lib/marketplace.js";
-import { CONSTITUTIONAL_LANGUAGES, translateText } from "./translations/constitutional22.js";
+import { CONSTITUTIONAL_LANGUAGES, translateText, isRtlLanguage, getLanguageMeta } from "./translations/constitutional22.js";
+import LanguageSelectorModal from "./components/common/LanguageSelectorModal.jsx";
 import AgenticCopilot, { AgenticDockLauncher } from "./ai/AgenticCopilot.jsx";
 import SaarthiScreen from "./components/saarthi/SaarthiScreen.jsx";
 import FarmerExperience from "./components/farmer/FarmerExperience.jsx";
@@ -728,7 +729,14 @@ class ErrorBoundary extends React.Component {
 }
 
 function App() {
-  const [lang, setLang] = useState("en"),
+  const [lang, setLang] = useState(() => {
+      try {
+        return localStorage.getItem("farmlink_language") || "en";
+      } catch {
+        return "en";
+      }
+    }),
+    [isLangModalOpen, setIsLangModalOpen] = useState(false),
     [view, setView] = useState("home"),
     [authRole, setAuthRole] = useState("consumer"),
     [lots, setLots] = useState(() => {
@@ -794,10 +802,9 @@ function App() {
   }, [theme]);
   const toggleTheme = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
 
-  const tUI = (text) => {
+  const tUI = (text, params = null) => {
     if (!text) return "";
-    if (lang === "en") return text;
-    return translateText(text, lang);
+    return translateText(text, lang, params);
   };
   useEffect(() => {
     try {
@@ -1033,7 +1040,11 @@ function App() {
   useEffect(() => {
     const root = document.body;
     if (!root) return;
-    document.documentElement.lang = lang === "hi" ? "hi" : "en";
+    try {
+      localStorage.setItem("farmlink_language", lang);
+    } catch {}
+    document.documentElement.lang = lang;
+    document.documentElement.dir = isRtlLanguage(lang) ? "rtl" : "ltr";
     let pending = false;
     const translate = () => {
       if (!pending) {
@@ -1404,28 +1415,19 @@ function App() {
 
         {/* Right: Consolidated Action Cluster */}
         <div className="head-actions-jivexa">
-          {/* Compact 22-Language Selector Pill */}
-          <div className="lang-pill" title="Translate into all 22 official Indian languages">
-            <Languages size={14} className="lang-icon" />
-            <select
-              aria-label="Interface language"
-              value={lang}
-              onChange={(event) => {
-                const newLang = event.target.value;
-                setLang(newLang);
-                const selected = CONSTITUTIONAL_LANGUAGES.find((l) => l.code === newLang);
-                if (selected && newLang !== "en") {
-                  notify(`Translated to ${selected.nativeName} (${selected.name})`);
-                }
-              }}
-            >
-              {CONSTITUTIONAL_LANGUAGES.map((l) => (
-                <option key={l.code} value={l.code}>
-                  {l.name} ({l.nativeName})
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* 22-Language Selector Trigger Button */}
+          <button
+            type="button"
+            className="lang-pill"
+            onClick={() => setIsLangModalOpen(true)}
+            title="Translate into all 22 official Indian languages (Click to search)"
+            aria-label="Select Interface Language"
+          >
+            <Languages size={15} className="lang-icon" />
+            <span className="lang-current-label" style={{ fontWeight: 700, fontSize: "0.85rem", marginInlineStart: "4px" }}>
+              {getLanguageMeta(lang).nativeName}
+            </span>
+          </button>
 
           {/* Quick Voice Assistant Mic Button */}
           <button
@@ -1700,6 +1702,20 @@ function App() {
           notify={notify}
         />
       )}{" "}
+      <LanguageSelectorModal
+        isOpen={isLangModalOpen}
+        onClose={() => setIsLangModalOpen(false)}
+        currentLang={lang}
+        onSelectLang={(newLang) => {
+          setLang(newLang);
+          const meta = getLanguageMeta(newLang);
+          if (newLang !== "en") {
+            notify(`भाषा बदली: ${meta.nativeName} (${meta.name})`);
+          } else {
+            notify("Language set to English");
+          }
+        }}
+      />
       {toast && (
         <div className="toast">
           <Check size={17} />

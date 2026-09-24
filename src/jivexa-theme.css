@@ -70,8 +70,8 @@
   --shadow-xl: 0 20px 44px -10px rgba(15, 23, 42, 0.16), 0 8px 16px -6px rgba(15, 23, 42, 0.06);
   --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
 
-  /* Fonts & Transitions */
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Outfit", sans-serif;
+  /* Fonts & Transitions - Full Indic & Universal Unicode Support */
+  --font-sans: "Inter", "Noto Sans", "Noto Sans Devanagari", "Noto Sans Bengali", "Noto Sans Tamil", "Noto Sans Telugu", "Noto Sans Gujarati", "Noto Sans Kannada", "Noto Sans Malayalam", "Noto Sans Gurmukhi", "Noto Sans Oriya", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --transition-fast: 0.14s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.24s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.38s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2008,3 +2008,148 @@ article.lot:hover .lot-img img {
   background: var(--surface-raised);
   border: 1px dashed var(--border);
 }
+
+/* ─── RTL SUPPORT (Urdu, Kashmiri, Sindhi) ────────────────────────── */
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] body {
+  text-align: right;
+}
+
+[dir="rtl"] .head-actions-jivexa {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+[dir="rtl"] .top-search-icon {
+  left: auto !important;
+  right: 12px !important;
+}
+
+[dir="rtl"] .top-search-input {
+  padding-left: 14px !important;
+  padding-right: 34px !important;
+}
+
+[dir="rtl"] .brand-icon-box {
+  margin-right: 0 !important;
+  margin-left: 8px !important;
+}
+
+[dir="rtl"] .hero-trust-item svg,
+[dir="rtl"] .lot-origin svg,
+[dir="rtl"] .meta-icon {
+  margin-right: 0 !important;
+  margin-left: 6px !important;
+}
+
+[dir="rtl"] .eco-card-link svg,
+[dir="rtl"] .arrow-right,
+[dir="rtl"] .chevron-right,
+[dir="rtl"] .icon-chevron {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .footer-grid-jivexa,
+[dir="rtl"] .footer-bottom-jivexa {
+  direction: rtl;
+}
+
+[dir="rtl"] .footer-bottom-links {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+/* ─── MICROINTERACTIONS & TOUCH TARGETS ──────────────────────────── */
+button,
+a.btn,
+.nav-pill,
+.top-icon-btn,
+.eco-card-link,
+.hero-btn-primary,
+.hero-btn-secondary,
+.lot-reserve-btn {
+  user-select: none;
+  touch-action: manipulation;
+}
+
+button:active:not(:disabled),
+.hero-btn-primary:active,
+.hero-btn-secondary:active,
+.nav-pill:active,
+.top-icon-btn:active,
+.lot-reserve-btn:active {
+  transform: scale(0.975);
+  transition: transform 0.08s ease !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--primary) !important;
+  outline-offset: 2px !important;
+}
+
+/* Responsive Touch Target Minimums */
+@media (max-width: 768px) {
+  .top-icon-btn,
+  .nav-pill,
+  .top-auth-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ─── WCAG AA CONTRAST & FORM READABILITY ────────────────────────── */
+input::placeholder,
+textarea::placeholder {
+  color: #64748b !important;
+  opacity: 1;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* High Contrast Form Fields */
+input, select, textarea {
+  border: 1.5px solid var(--border) !important;
+  background-color: var(--surface) !important;
+  color: var(--text-main) !important;
+  font-family: inherit;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--primary-glow) !important;
+}
+
+/* Subtle Shimmer Skeleton */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-box {
+  background: linear-gradient(90deg, var(--surface-raised) 25%, var(--border) 50%, var(--surface-raised) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* Respect Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
