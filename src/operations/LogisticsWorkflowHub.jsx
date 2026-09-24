@@ -38,7 +38,6 @@ export const LOGISTICS_STAGES = [
   { id: 'DELIVERED', label: '6. Delivered', desc: 'Handshake OTP confirmed & payment settled', color: '#10b981' }
 ];
 
-export const INITIAL_SHIPMENTS = [];
 
 export default function LogisticsWorkflowHub({ notify }) {
   const [shipments, setShipments] = useState(() => getShipments());

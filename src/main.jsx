@@ -769,6 +769,7 @@ function App() {
     [now, setNow] = useState(Date.now()),
     [topSearch, setTopSearch] = useState(""),
     [placingOrder, setPlacingOrder] = useState(false),
+    [adminTab, setAdminTab] = useState("analytics"),
     placingOrderRef = useRef(false);
   const t = translations[lang] || translations.en;
   const [theme, setTheme] = useState(() => {
@@ -1562,75 +1563,10 @@ function App() {
           <AuthView initialRole={authRole} setSession={setSession} setView={setView} notify={notify} />
         )}{" "}
         {["privacy", "terms", "disclaimer"].includes(view) && <LegalPage type={view} setView={setView} />}
-        {view === "analytics" && (
-          <section className="page">
-            <div className="page-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <p className="eyebrow green">REAL-TIME PLATFORM INTELLIGENCE</p>
-                <h1 style={{ margin: '4px 0 8px' }}>Executive Analytics &amp; AI Demand Forecasting</h1>
-                <p style={{ margin: 0, color: 'var(--text-muted)' }}>Transparent economic KPIs, 36-month backtested SARIMAX forecasting, and farmer realization analytics.</p>
-              </div>
-              <button className="secondary" onClick={() => setView("home")}>← Back to Home</button>
-            </div>
-            <AdminAnalyticsEngine lots={lots} orders={orders} />
-            <DemandForecastEngine initialCrop="Mustard" />
-          </section>
-        )}
-        {view === "logistics" && (
-          <section className="page">
-            <div className="page-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <p className="eyebrow green">CONNECTED AGRI SUPPLY CHAIN</p>
-                <h1 style={{ margin: '4px 0 8px' }}>End-to-End Fleet Logistics &amp; Handoff Hub</h1>
-                <p style={{ margin: 0, color: 'var(--text-muted)' }}>Order ➔ Pickup Assignment ➔ Farmgate Weighment &amp; QR Tag ➔ WDRA Warehouse ➔ Final Buyer Delivery.</p>
-              </div>
-              <button className="secondary" onClick={() => setView("home")}>← Back to Home</button>
-            </div>
-            <LogisticsWorkflowHub notify={notify} />
-          </section>
-        )}
-        {view === "routes" && (
-          <section className="page">
-            <div className="page-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <p className="eyebrow green">ALGORITHMIC LOGISTICS &amp; TELEMETRY</p>
-                <h1 style={{ margin: '4px 0 8px' }}>Multi-Stop Cluster Route Optimization</h1>
-                <p style={{ margin: 0, color: 'var(--text-muted)' }}>Dijkstra + 2-Opt TSP heuristic solver, vehicle payload allocation, and live IoT cold-chain telemetry.</p>
-              </div>
-              <button className="secondary" onClick={() => setView("home")}>← Back to Home</button>
-            </div>
-            <RouteOptimizationEngine notify={notify} />
-          </section>
-        )}
-        {view === "fpo" && (
-          <section className="page">
-            <div className="page-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <p className="eyebrow green">COLLECTIVE SMALLHOLDER EMPOWERMENT</p>
-                <h1 style={{ margin: '4px 0 8px' }}>FPO Aggregation Portal &amp; Collective Pooling</h1>
-                <p style={{ margin: 0, color: 'var(--text-muted)' }}>Pool member volume, negotiate corporate contracts with price floors, and automate transparent member dividend splits.</p>
-              </div>
-              <button className="secondary" onClick={() => setView("home")}>← Back to Home</button>
-            </div>
-            <FpoCollectiveHub notify={notify} />
-          </section>
-        )}
-        {view === "disputes" && (
-          <section className="page">
-            <div className="page-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <p className="eyebrow green">MISSION-CRITICAL RESILIENCE</p>
-                <h1 style={{ margin: '4px 0 8px' }}>Automated Failure Modes &amp; Dispute Arbitration</h1>
-                <p style={{ margin: 0, color: 'var(--text-muted)' }}>Proactive failovers for QC rejections, farmgate deficits, vehicle breakdowns, buyer cancellations, and API degradation.</p>
-              </div>
-              <button className="secondary" onClick={() => setView("home")}>← Back to Home</button>
-            </div>
-            <FailureDisputeEngine notify={notify} />
-          </section>
-        )}
-        {view === "admin" && (
+        {["admin", "analytics", "logistics", "routes", "fpo", "disputes"].includes(view) && (
           <>
             <AdminView
+              initialTab={view === "admin" ? adminTab : view}
               session={session}
               lots={lots}
               orders={orders}
@@ -2104,9 +2040,9 @@ function Home({ t, lots, setView, access, reserve, setModal, lang, tUI }) {
                 type="button"
                 className="text-btn"
                 style={{ fontSize: '0.76rem', color: 'var(--primary)', padding: 0, fontWeight: 700 }}
-                onClick={() => setView("logistics")}
+                onClick={() => setView("farmer")}
               >
-                Track Fleet ➔
+                Schedule Pickup ➔
               </button>
             </div>
           </div>
@@ -2146,9 +2082,9 @@ function Home({ t, lots, setView, access, reserve, setModal, lang, tUI }) {
                 type="button"
                 className="text-btn"
                 style={{ fontSize: '0.76rem', color: 'var(--primary)', padding: 0, fontWeight: 700 }}
-                onClick={() => setView("analytics")}
+                onClick={() => setView("market")}
               >
-                Forecast Lab ➔
+                Browse Produce ➔
               </button>
             </div>
           </div>
@@ -2172,25 +2108,32 @@ function Home({ t, lots, setView, access, reserve, setModal, lang, tUI }) {
 
         <div className="flow-cta-banner">
           <div className="flow-cta-text">
-            <h4>{tr("Explore FarmLink's Real-Time Intelligence & Fleet Network")}</h4>
-            <p>{tr("Inspect quantitative AI demand predictions, real-time platform KPIs, and order-to-delivery logistics tracking.")}</p>
+            <h4>{tr("Direct Agricultural Supply Chain & Real-Time Handoffs")}</h4>
+            <p>{tr("Explore verified farmer listings, B2B wholesale procurement, and WDRA accredited warehouse inspection.")}</p>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button className="hero-btn-primary" onClick={() => setView("analytics")} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
-              <TrendingUp size={15} />
-              <span>{tr("AI Demand & KPIs")}</span>
+            <button className="hero-btn-primary" onClick={() => setView("market")} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+              <ShoppingCart size={15} />
+              <span>{tr("Marketplace")}</span>
             </button>
-            <button className="hero-btn-secondary" onClick={() => setView("logistics")} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+            <button className="hero-btn-secondary" onClick={() => setView("bulk")} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+              <Building2 size={15} />
+              <span>{tr("Wholesale Desk")}</span>
+            </button>
+            <button className="hero-btn-secondary" onClick={() => setView("warehouse")} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+              <Warehouse size={15} />
+              <span>{tr("WDRA Warehouses")}</span>
+            </button>
+            <button className="hero-btn-secondary" onClick={() => setView("farmer")} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
               <Truck size={15} />
-              <span>{tr("Logistics Fleet Hub")}</span>
+              <span>{tr("Farmer Portal")}</span>
             </button>
-            <button className="top-ai-copilot-btn" onClick={() => setModal("agentic")} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
-              <Sparkles size={15} />
-              <span>{tr("Launch Copilot 🚀")}</span>
+            <button className="top-auth-btn" onClick={() => { setAdminTab("analytics"); setView("admin"); }} style={{ padding: '8px 16px', fontSize: '0.85rem', background: 'rgba(5, 150, 105, 0.15)', color: 'var(--primary)', border: '1px solid rgba(5, 150, 105, 0.3)', fontWeight: 700 }}>
+              <ShieldCheck size={15} />
+              <span>{tr("Admin Profile")}</span>
             </button>
           </div>
-        </div>
-      </section>
+        </div>      </section>
 
       {/* MULTILINGUAL VOICE CONSULTATION BANNER */}
       <section className="voice-banner">
@@ -5521,7 +5464,7 @@ function AuthView({ initialRole = "consumer", setSession, setView, notify }) {
               className="secondary"
               style={{ fontSize: "0.82rem", padding: "5px 10px", display: "flex", alignItems: "center", gap: "5px" }}
               onClick={() => {
-                setSession({ role: "farmer", label: "Ramesh Kumar", name: "Ramesh Kumar", farmerId: "FLR-98124", userId: "demo-farmer-ramesh" });
+                setSession({ role: "farmer", label: "Verified Farmer", name: "Verified Farmer", farmerId: "FARMLINK-PRODUCER", userId: "demo-farmer-ramesh" });
                 setView("farmer");
                 notify("Signed in as Farmer Ramesh Kumar.");
               }}
@@ -5545,7 +5488,7 @@ function AuthView({ initialRole = "consumer", setSession, setView, notify }) {
               className="secondary"
               style={{ fontSize: "0.82rem", padding: "5px 10px", display: "flex", alignItems: "center", gap: "5px" }}
               onClick={() => {
-                setSession({ role: "consumer", label: "Priya Sharma", name: "Priya Sharma", userId: "demo-consumer" });
+                setSession({ role: "consumer", label: "Registered Consumer", name: "Registered Consumer", userId: "demo-consumer" });
                 setView("market");
                 notify("Signed in as Consumer Priya Sharma.");
               }}
@@ -5578,261 +5521,8 @@ function Field({ icon, label, name, type, onChange }) {
     </label>
   );
 }
-function LegacyAdminView({ lots, orders, produceRequests, setView, logout, notify }) {
-  const value = lots.reduce((sum, l) => sum + l.qty * l.price, 0);
-  const [tab, setTab] = useState("users");
-  return (
-    <section className="page admin-page">
-      <div className="page-top">
-        <div>
-          <p className="eyebrow green">PLATFORM COMMAND CENTER</p>
-          <h1>FarmLink Admin</h1>
-          <p>
-            Monitor farmer collection requests, consumer pickup orders,
-            warehouse stock and market operations.
-          </p>
-        </div>
-        <button className="secondary" onClick={logout}>
-          <LogOut size={17} />
-          Sign out
-        </button>
-      </div>
-      <div className="metric-grid">
-        <Metric
-          icon={<Users />}
-          label="Registered farmers"
-          value="152"
-          note={produceRequests.length + " new collection request(s)"}
-        />
-        <Metric
-          icon={<ShoppingCart />}
-          label="Consumer pickup orders"
-          value={String(orders.length)}
-          note="Awaiting warehouse fulfillment"
-        />
-        <Metric
-          icon={<PackageCheck />}
-          label="Live inventory"
-          value={lots.reduce((s, l) => s + l.qty, 0).toLocaleString() + " kg"}
-          note="Across 2 warehouses"
-        />
-        <Metric
-          icon={<BarChart3 />}
-          label="Stock value"
-          value={"₹" + value.toLocaleString()}
-          note="Indicative live value"
-        />
-      </div>
-      <div className="admin-grid">
-        <QueuePanel
-          title="New farmer collection requests"
-          empty="No new farmer produce or cluster requests."
-          items={produceRequests}
-          render={(r) => (
-            <>
-              <b>
-                {r.crop} · {r.grossWeight} kg gross
-              </b>
-              <small>
-                {r.type} · {r.farmer} · {r.cluster}
-              </small>
-            </>
-          )}
-        />
-        <QueuePanel
-          title="Consumer pickup orders"
-          empty="No consumer pickup orders yet."
-          items={orders}
-          render={(o) => (
-            <>
-              <b>
-                {o.id} · {o.quantity} kg
-              </b>
-              <small>
-                Pickup at {o.pickupWarehouse} · {o.status}
-              </small>
-            </>
-          )}
-        />
-      </div>
-      <div className="admin-grid">
-        <div className="admin-panel">
-          <h3>Warehouse & inventory events</h3>
-          {lots.map((l, i) => (
-            <div key={l.id} className="admin-row">
-              <span className="dot"></span>
-              <div>
-                <b>
-                  {l.id} · {l.crop}
-                </b>
-                <small>
-                  {i === 0
-                    ? "Grade verified and available to buy"
-                    : "Live inventory record · " + l.warehouse}
-                </small>
-              </div>
-              <strong>{l.qty} kg</strong>
-            </div>
-          ))}
-          <button className="wide-btn" onClick={() => setView("warehouse")}>
-            Open admin warehouse console
-          </button>
-        </div>
-        <div className="admin-panel">
-          <h3>Operations queue</h3>
-          <div className="queue">
-            <span className="warn">3</span>
-            <div>
-              <b>Buyer verification</b>
-              <small>Bulk buyer accounts pending review</small>
-            </div>
-          </div>
-          <div className="queue">
-            <span className="ok">2</span>
-            <div>
-              <b>Finance enquiries</b>
-              <small>Consent received; partner follow-up needed</small>
-            </div>
-          </div>
-          <div className="queue">
-            <span className="neutral">5</span>
-            <div>
-              <b>Stock-age alerts</b>
-              <small>Review markdown / redistribution action</small>
-            </div>
-          </div>
-          <button
-            className="primary"
-            onClick={() => notify("Operations report generated for review.")}
-          >
-            Generate report
-          </button>
-        </div>
-      </div>
-      <section className="admin-control">
-        <p className="eyebrow green">GOVERNANCE & MODERATION</p>
-        <div className="tabs">
-          {[
-            "users",
-            "verification",
-            "listings",
-            "disputes",
-            "configuration",
-          ].map((x) => (
-            <button
-              key={x}
-              className={tab === x ? "selected" : ""}
-              onClick={() => setTab(x)}
-            >
-              {x}
-            </button>
-          ))}
-        </div>
-        {tab === "users" && (
-          <div className="account-panel">
-            <h3>User management</h3>
-            <div className="contract-row">
-              <b>Ramesh Kumar</b>
-              <span>Farmer · verified</span>
-              <span>Active</span>
-              <button onClick={() => notify("User moderation profile opened.")}>
-                Manage
-              </button>
-            </div>
-            <div className="contract-row">
-              <b>Metro Fresh Foods</b>
-              <span>Bulk buyer · GST pending</span>
-              <span>Review required</span>
-              <button
-                onClick={() => notify("Bulk buyer GST verification opened.")}
-              >
-                Verify GST
-              </button>
-            </div>
-          </div>
-        )}
-        {tab === "verification" && (
-          <div className="account-panel">
-            <h3>Farmer & buyer verification queue</h3>
-            <p>
-              Review document uploads, farm/FPO details and GST credentials
-              before enabling trust badges and wholesale purchasing.
-            </p>
-            <button
-              className="primary"
-              onClick={() =>
-                notify("Verification queue assigned to current administrator.")
-              }
-            >
-              Review pending applications
-            </button>
-          </div>
-        )}
-        {tab === "listings" && (
-          <div className="account-panel">
-            <h3>Listing moderation</h3>
-            <div className="contract-row">
-              <b>Organic onion – 500 kg</b>
-              <span>AI grade B</span>
-              <span>Awaiting moderation</span>
-              <button onClick={() => notify("Listing approved and published.")}>
-                Approve
-              </button>
-            </div>
-            <button
-              className="secondary"
-              onClick={() =>
-                notify("Listing rejected with farmer-visible reason request.")
-              }
-            >
-              Reject selected listing
-            </button>
-          </div>
-        )}
-        {tab === "disputes" && (
-          <div className="account-panel">
-            <h3>Dispute resolution</h3>
-            <p>
-              Record customer complaints, evidence, warehouse findings, remedies
-              and final outcome in an auditable resolution timeline.
-            </p>
-            <button
-              className="primary"
-              onClick={() => notify("New dispute case created.")}
-            >
-              Create resolution case
-            </button>
-          </div>
-        )}
-        {tab === "configuration" && (
-          <div className="account-panel form-grid">
-            <h3>System configuration</h3>
-            <label>
-              Marketplace category
-              <input defaultValue="Vegetables" />
-            </label>
-            <label>
-              AI grade confidence threshold
-              <input type="number" defaultValue="85" />
-            </label>
-            <label>
-              Stock freshness alert (days)
-              <input type="number" defaultValue="3" />
-            </label>
-            <button
-              className="primary"
-              onClick={() => notify("Configuration draft saved for review.")}
-            >
-              Save configuration
-            </button>
-          </div>
-        )}
-      </section>
-    </section>
-  );
-}
-function AdminView({ session, lots, orders, produceRequests, bulkRequests, logisticsJobs, warehouses, setOrderStatus, liveTick, setLiveTick, setView, logout, notify, farmerVerification, setFarmerVerification }) {
-  const [tab, setTab] = useState("analytics");
+function AdminView({ session, lots, orders, produceRequests, bulkRequests, logisticsJobs, warehouses, setOrderStatus, liveTick, setLiveTick, setView, logout, notify, farmerVerification, setFarmerVerification, initialTab = "analytics" }) {
+  const [tab, setTab] = useState(initialTab || "analytics");
   const [listings, setListings] = useState([]);
   const [listingCategory, setListingCategory] = useState("pending");
   const [actionBusy, setActionBusy] = useState({});
@@ -5846,61 +5536,6 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
   const [priceFloors, setPriceFloors] = useState([]);
   const [route, setRoute] = useState({ origin: warehouses[0]?.name || "", destination: warehouses[1]?.name || "" });
   const refresh = () => setLiveTick((tick) => tick + 1);
-
-  const demoListings = useMemo(() => [
-    {
-      id: "demo-listing-1",
-      crop: "Rapeseed & mustard",
-      category: "Oilseeds",
-      description: "Phulera pilot intake batch. 40%+ oil content verified.",
-      quantity_kg: 200,
-      price_per_kg: 86.00,
-      image_url: "https://images.unsplash.com/photo-1508747703725-719777637510?auto=format&fit=crop&w=600&q=80",
-      harvest_date: "2026-03-15",
-      status: "pending",
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-      profiles: { full_name: "Ramesh Kumar" }
-    },
-    {
-      id: "demo-listing-2",
-      crop: "Wheat",
-      category: "Cereals & millets",
-      description: "Sharbati golden grain, moisture 11.2%, cleaned and bagged.",
-      quantity_kg: 500,
-      price_per_kg: 26.50,
-      image_url: "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?auto=format&fit=crop&w=600&q=80",
-      harvest_date: "2026-03-10",
-      status: "pending",
-      created_at: new Date(Date.now() - 7200000).toISOString(),
-      profiles: { full_name: "Suresh Patel" }
-    },
-    {
-      id: "demo-listing-3",
-      crop: "Tomato",
-      category: "Vegetables",
-      description: "Grade A greenhouse tomatoes, Jaipur North cluster intake.",
-      quantity_kg: 150,
-      price_per_kg: 28.00,
-      image_url: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80",
-      harvest_date: "2026-03-20",
-      status: "published",
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-      profiles: { full_name: "Ramesh Kumar" }
-    },
-    {
-      id: "demo-listing-4",
-      crop: "Chickpea (Gram)",
-      category: "Pulses",
-      description: "Bold desi gram, harvested from Sanganer cluster.",
-      quantity_kg: 300,
-      price_per_kg: 64.00,
-      image_url: "https://images.unsplash.com/photo-1515543904379-3d757afe72e4?auto=format&fit=crop&w=600&q=80",
-      harvest_date: "2026-03-12",
-      status: "published",
-      created_at: new Date(Date.now() - 172800000).toISOString(),
-      profiles: { full_name: "Aman Sharma" }
-    }
-  ], []);
 
   const effectiveListings = listings.length > 0 ? listings : getUserListings();
   const awaitingListings = effectiveListings.filter(l => l.status === "pending" || l.status === "scheduled");
@@ -5949,7 +5584,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
 
     try {
       if (String(id).startsWith("demo-")) {
-        setListings((current) => (current.length ? current : demoListings).map(item => item.id === id ? { ...item, status } : item));
+        setListings((current) => (current.length ? current : getUserListings()).map(item => item.id === id ? { ...item, status } : item));
         notify(status === "published" ? "Listing verified and published with the farmer photo." : "Listing rejected; the farmer can correct it and resubmit.");
         return;
       }
@@ -5978,7 +5613,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
 
     try {
       if (String(listing.id).startsWith("demo-")) {
-        setListings((current) => (current.length ? current : demoListings).filter(item => item.id !== listing.id));
+        setListings((current) => (current.length ? current : getUserListings()).filter(item => item.id !== listing.id));
         notify(`${listing.crop} has been removed from the marketplace. The underlying traceability record was retained.`);
         return;
       }
@@ -6010,7 +5645,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
 
     try {
       if (String(listing.id).startsWith("demo-")) {
-        setListings((current) => (current.length ? current : demoListings).map(item => item.id === listing.id ? { ...item, status: "scheduled", warehouses: { name: warehouse.name } } : item));
+        setListings((current) => (current.length ? current : getUserListings()).map(item => item.id === listing.id ? { ...item, status: "scheduled", warehouses: { name: warehouse.name } } : item));
         notify(`Listing scheduled to ${warehouse.name}. It is now visible in warehouse intake.`);
         return;
       }
