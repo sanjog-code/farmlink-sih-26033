@@ -1723,7 +1723,6 @@ function App() {
         </div>
       )}
       <SiteFooter setView={setView} notify={notify} lang={lang} tUI={tUI} />
-      <AgenticDockLauncher onOpen={() => setModal("agentic")} /> 
     </>
   );
 }

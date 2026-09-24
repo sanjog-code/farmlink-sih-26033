@@ -282,7 +282,7 @@ export default function AdminAnalyticsEngine({ lots = [], orders = [] }) {
                 FarmLink Saarthi — Rural Voice AI Assistant Analytics
               </h3>
               <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 800 }}>
-                GEMINI 3.7 FLASH
+                KANAK AI 3.7 FLASH
               </span>
             </div>
             <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>

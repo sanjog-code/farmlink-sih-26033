@@ -231,24 +231,39 @@ export default function SaarthiScreen({
               {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
             </button>
 
-            <button
-              type="button"
-              className="saarthi-btn-icon"
-              onClick={() => setKioskMode(!kioskMode)}
-              title={kioskMode ? 'Exit Kiosk Mode' : 'Enter Kiosk Mode'}
-            >
-              {kioskMode ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-            </button>
-
-            {!kioskMode && (
+            {kioskMode ? (
               <button
                 type="button"
-                className="saarthi-btn-icon"
-                onClick={onClose}
-                title="Close Saarthi"
+                className="saarthi-exit-kiosk-btn"
+                onClick={() => {
+                  setKioskMode(false);
+                  onClose();
+                }}
+                title="Exit Kiosk Mode"
+                aria-label="Exit Kiosk Mode"
               >
-                <X size={20} />
+                <X size={18} />
+                <span>कियोस्क बंद करें (Exit)</span>
               </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="saarthi-btn-icon"
+                  onClick={() => setKioskMode(true)}
+                  title="Enter Fullscreen Kiosk Mode"
+                >
+                  <Maximize2 size={20} />
+                </button>
+                <button
+                  type="button"
+                  className="saarthi-btn-icon"
+                  onClick={onClose}
+                  title="Close Saarthi"
+                >
+                  <X size={20} />
+                </button>
+              </>
             )}
           </div>
         </header>

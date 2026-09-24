@@ -646,39 +646,177 @@
 }
 
 /* Dark mode compatibility */
+[data-theme="dark"] .saarthi-exp-container,
 body.dark .saarthi-exp-container {
-  background: #0b1712;
-  color: #e2ede6;
+  background: #08130e;
+  color: #f8fafc;
 }
 
+[data-theme="dark"] .saarthi-exp-header,
 body.dark .saarthi-exp-header,
+[data-theme="dark"] .saarthi-convo-card,
 body.dark .saarthi-convo-card,
+[data-theme="dark"] .saarthi-shortcut-card,
 body.dark .saarthi-shortcut-card,
+[data-theme="dark"] .saarthi-drawer-panel,
 body.dark .saarthi-drawer-panel,
+[data-theme="dark"] .mode-select-card,
 body.dark .mode-select-card {
-  background: #12241b;
-  border-color: #1e3d2d;
-  color: #e2ede6;
+  background: #0f231a;
+  border-color: #1e4533;
+  color: #f8fafc;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
+[data-theme="dark"] .saarthi-prompt-text,
 body.dark .saarthi-prompt-text,
+[data-theme="dark"] .saarthi-exp-greeting-title,
 body.dark .saarthi-exp-greeting-title,
+[data-theme="dark"] .saarthi-shortcut-title,
 body.dark .saarthi-shortcut-title,
+[data-theme="dark"] .saarthi-drawer-title,
 body.dark .saarthi-drawer-title,
-body.dark .mode-select-title {
+[data-theme="dark"] .mode-select-title,
+body.dark .mode-select-title,
+[data-theme="dark"] .saarthi-card-val,
+body.dark .saarthi-card-val,
+[data-theme="dark"] .saarthi-mic-caption,
+body.dark .saarthi-mic-caption {
+  color: #34d399;
+}
+
+[data-theme="dark"] .saarthi-exp-greeting-sub,
+body.dark .saarthi-exp-greeting-sub,
+[data-theme="dark"] .saarthi-shortcut-sub,
+body.dark .saarthi-shortcut-sub {
   color: #a7f3d0;
 }
 
+[data-theme="dark"] .saarthi-shortcut-card:hover,
 body.dark .saarthi-shortcut-card:hover {
-  background: #183325;
+  background: #153326;
   border-color: #34d399;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.25);
 }
 
+[data-theme="dark"] .saarthi-visual-card,
+body.dark .saarthi-visual-card {
+  background: #142e22;
+  border-color: #1e4533;
+}
+
+[data-theme="dark"] .saarthi-card-label,
+body.dark .saarthi-card-label,
+[data-theme="dark"] .mode-select-sub,
+body.dark .mode-select-sub {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .saarthi-drawer-item,
+body.dark .saarthi-drawer-item {
+  background: #142e22;
+  border-color: #1e4533;
+}
+
+[data-theme="dark"] .saarthi-drawer-item:hover,
+body.dark .saarthi-drawer-item:hover {
+  background: #1a3c2c;
+  border-color: #10b981;
+}
+
+[data-theme="dark"] .saarthi-drawer-item-title,
+body.dark .saarthi-drawer-item-title {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .saarthi-drawer-item-desc,
+body.dark .saarthi-drawer-item-desc {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .saarthi-drawer-close,
+body.dark .saarthi-drawer-close {
+  background: #1e4533;
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .mode-option-btn,
+body.dark .mode-option-btn {
+  background: #142e22;
+  border-color: #1e4533;
+}
+
+[data-theme="dark"] .mode-option-btn:hover,
+body.dark .mode-option-btn:hover {
+  background: #1a3c2c;
+  border-color: #10b981;
+}
+
+[data-theme="dark"] .mode-option-btn.classic,
+body.dark .mode-option-btn.classic {
+  background: #131c26;
+  border-color: #24354a;
+}
+
+[data-theme="dark"] .mode-option-btn.classic:hover,
+body.dark .mode-option-btn.classic:hover {
+  background: #1a2736;
+  border-color: #3b82f6;
+}
+
+[data-theme="dark"] .mode-option-title,
+body.dark .mode-option-title {
+  color: #34d399;
+}
+
+[data-theme="dark"] .mode-option-btn.classic .mode-option-title,
+body.dark .mode-option-btn.classic .mode-option-title {
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .mode-option-desc,
+body.dark .mode-option-desc {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .classic-mode-top-banner,
 body.dark .classic-mode-top-banner {
-  background: #14281f;
-  border-color: #244635;
+  background: #0f231a;
+  border-color: #1e4533;
 }
 
+[data-theme="dark"] .classic-banner-text,
 body.dark .classic-banner-text {
   color: #a7f3d0;
+}
+
+[data-theme="dark"] .saarthi-mode-switch-btn,
+body.dark .saarthi-mode-switch-btn {
+  background: #142e22;
+  border-color: #1e4533;
+  color: #a7f3d0;
+}
+
+[data-theme="dark"] .saarthi-mode-switch-btn:hover,
+body.dark .saarthi-mode-switch-btn:hover {
+  background: #10b981;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .saarthi-confirm-box,
+body.dark .saarthi-confirm-box {
+  background: #271d0e;
+  border-color: #5e3a0d;
+}
+
+[data-theme="dark"] .saarthi-confirm-prompt,
+body.dark .saarthi-confirm-prompt {
+  color: #fde68a;
+}
+
+[data-theme="dark"] .saarthi-btn-no,
+body.dark .saarthi-btn-no {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-color: #374151;
 }

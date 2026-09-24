@@ -381,7 +381,7 @@ export async function executeAutonomousAgent({
       console.warn('Gemini cloud invocation failed, gracefully falling back to autonomous edge ReAct engine:', err.message);
       onStep({
         type: 'thought',
-        content: `Notice: Cloud Gemini connection returned (${err.message}). Activating FarmLink Autonomous Edge ReAct Engine for guaranteed uptime...`
+        content: `Notice: KANAK AI Cloud connection returned (${err.message}). Activating FarmLink Autonomous Edge Engine for guaranteed uptime...`
       });
       // Fallback to Edge ReAct
       const edgeResult = await runAutonomousEdgeAgent({

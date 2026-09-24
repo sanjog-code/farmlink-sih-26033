@@ -415,9 +415,9 @@ export default function AgenticCopilot({
             </div>
             <div className="agentic-title">
               <h3>
-                FarmLink Agentic Copilot
-                <span className={`agentic-engine-badge ${useGemini && geminiKey ? 'cloud' : 'edge'}`}>
-                  {useGemini && geminiKey ? '☁️ Gemini 3.6 Flash' : '⚡ Autonomous Edge AI'}
+                KANAK AI Copilot
+                <span className="agentic-engine-badge cloud">
+                  🌾 KANAK AI Core
                 </span>
               </h3>
               <p>
@@ -427,29 +427,6 @@ export default function AgenticCopilot({
           </div>
 
           <div className="agentic-controls">
-            <button
-              type="button"
-              className="agentic-mode-pill-btn"
-              title={useGemini && geminiKey ? 'Switch to Offline/Edge ReAct AI' : 'Switch to Gemini 3.6 Cloud AI'}
-              onClick={() => {
-                if (!geminiKey && !useGemini) {
-                  setShowSettings(true);
-                  setKeyStatus('Please enter your Gemini API key below to activate Cloud AI.');
-                } else {
-                  setUseGemini(!useGemini);
-                }
-              }}
-            >
-              {useGemini && geminiKey ? '☁️ Cloud LLM' : '⚡ Edge ReAct'}
-            </button>
-            <button
-              type="button"
-              className="agentic-icon-btn"
-              title="Configure Gemini API LLM Key"
-              onClick={() => setShowSettings(!showSettings)}
-            >
-              <Settings2 size={18} />
-            </button>
             <button
               type="button"
               className="agentic-icon-btn"
@@ -463,8 +440,8 @@ export default function AgenticCopilot({
 
         {/* Scrollable Body */}
         <div className="agentic-body">
-          {/* Settings Drawer (Voice AI & Gemini Cloud Tabs) */}
-          {showSettings && (
+          {/* Settings Drawer (Removed per user request) */}
+          {false && (
             <div className="agentic-settings-drawer">
               <div className="settings-tabs">
                 <button
@@ -865,19 +842,7 @@ export default function AgenticCopilot({
   );
 }
 
-// Persistent Floating Agentic Dock Button (Mounted Globally)
-export function AgenticDockLauncher({ onOpen }) {
-  return (
-    <button
-      type="button"
-      className="agentic-dock-btn"
-      onClick={onOpen}
-      title="Open FarmLink Agentic AI Copilot (ReAct Tools & Voice in 22 Languages)"
-    >
-      <span className="sparkle-icon">
-        <Sparkles size={18} />
-      </span>
-      <span>FarmLink Agentic Copilot</span>
-    </button>
-  );
+// Persistent Floating Agentic Dock Button (Removed per user request)
+export function AgenticDockLauncher() {
+  return null;
 }

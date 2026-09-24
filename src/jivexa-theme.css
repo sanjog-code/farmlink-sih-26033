@@ -194,10 +194,77 @@ html[data-theme="dark"] body {
 [data-theme="dark"] .recommend,
 [data-theme="dark"] .grade-ai,
 [data-theme="dark"] .eco-card,
-[data-theme="dark"] .pipeline-card {
+[data-theme="dark"] .pipeline-card,
+[data-theme="dark"] .market-tools,
+[data-theme="dark"] .account-panel,
+[data-theme="dark"] .admin-control,
+[data-theme="dark"] .farmer-operations,
+[data-theme="dark"] .farmer-help,
+[data-theme="dark"] .queue-panel,
+[data-theme="dark"] .admin-work-panel,
+[data-theme="dark"] .live-admin,
+[data-theme="dark"] .metric,
+[data-theme="dark"] .product-wrap,
+[data-theme="dark"] .service-card,
+[data-theme="dark"] .details-card {
   background-color: #0f231a !important;
   border-color: #1e4533 !important;
   color: #f8fafc !important;
+}
+
+[data-theme="dark"] .quote-card {
+  background: #142e22 !important;
+  border: 1px solid #1e4533 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .tabs {
+  background: #12291e !important;
+  border-color: #1e4533 !important;
+}
+
+[data-theme="dark"] .tabs button {
+  color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] .tabs button.selected {
+  background: #059669 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .service-card p,
+[data-theme="dark"] .service-card small,
+[data-theme="dark"] .contract-row small,
+[data-theme="dark"] .queue-panel small,
+[data-theme="dark"] .live-row small {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .tracking,
+[data-theme="dark"] .contract-row,
+[data-theme="dark"] .live-row {
+  border-bottom-color: #1e4533 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .integration-table th {
+  background: #142e22 !important;
+  color: #a7f3d0 !important;
+  border-bottom-color: #1e4533 !important;
+}
+
+[data-theme="dark"] .integration-table td {
+  color: #f8fafc !important;
+  border-bottom-color: #1e4533 !important;
+}
+
+[data-theme="dark"] .integration-section {
+  border-top-color: #1e4533 !important;
+}
+
+[data-theme="dark"] .feedback-message {
+  background: #142e22 !important;
+  color: #a7f3d0 !important;
 }
 
 [data-theme="dark"] input,
