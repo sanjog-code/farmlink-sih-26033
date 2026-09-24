@@ -1,0 +1,684 @@
+/* FarmLink — Saarthi Mode Radical Simplicity Styles (Mobile-First) */
+
+.saarthi-exp-container {
+  min-height: calc(100vh - 72px);
+  background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 40%, #f9fafb 100%);
+  color: #1a382b;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans Devanagari', sans-serif;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+/* Top Control Bar */
+.saarthi-exp-header {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1.5px solid #d1fae5;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.08);
+  margin-bottom: 20px;
+}
+
+.saarthi-exp-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.saarthi-exp-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+}
+
+.saarthi-exp-greeting-title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: #064e3b;
+  line-height: 1.25;
+}
+
+.saarthi-exp-greeting-sub {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #059669;
+  font-weight: 600;
+}
+
+.saarthi-exp-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Switch to Classic Mode Button */
+.saarthi-mode-switch-btn {
+  background: #f0fdf4;
+  border: 1.5px solid #10b981;
+  color: #065f46;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 750;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.saarthi-mode-switch-btn:hover {
+  background: #10b981;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+/* Main Conversational & Voice Center */
+.saarthi-voice-center {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.saarthi-prompt-text {
+  font-size: 1.35rem;
+  font-weight: 850;
+  color: #064e3b;
+  margin: 0 0 16px 0;
+}
+
+/* Massive Microphone Button */
+.saarthi-giant-mic-btn {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.saarthi-giant-mic-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 14px 38px rgba(16, 185, 129, 0.5);
+}
+
+.saarthi-giant-mic-btn:active {
+  transform: scale(0.96);
+}
+
+.saarthi-giant-mic-btn.is-listening {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  box-shadow: 0 10px 32px rgba(239, 68, 68, 0.45);
+  animation: saarthi-pulse 1.4s infinite;
+}
+
+.saarthi-giant-mic-btn.is-processing {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 10px 32px rgba(245, 158, 11, 0.4);
+}
+
+.saarthi-giant-mic-btn.is-speaking {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  box-shadow: 0 10px 32px rgba(59, 130, 246, 0.4);
+  animation: saarthi-glow 1.8s infinite;
+}
+
+@keyframes saarthi-pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55); }
+  70% { transform: scale(1.08); box-shadow: 0 0 0 22px rgba(239, 68, 68, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+@keyframes saarthi-glow {
+  0%, 100% { box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4); }
+  50% { box-shadow: 0 12px 35px rgba(59, 130, 246, 0.7); }
+}
+
+.saarthi-mic-caption {
+  font-size: 0.98rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  margin-top: 14px;
+  color: #064e3b;
+  text-transform: uppercase;
+}
+
+/* Audio Status Pill */
+.saarthi-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 750;
+  margin-top: 10px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.saarthi-status-pill.listening {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+
+.saarthi-status-pill.processing {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.saarthi-status-pill.speaking {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+/* Active Conversation Bubble */
+.saarthi-convo-card {
+  width: 100%;
+  max-width: 640px;
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 18px 20px;
+  border: 1.5px solid #d1fae5;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.09);
+  margin-bottom: 22px;
+  text-align: left;
+  position: relative;
+}
+
+.saarthi-convo-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0fdf4;
+}
+
+.saarthi-convo-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #059669;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.saarthi-replay-btn {
+  background: #f0fdf4;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.saarthi-replay-btn:hover {
+  background: #10b981;
+  color: #ffffff;
+}
+
+/* Consequential Action Confirmation Card */
+.saarthi-confirm-box {
+  margin-top: 14px;
+  padding: 14px;
+  background: #fffbeb;
+  border: 1.5px solid #fde68a;
+  border-radius: 14px;
+}
+
+.saarthi-confirm-prompt {
+  margin: 0 0 12px 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #92400e;
+}
+
+.saarthi-confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.saarthi-btn-yes {
+  flex: 1;
+  background: #16a34a;
+  color: #ffffff;
+  border: none;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 3px 10px rgba(22, 163, 74, 0.3);
+}
+
+.saarthi-btn-yes:active { transform: translateY(1px); }
+
+.saarthi-btn-no {
+  flex: 1;
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1.5px solid #d1d5db;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* 6 VERY LARGE TOUCH SHORTCUTS GRID */
+.saarthi-shortcuts-grid {
+  width: 100%;
+  max-width: 640px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.saarthi-shortcut-card {
+  background: #ffffff;
+  border: 2px solid #d1fae5;
+  border-radius: 18px;
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.06);
+}
+
+.saarthi-shortcut-card:hover {
+  transform: translateY(-2px);
+  border-color: #10b981;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.16);
+  background: #f0fdf4;
+}
+
+.saarthi-shortcut-card:active {
+  transform: translateY(0);
+}
+
+.saarthi-shortcut-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.saarthi-shortcut-title {
+  font-size: 1.05rem;
+  font-weight: 850;
+  color: #064e3b;
+  margin-bottom: 2px;
+}
+
+.saarthi-shortcut-sub {
+  font-size: 0.78rem;
+  color: #047857;
+  font-weight: 600;
+}
+
+/* Visual Information Cards (for Market Price, Payment, Pickup) */
+.saarthi-visual-card {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: #f8faf8;
+  border: 1.5px solid #a7f3d0;
+  border-radius: 14px;
+}
+
+.saarthi-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.saarthi-card-row:last-child {
+  margin-bottom: 0;
+}
+
+.saarthi-card-label {
+  font-size: 0.84rem;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.saarthi-card-val {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #064e3b;
+}
+
+.saarthi-card-pill {
+  background: #dcfce7;
+  color: #166534;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+/* Progressive Disclosure "Aur Services" Modal/Drawer */
+.saarthi-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.saarthi-drawer-panel {
+  background: #ffffff;
+  width: 100%;
+  max-width: 580px;
+  border-radius: 24px 24px 0 0;
+  padding: 24px 20px;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.15);
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: saarthi-slide-up 0.25s ease-out;
+}
+
+@keyframes saarthi-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.saarthi-drawer-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.saarthi-drawer-title {
+  font-size: 1.25rem;
+  font-weight: 850;
+  color: #064e3b;
+  margin: 0;
+}
+
+.saarthi-drawer-close {
+  background: #f3f4f6;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #374151;
+}
+
+.saarthi-drawer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.saarthi-drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: left;
+}
+
+.saarthi-drawer-item:hover {
+  background: #ecfdf5;
+  border-color: #10b981;
+  transform: translateX(3px);
+}
+
+.saarthi-drawer-item-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.saarthi-drawer-item-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 2px;
+}
+
+.saarthi-drawer-item-desc {
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+/* FIRST LOGIN MODE SELECTION MODAL */
+.mode-select-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.mode-select-card {
+  background: #ffffff;
+  width: 100%;
+  max-width: 480px;
+  border-radius: 24px;
+  padding: 28px 24px;
+  text-align: center;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+}
+
+.mode-select-title {
+  font-size: 1.35rem;
+  font-weight: 850;
+  color: #064e3b;
+  margin: 0 0 6px 0;
+}
+
+.mode-select-sub {
+  font-size: 0.92rem;
+  color: #4b5563;
+  margin: 0 0 24px 0;
+}
+
+.mode-option-btn {
+  width: 100%;
+  background: #f0fdf4;
+  border: 2px solid #10b981;
+  border-radius: 18px;
+  padding: 18px;
+  margin-bottom: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.mode-option-btn:hover {
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.2);
+  transform: translateY(-2px);
+}
+
+.mode-option-btn.classic {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.mode-option-btn.classic:hover {
+  background: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.15);
+}
+
+.mode-option-icon {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.mode-option-title {
+  font-size: 1.12rem;
+  font-weight: 850;
+  color: #064e3b;
+  margin-bottom: 3px;
+}
+
+.mode-option-btn.classic .mode-option-title {
+  color: #1e293b;
+}
+
+.mode-option-desc {
+  font-size: 0.86rem;
+  color: #4b5563;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+/* Classic Mode Floating / Top Switcher Banner */
+.classic-mode-top-banner {
+  background: linear-gradient(90deg, #ecfdf5 0%, #e0f2fe 100%);
+  border: 1.5px solid #a7f3d0;
+  border-radius: 14px;
+  padding: 10px 18px;
+  margin: 12px auto 16px;
+  max-width: 1200px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.08);
+}
+
+.classic-banner-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  font-weight: 750;
+  color: #065f46;
+}
+
+.classic-switch-to-saarthi-btn {
+  background: #059669;
+  color: #ffffff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 3px 10px rgba(5, 150, 105, 0.25);
+  transition: all 0.18s ease;
+}
+
+.classic-switch-to-saarthi-btn:hover {
+  background: #047857;
+  transform: translateY(-1px);
+}
+
+/* Dark mode compatibility */
+body.dark .saarthi-exp-container {
+  background: #0b1712;
+  color: #e2ede6;
+}
+
+body.dark .saarthi-exp-header,
+body.dark .saarthi-convo-card,
+body.dark .saarthi-shortcut-card,
+body.dark .saarthi-drawer-panel,
+body.dark .mode-select-card {
+  background: #12241b;
+  border-color: #1e3d2d;
+  color: #e2ede6;
+}
+
+body.dark .saarthi-prompt-text,
+body.dark .saarthi-exp-greeting-title,
+body.dark .saarthi-shortcut-title,
+body.dark .saarthi-drawer-title,
+body.dark .mode-select-title {
+  color: #a7f3d0;
+}
+
+body.dark .saarthi-shortcut-card:hover {
+  background: #183325;
+  border-color: #34d399;
+}
+
+body.dark .classic-mode-top-banner {
+  background: #14281f;
+  border-color: #244635;
+}
+
+body.dark .classic-banner-text {
+  color: #a7f3d0;
+}

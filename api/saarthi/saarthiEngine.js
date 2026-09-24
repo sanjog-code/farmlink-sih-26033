@@ -175,6 +175,23 @@ export class SaarthiEngine {
 
           return { response: resp, actionResult: res };
         }
+
+        if (action.type === 'CANCEL_LISTING') {
+          const res = await tools.tool_cancelCropListing({
+            listingId: action.listingId,
+            crop: action.crop,
+            farmerId: session.farmerId,
+            existingListings: dataContext.existingListings || []
+          });
+
+          const resp = lang === 'hi'
+            ? `हाँ जी, आपकी ${action.crop || 'फसल'} की लिस्टिंग सफलतापूर्वक हटा दी गई है।`
+            : lang === 'en'
+              ? `Your listing for ${action.crop || 'produce'} has been removed.`
+              : `Haanji, aapki ${action.crop || 'fasal'} ki listing hata di gayi hai.`;
+
+          return { response: resp, actionResult: res };
+        }
       }
     }
 
@@ -356,6 +373,89 @@ export class SaarthiEngine {
       return { response: resp };
     }
 
+    // ─── 9. WORKFLOW: CANCEL LISTING ─────────────────────────────────────────
+    if (intent === 'CANCEL_LISTING') {
+      const existing = dataContext.existingListings || [];
+      const crop = session.entities.crop;
+      const targetListing = existing.find(l => {
+        if (crop && (l.crop || '').toLowerCase().includes(crop.toLowerCase())) return true;
+        return l.status !== 'cancelled' && l.status !== 'sold';
+      });
+
+      if (!targetListing) {
+        const resp = lang === 'hi'
+          ? 'रद्द करने के लिए आपकी कोई सक्रिय लिस्टिंग नहीं मिली।'
+          : 'Cancel karne ke liye koi active listing nahi mili.';
+        return { response: resp };
+      }
+
+      session.pendingAction = {
+        type: 'CANCEL_LISTING',
+        listingId: targetListing.id,
+        crop: targetListing.crop
+      };
+
+      const resp = lang === 'hi'
+        ? `क्या आप सच में अपनी ${targetListing.crop} (${targetListing.quantity_kg || targetListing.qty} किलो) की लिस्टिंग हटाना चाहते हैं?`
+        : `Kya aap sach me ${targetListing.crop} ki listing hatana chahte hain?`;
+      return { response: resp };
+    }
+
+    // ─── 10. WORKFLOW: CHECK PAYMENT / PAISA ─────────────────────────────────
+    if (intent === 'CHECK_PAYMENT') {
+      const payments = await tools.tool_getFarmerPayments({
+        farmerId: session.farmerId,
+        existingTransactions: dataContext.existingTransactions || [],
+        existingOrders: dataContext.existingOrders || []
+      });
+
+      const resp = lang === 'hi'
+        ? `हाँ जी! आपके खाते में कुल ₹${payments.totalEarned.toLocaleString('en-IN')} का भुगतान आ चुका है। हाल ही में ₹${payments.recentPayout.amount.toLocaleString('en-IN')} आपके खाते में जमा हुए हैं।`
+        : `Haanji! Aapke account me kul ₹${payments.totalEarned.toLocaleString('en-IN')} aa chuke hain. Haal hi me ₹${payments.recentPayout.amount.toLocaleString('en-IN')} jama ho gaye hain.`;
+      return { response: resp, visualData: { type: 'payment', data: payments } };
+    }
+
+    // ─── 11. WORKFLOW: TRACK PICKUP ──────────────────────────────────────────
+    if (intent === 'TRACK_PICKUP') {
+      const pickupData = await tools.tool_getPickupStatus({
+        farmerId: session.farmerId,
+        existingPickups: dataContext.existingPickups || []
+      });
+
+      if (!pickupData.found) {
+        const resp = lang === 'hi'
+          ? 'अभी आपका कोई निर्धारित पिकअप नहीं है। क्या आप खेत से पिकअप बुक करवाना चाहते हैं?'
+          : 'Abhi aapka koi scheduled pickup nahi hai. Kya khet se pickup book karein?';
+        return { response: resp };
+      }
+
+      const resp = lang === 'hi'
+        ? `आपका पिकअप रास्ते में है। चालक: ${pickupData.driver}। समय: ${pickupData.expectedWindow}।`
+        : `Aapka pickup raste me hai. Driver: ${pickupData.driver}. Expected: ${pickupData.expectedWindow}.`;
+      return { response: resp, visualData: { type: 'pickup', data: pickupData } };
+    }
+
+    // ─── 12. WORKFLOW: CHECK ORDER ───────────────────────────────────────────
+    if (intent === 'CHECK_ORDER') {
+      const ordersData = await tools.tool_getFarmerOrders({
+        farmerId: session.farmerId,
+        existingOrders: dataContext.existingOrders || []
+      });
+
+      if (ordersData.count === 0) {
+        const resp = lang === 'hi'
+          ? 'अभी आपका कोई नया खरीदार ऑर्डर नहीं है। जैसे ही खरीदार खरीदेगा, आपको तुरंत सूचना मिलेगी।'
+          : 'Abhi koi naya buyer order nahi hai. Jaise hi buyer khareedega, aapko message mil jayega.';
+        return { response: resp };
+      }
+
+      const latest = ordersData.orders[0];
+      const resp = lang === 'hi'
+        ? `आपके कुल ${ordersData.count} ऑर्डर हैं। नवीनतम: ${latest.crop} (${latest.quantityKg} किलो) पुष्टि हो चुका है।`
+        : `Aapke kul ${ordersData.count} orders hain. Latest: ${latest.crop} confirmed hai.`;
+      return { response: resp, visualData: { type: 'order', data: ordersData } };
+    }
+
     // ─── 9. DEFAULT / UNKNOWN ────────────────────────────────────────────────
     const defaultResp = lang === 'hi'
       ? 'राम राम! आप फसल बेचने, आज का मंडी भाव जानने, या पिकअप के लिए बोल सकते हैं।'
@@ -469,6 +569,26 @@ export class SaarthiEngine {
     }
     if ((t.includes('nahi') || t.includes('नहीं') || t.includes('cancel') || t.includes('mat karo') || t.includes('ruko') || t.includes('rehne do')) && !hasCorrection) {
       return { intent: 'CONFIRMATION_NO', entities: { crop: foundCrop, quantityKg: qty }, response: 'नहीं' };
+    }
+
+    // Cancellation query (e.g. "meri gehu wali listing hata do", "listing cancel karo")
+    if (t.includes('hata do') || t.includes('हटा') || t.includes('delete') || t.includes('रद्द') || (t.includes('listing') && (t.includes('cancel') || t.includes('hata')))) {
+      return { intent: 'CANCEL_LISTING', entities: { crop: foundCrop }, response: '' };
+    }
+
+    // Payment query
+    if (t.includes('payment') || t.includes('paise') || t.includes('पैसे') || t.includes('रुपये') || t.includes('रुपया') || t.includes('bhugtan') || t.includes('भुगतान') || t.includes('khate me') || t.includes('khata')) {
+      return { intent: 'CHECK_PAYMENT', entities: {}, response: '' };
+    }
+
+    // Track Pickup query
+    if ((t.includes('pickup') || t.includes('पिकअप') || t.includes('गाड़ी') || t.includes('gadi')) && (t.includes('kahan') || t.includes('कहाँ') || t.includes('status') || t.includes('ट्रैक'))) {
+      return { intent: 'TRACK_PICKUP', entities: { crop: foundCrop }, response: '' };
+    }
+
+    // Order query
+    if (t.includes('order') || t.includes('ऑर्डर')) {
+      return { intent: 'CHECK_ORDER', entities: {}, response: '' };
     }
 
     // Price query

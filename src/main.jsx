@@ -79,6 +79,7 @@ import { availableToAdd, rankAndFilter, updateQuantity } from "./lib/marketplace
 import { CONSTITUTIONAL_LANGUAGES, translateText } from "./translations/constitutional22.js";
 import AgenticCopilot, { AgenticDockLauncher } from "./ai/AgenticCopilot.jsx";
 import SaarthiScreen from "./components/saarthi/SaarthiScreen.jsx";
+import FarmerExperience from "./components/farmer/FarmerExperience.jsx";
 import FormattedAiMessage from "./components/common/FormattedAiMessage.jsx";
 import { transcribeWithSarvam, speakHybrid, stopAllSpeech, DEFAULT_SARVAM_KEY } from "./ai/speechEngine.js";
 import MspFloorBadge from "./components/MspFloorBadge";
@@ -1580,7 +1581,7 @@ function App() {
           />
         )}{" "}
         {view === "farmer" && (
-          <FarmerView
+          <FarmerExperience
             session={session}
             lots={lots}
             setModal={setModal}
@@ -1593,6 +1594,7 @@ function App() {
             farmerVerification={farmerVerification}
             setFarmerVerification={setFarmerVerification}
             lang={lang}
+            ClassicFarmerViewComponent={FarmerView}
           />
         )}{" "}
         {view === "auth" && (

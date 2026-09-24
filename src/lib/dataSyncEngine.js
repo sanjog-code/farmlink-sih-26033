@@ -1,7 +1,7 @@
 // Unified Live Data & Real-Time Synchronization Engine for FarmLink
 // Manages real user-given data, live broadcasts across components/tabs, and Supabase cloud sync
 
-import { supabase, isSupabaseConfigured } from '../supabase';
+import { supabase, isSupabaseConfigured } from '../supabase.js';
 
 const STORAGE_KEYS = {
   LISTINGS: 'farmlink_user_listings',

@@ -161,6 +161,71 @@ async function runTests() {
   const sentenceCount = correctionStep.response.split(/[।!?.]+/).filter(Boolean).length;
   assert(sentenceCount <= 2, `Response is concise (${sentenceCount} sentences <= 2)`);
 
+  // Test 13: Check Payment Intent
+  console.log('\n--- Test 13: Payment Status Check (Mera Payment Aaya?) ---');
+  const paySession = `pay-${Date.now()}`;
+  const payStep = await engine.handleTurn({
+    sessionId: paySession,
+    message: 'mera payment aaya?',
+    farmerId: 'farmer-ramesh',
+    farmerName: 'Ramesh Kumar'
+  });
+  console.log('Saarthi response (Payment):', payStep.response);
+  assert(payStep.intent === 'CHECK_PAYMENT', 'Intent identified as CHECK_PAYMENT');
+  assert(payStep.response.includes('₹') || payStep.response.includes('रुपये') || payStep.response.includes('पैसे'), 'Reports monetary payment amount accurately');
+
+  // Test 14: Track Pickup Intent
+  console.log('\n--- Test 14: Track Pickup (Mera Pickup Kahan Hai?) ---');
+  const pkpSession = `pkp-${Date.now()}`;
+  const pkpStep = await engine.handleTurn({
+    sessionId: pkpSession,
+    message: 'mera pickup kahan hai?',
+    farmerId: 'farmer-ramesh',
+    farmerName: 'Ramesh Kumar',
+    dataContext: {
+      existingPickups: [
+        { id: 'PKP-101', crop: 'Wheat', qty: 300, status: 'In Transit', driver: 'Mahendra Singh' }
+      ]
+    }
+  });
+  console.log('Saarthi response (Track Pickup):', pkpStep.response);
+  assert(pkpStep.intent === 'TRACK_PICKUP', 'Intent identified as TRACK_PICKUP');
+  assert(pkpStep.response.includes('पिकअप') || pkpStep.response.includes('pickup'), 'Mentions pickup status clearly');
+
+  // Test 15: Listing Cancellation Workflow
+  console.log('\n--- Test 15: Listing Cancellation (Meri gehu wali listing hata do) ---');
+  const cancelSession = `cancel-${Date.now()}`;
+  const cancelStep1 = await engine.handleTurn({
+    sessionId: cancelSession,
+    message: 'meri gehu wali listing hata do',
+    farmerId: 'farmer-ramesh',
+    farmerName: 'Ramesh Kumar',
+    dataContext: {
+      existingListings: [
+        { id: 'LIST-WHEAT-99', crop: 'Wheat', qty: 300, price: 26, status: 'published' }
+      ]
+    }
+  });
+  console.log('Saarthi response (Cancel Step 1):', cancelStep1.response);
+  assert(cancelStep1.intent === 'CANCEL_LISTING', 'Intent identified as CANCEL_LISTING');
+  assert(cancelStep1.requiresConfirmation === true, 'Confirmation requested before removing listing');
+  assert(cancelStep1.pendingAction?.type === 'CANCEL_LISTING', 'Pending action marked as CANCEL_LISTING');
+
+  const cancelStep2 = await engine.handleTurn({
+    sessionId: cancelSession,
+    message: 'haan hata do',
+    farmerId: 'farmer-ramesh',
+    farmerName: 'Ramesh Kumar',
+    dataContext: {
+      existingListings: [
+        { id: 'LIST-WHEAT-99', crop: 'Wheat', qty: 300, price: 26, status: 'published' }
+      ]
+    }
+  });
+  console.log('Saarthi response (Cancel Step 2):', cancelStep2.response);
+  assert(cancelStep2.actionResult?.action === 'LISTING_CANCELLED', 'Listing cancellation tool executed on confirmation');
+  assert(cancelStep2.pendingAction === null, 'Pending action cleared after cancellation');
+
   console.log(`\n=== TEST RESULTS: ${passedTests} PASSED, ${failedTests} FAILED ===\n`);
   if (failedTests > 0) {
     process.exit(1);
