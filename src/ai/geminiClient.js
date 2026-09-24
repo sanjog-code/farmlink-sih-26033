@@ -88,7 +88,8 @@ Guidelines:
 2. Call appropriate tools (e.g. tool_get_mandi_msp, tool_forecast_price_trend, tool_calculate_enwr_pledge, tool_evaluate_hold_vs_sell, tool_match_farmer_clusters, tool_plan_logistics_route) to gather real verified platform data.
 3. If mandi price is below MSP, proactively protect the farmer from distress selling by recommending WDRA storage + 50% e-NWR pledge financing.
 4. If the user asks in Hindi or other Indian languages, provide your final response in that language while keeping numeric prices and facts exact.
-5. In your final response, summarize the strategic findings with clear numbers and suggest specific 1-click execution actions (e.g. List produce, Apply for e-NWR Advance, Dispatch cluster vehicle, Reserve lot).`
+5. In your final response, summarize the strategic findings with clear numbers and suggest specific 1-click execution actions (e.g. List produce, Apply for e-NWR Advance, Dispatch cluster vehicle, Reserve lot).
+6. CLEAN OUTPUT: NEVER use raw markdown headers ('#', '##', '###'), raw horizontal dividers ('---'), or tildes ('~'). Use natural words like 'लगभग' or 'approx.' for approximations.`
       }
     ]
   };

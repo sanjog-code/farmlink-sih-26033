@@ -1,5 +1,8 @@
 import React from 'react';
 import './formattedAiMessage.css';
+import { sanitizeAiText, parseBlocks } from './aiTextCleaner.js';
+
+export { sanitizeAiText, parseBlocks };
 
 /**
  * Pure inline formatting parser for bold (**text**), italics (*text*), currency (₹...), and percentages (...%).
@@ -7,21 +10,25 @@ import './formattedAiMessage.css';
 function renderInlineFormatting(text) {
   if (!text) return null;
 
+  // Clean weird symbols like ~#, ~, # before parsing inline elements
+  const cleaned = sanitizeAiText(text);
+  if (!cleaned) return null;
+
   // Split on **bold** syntax first
   const parts = [];
   const boldRegex = /\*\*(.+?)\*\*/g;
   let lastIndex = 0;
   let match;
 
-  while ((match = boldRegex.exec(text)) !== null) {
+  while ((match = boldRegex.exec(cleaned)) !== null) {
     if (match.index > lastIndex) {
-      parts.push({ type: 'text', content: text.substring(lastIndex, match.index) });
+      parts.push({ type: 'text', content: cleaned.substring(lastIndex, match.index) });
     }
     parts.push({ type: 'bold', content: match[1] });
     lastIndex = boldRegex.lastIndex;
   }
-  if (lastIndex < text.length) {
-    parts.push({ type: 'text', content: text.substring(lastIndex) });
+  if (lastIndex < cleaned.length) {
+    parts.push({ type: 'text', content: cleaned.substring(lastIndex) });
   }
 
   return parts.map((part, idx) => {
@@ -57,90 +64,6 @@ function renderInlineFormatting(text) {
   });
 }
 
-/**
- * Parses raw markdown AI outputs into structured blocks:
- * - Numbered Option Cards
- * - Bullet Points
- * - Paragraphs with clean typography
- */
-function parseBlocks(rawText) {
-  if (!rawText) return [];
-  const lines = rawText.split(/\r?\n/);
-  const blocks = [];
-  let currentList = null;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) {
-      if (currentList) {
-        blocks.push(currentList);
-        currentList = null;
-      }
-      continue;
-    }
-
-    // Numbered item: "1. **Title**: Desc" or "1. Title: Desc" or "1) Title"
-    const numMatch = line.match(/^(\d+)[\.\)]\s*(.*)$/);
-    if (numMatch) {
-      const num = numMatch[1];
-      const rest = numMatch[2];
-
-      let title = '';
-      let desc = rest;
-
-      // Check if there is a colon separator
-      const colonMatch = rest.match(/^(?:\*\*(.+?)\*\*|([^:]+)):\s*(.*)$/);
-      if (colonMatch) {
-        title = colonMatch[1] || colonMatch[2];
-        desc = colonMatch[3];
-      } else {
-        const boldTitleMatch = rest.match(/^\*\*(.+?)\*\*\s*(.*)$/);
-        if (boldTitleMatch) {
-          title = boldTitleMatch[1];
-          desc = boldTitleMatch[2];
-        }
-      }
-
-      if (!currentList || currentList.type !== 'numbered_list') {
-        if (currentList) blocks.push(currentList);
-        currentList = { type: 'numbered_list', items: [] };
-      }
-
-      currentList.items.push({
-        num,
-        title: title.trim(),
-        desc: desc.trim(),
-        raw: rest
-      });
-      continue;
-    }
-
-    // Bullet point: "• text" or "- text" or "* text"
-    const bulletMatch = line.match(/^[\*\•\-]\s+(.*)$/);
-    if (bulletMatch) {
-      if (!currentList || currentList.type !== 'bullet_list') {
-        if (currentList) blocks.push(currentList);
-        currentList = { type: 'bullet_list', items: [] };
-      }
-      currentList.items.push(bulletMatch[1].trim());
-      continue;
-    }
-
-    // Normal paragraph line
-    if (currentList) {
-      blocks.push(currentList);
-      currentList = null;
-    }
-    blocks.push({ type: 'paragraph', content: line });
-  }
-
-  if (currentList) {
-    blocks.push(currentList);
-  }
-
-  return blocks;
-}
-
 export default function FormattedAiMessage({ text = '', onOptionClick = null, className = '' }) {
   if (!text) return null;
 
@@ -149,6 +72,18 @@ export default function FormattedAiMessage({ text = '', onOptionClick = null, cl
   return (
     <div className={`ai-formatted-container ${className}`}>
       {blocks.map((block, bIdx) => {
+        if (block.type === 'heading') {
+          return (
+            <h4 key={bIdx} className="ai-formatted-heading">
+              {renderInlineFormatting(block.content)}
+            </h4>
+          );
+        }
+
+        if (block.type === 'divider') {
+          return <hr key={bIdx} className="ai-formatted-divider" />;
+        }
+
         if (block.type === 'paragraph') {
           return (
             <p key={bIdx} className="ai-formatted-paragraph">

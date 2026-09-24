@@ -120,10 +120,28 @@ export async function transcribeWithWhisper(audioBlob, { apiKey, language = 'hi'
   return data.text || '';
 }
 
+export function cleanSpeechText(text, maxLen = 450) {
+  if (!text) return '';
+  return text
+    // Replace markdown horizontal dividers like ---, ***, ___ with a pause
+    .replace(/^\s*[-*_=\~]{3,}\s*$/gm, '. ')
+    // Replace weird combos like ~#, #~
+    .replace(/~#+|#+~/g, ' ')
+    // Remove markdown code fences and backticks
+    .replace(/```[a-z]*\n?/gi, '')
+    .replace(/`/g, '')
+    // Strip hashtags, tildes, asterisks, underscores, and multiple hyphens
+    .replace(/[-_~#*]/g, ' ')
+    // Remove extra whitespace
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+}
+
 export async function synthesizeWithOpenAI(text, { apiKey, voice = 'nova', model = 'tts-1' }) {
   if (!apiKey || !apiKey.trim()) throw new Error('OpenAI API key is required.');
 
-  const cleanText = (text || '').replace(/[#*`_~]/g, '').slice(0, 1000);
+  const cleanText = cleanSpeechText(text, 1000);
 
   const res = await fetch('https://api.openai.com/v1/audio/speech', {
     method: 'POST',
@@ -238,7 +256,7 @@ export async function synthesizeWithSarvam(text, { apiKey = DEFAULT_SARVAM_KEY, 
   if (!activeKey) throw new Error('Sarvam API key is required.');
 
   const langInfo = resolveSpeechCode(language);
-  const cleanText = (text || '').replace(/[#*`_~]/g, '').slice(0, 450);
+  const cleanText = cleanSpeechText(text, 450);
 
   const res = await fetch('https://api.sarvam.ai/text-to-speech', {
     method: 'POST',
@@ -433,7 +451,7 @@ function speakWithBrowserNative(text, language, onStart, onEnd, onError) {
   }
 
   onStart({ provider: 'webspeech' });
-  const cleanText = (text || '').replace(/[#*`_~]/g, '').slice(0, 320);
+  const cleanText = cleanSpeechText(text, 320);
   const utterance = new SpeechSynthesisUtterance(cleanText);
   const info = resolveSpeechCode(language);
   utterance.lang = info.bcp47 || 'hi-IN';

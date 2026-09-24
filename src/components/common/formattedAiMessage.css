@@ -140,6 +140,35 @@
   top: 1px;
 }
 
+/* Clean Headings (replaces raw ### markdown) */
+.ai-formatted-heading {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #0c432d;
+  margin: 14px 0 6px 0;
+  line-height: 1.45;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-formatted-heading::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 16px;
+  background: #176b49;
+  border-radius: 2px;
+}
+
+/* Elegant Visual Divider (replaces raw --- text) */
+.ai-formatted-divider {
+  border: none;
+  border-top: 1.5px dashed #d1e4d9;
+  margin: 12px 0;
+  width: 100%;
+}
+
 /* Dark mode compatibility */
 body.dark .ai-formatted-container {
   color: #e2ede6;
@@ -147,6 +176,18 @@ body.dark .ai-formatted-container {
 
 body.dark .ai-formatted-paragraph {
   color: #e2ede6;
+}
+
+body.dark .ai-formatted-heading {
+  color: #a7f3d0;
+}
+
+body.dark .ai-formatted-heading::before {
+  background: #34d399;
+}
+
+body.dark .ai-formatted-divider {
+  border-top-color: #244635;
 }
 
 body.dark .ai-formatted-bold {
