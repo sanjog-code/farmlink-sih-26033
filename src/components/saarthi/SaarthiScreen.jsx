@@ -22,6 +22,7 @@ import {
   PackageCheck
 } from 'lucide-react';
 import { SaarthiClient } from './saarthiClient.js';
+import FormattedAiMessage from '../common/FormattedAiMessage.jsx';
 import './saarthi.css';
 
 export default function SaarthiScreen({
@@ -290,7 +291,12 @@ export default function SaarthiScreen({
               </div>
             </div>
 
-            <p className="saarthi-bubble-text">{currentResponse}</p>
+            <div className="saarthi-bubble-text">
+              <FormattedAiMessage
+                text={currentResponse}
+                onOptionClick={(opt) => handleQuickAction({ text: opt })}
+              />
+            </div>
           </div>
 
           {/* ACTION CONFIRMATION CARD (IF REQUIRING USER APPROVAL) */}

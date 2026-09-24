@@ -36,6 +36,7 @@ import {
   resolveSpeechCode
 } from './speechEngine.js';
 import './agentic.css';
+import FormattedAiMessage from '../components/common/FormattedAiMessage.jsx';
 
 export default function AgenticCopilot({
   isOpen = false,
@@ -113,8 +114,16 @@ export default function AgenticCopilot({
 
   // Hybrid Text to Speech playback
   const handlePlaySpeech = (text) => {
+    // Strip markdown symbols (**bold**, #, etc.) so speech audio is completely natural and fluent
+    const cleanSpokenText = (text || '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/#+\s+/g, '')
+      .replace(/`+/g, '')
+      .trim();
+
     unifiedSpeak({
-      text,
+      text: cleanSpokenText,
       language,
       provider: voiceProvider,
       sarvamKey,
@@ -731,7 +740,10 @@ export default function AgenticCopilot({
                 </div>
               </div>
               <div className="strategic-text">
-                {result.text}
+                <FormattedAiMessage
+                  text={result.text}
+                  onOptionClick={(opt) => handleExecute(opt)}
+                />
               </div>
 
               {/* Action Cards Grid */}

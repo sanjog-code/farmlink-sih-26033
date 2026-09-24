@@ -78,6 +78,7 @@ import { availableToAdd, rankAndFilter, updateQuantity } from "./lib/marketplace
 import { CONSTITUTIONAL_LANGUAGES, translateText } from "./translations/constitutional22.js";
 import AgenticCopilot, { AgenticDockLauncher } from "./ai/AgenticCopilot.jsx";
 import SaarthiScreen from "./components/saarthi/SaarthiScreen.jsx";
+import FormattedAiMessage from "./components/common/FormattedAiMessage.jsx";
 import { transcribeWithSarvam, speakHybrid, stopAllSpeech, DEFAULT_SARVAM_KEY } from "./ai/speechEngine.js";
 import MspFloorBadge from "./components/MspFloorBadge";
 import { getMspFloorForCrop } from "./lib/mspRates";
@@ -7395,7 +7396,9 @@ function Voice({ close, notify, setModal }) {
                     </span>
                     <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>{m.timestamp}</span>
                   </div>
-                  <div>{m.text}</div>
+                  <div>
+                    {isUser ? m.text : <FormattedAiMessage text={m.text} />}
+                  </div>
 
                   {/* Assistant Audio Replay Controls */}
                   {!isUser && (
