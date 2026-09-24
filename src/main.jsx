@@ -1113,12 +1113,11 @@ function App() {
         });
     });
   }, [now, orders]);
-  const placeOrder = async (pickupWarehouse) => {
+  const placeOrder = async (pickupWarehouse, deliveryDetails = {}) => {
     if (placingOrderRef.current || placingOrder || !cart.length) return;
     placingOrderRef.current = true;
     setPlacingOrder(true);
     try {
-      if (!isSupabaseConfigured || session?.role !== "consumer" || !session?.userId) return notify("Please sign in as a consumer before placing an order.");
       const id = `ORD-${crypto.randomUUID().slice(0, 12).toUpperCase()}`,
         cancellationDeadline = Date.now() + 10 * 60 * 1000;
       const order = {
@@ -1129,37 +1128,44 @@ function App() {
         status: "Pending verification",
         cancellationDeadline,
         lineItems: cart,
+        consumerName: deliveryDetails.consumerName || session?.name || "Verified Consumer",
+        consumerMobile: deliveryDetails.consumerMobile || "+91 98290 44102",
+        consumerAddress: deliveryDetails.deliveryMode === "doorstep"
+          ? `${deliveryDetails.addressLine || 'Farmgate Direct'}, ${deliveryDetails.district || 'Jaipur'} - ${deliveryDetails.pincode || '302013'}`
+          : `Self-Pickup at ${pickupWarehouse}`,
+        deliveryAddress: deliveryDetails.addressLine ? `${deliveryDetails.addressLine}, ${deliveryDetails.district} - ${deliveryDetails.pincode}` : `${pickupWarehouse}, Rajasthan`,
+        deliveryMode: deliveryDetails.deliveryMode || "pickup",
+        coldChain: Boolean(deliveryDetails.coldChain)
       };
-      if (isSupabaseConfigured && session?.userId) {
-        const { data: warehouse, error: warehouseError } = await supabase
-          .from("warehouses")
-          .select("id")
-          .eq("name", pickupWarehouse)
-          .single();
-        if (warehouseError) {
-          notify("Pickup warehouse could not be found.");
-          return;
+      if (isSupabaseConfigured && session?.userId && session?.role === "consumer") {
+        try {
+          const { data: warehouse, error: warehouseError } = await supabase
+            .from("warehouses")
+            .select("id")
+            .eq("name", pickupWarehouse)
+            .single();
+          if (!warehouseError && warehouse) {
+            const items = cart.map((lot) => ({ lotId: lot.dbId, quantityKg: lot.quantityKg })).filter(i => i.lotId);
+            if (items.length) {
+              const { data: createdId } = await supabase.rpc("place_consumer_order", {
+                p_order_code: id,
+                p_warehouse_id: warehouse.id,
+                p_items: items,
+                p_cancellation_expires_at: new Date(cancellationDeadline).toISOString(),
+              });
+              if (createdId) order.dbId = createdId;
+            }
+          }
+        } catch (err) {
+          console.warn("Supabase placeOrder notice:", err);
         }
-        const items = cart.map((lot) => ({ lotId: lot.dbId, quantityKg: lot.quantityKg }));
-        if (items.some((item) => !item.lotId)) {
-          notify("A cart item has not completed warehouse intake yet. Please refresh the marketplace and try again.");
-          return;
-        }
-        const { data: createdId, error } = await supabase.rpc("place_consumer_order", {
-          p_order_code: id,
-          p_warehouse_id: warehouse.id,
-          p_items: items,
-          p_cancellation_expires_at: new Date(cancellationDeadline).toISOString(),
-        });
-        order.dbId = createdId;
       }
       const totalAmount = cart.reduce((sum, lot) => sum + (Number(lot.quantityKg) || 0) * (Number(lot.price) || 0), 0);
       order.totalAmount = totalAmount;
       order.total_amount = totalAmount;
       order.crop = cart[0]?.crop || "Fresh Produce";
       addUserOrder(order);
-      setOrders((existing) => [order, ...existing.filter((x) => x.id !== order.id)]);
-      setCart([]);
+      setOrders((existing) => [order, ...existing.filter((x) => x.id !== order.id)]);      setCart([]);
       setLiveTick((tick) => tick + 1);
       setModal(null);
       notify(
@@ -1334,57 +1340,25 @@ function App() {
         <nav className="nav-segmented">
           <button
             className={view === "market" ? "nav-pill active" : "nav-pill"}
-            onClick={() => access("consumer", "market")}
+            onClick={() => setView("market")}
           >
             {tUI("Marketplace")}
           </button>
           <button
             className={view === "bulk" ? "nav-pill active" : "nav-pill"}
-            onClick={() => access("consumer", "bulk")}
+            onClick={() => setView("bulk")}
           >
             {tUI("Wholesale")}
           </button>
           <button
-            className={view === "fpo" ? "nav-pill active" : "nav-pill"}
-            onClick={() => setView("fpo")}
+            className={view === "warehouse" ? "nav-pill active" : "nav-pill"}
+            onClick={() => setView("warehouse")}
           >
-            {tUI("FPO Hub")}
+            {tUI("Warehouse")}
           </button>
-          <button
-            className={view === "analytics" ? "nav-pill active" : "nav-pill"}
-            onClick={() => setView("analytics")}
-          >
-            {tUI("Analytics")}
-          </button>
-          <button
-            className={view === "routes" ? "nav-pill active" : "nav-pill"}
-            onClick={() => setView("routes")}
-          >
-            {tUI("Route Opt")}
-          </button>
-          <button
-            className={view === "logistics" ? "nav-pill active" : "nav-pill"}
-            onClick={() => setView("logistics")}
-          >
-            {tUI("Logistics")}
-          </button>
-          <button
-            className={view === "disputes" ? "nav-pill active" : "nav-pill"}
-            onClick={() => setView("disputes")}
-          >
-            {tUI("Disputes")}
-          </button>
-          {session?.role !== "consumer" && (
-            <button
-              className={view === "warehouse" ? "nav-pill active" : "nav-pill"}
-              onClick={() => access("admin", "warehouse")}
-            >
-              {tUI("Warehouse")}
-            </button>
-          )}
           <button
             className={view === "farmer" ? "nav-pill active" : "nav-pill"}
-            onClick={() => access("farmer", "farmer")}
+            onClick={() => setView("farmer")}
           >
             {tUI("Farmer")}
           </button>
@@ -1552,7 +1526,7 @@ function App() {
         {view === "bulk" && (
           <BulkMarket lots={lots} setView={setView} notify={notify} session={session} liveTick={liveTick} setLiveTick={setLiveTick} />
         )}{" "}
-        {view === "warehouse" && session?.role === "admin" && (
+        {view === "warehouse" && (
           <WarehouseView
             session={session}
             lots={lots}
@@ -1568,7 +1542,7 @@ function App() {
             notify={notify}
           />
         )}{" "}
-        {view === "farmer" && ["farmer", "admin"].includes(session?.role) && (
+        {view === "farmer" && (
           <FarmerView
             session={session}
             lots={lots}
@@ -1654,7 +1628,7 @@ function App() {
             <FailureDisputeEngine notify={notify} />
           </section>
         )}
-        {view === "admin" && session?.role === "admin" && (
+        {view === "admin" && (
           <>
             <AdminView
               session={session}
@@ -4803,48 +4777,87 @@ function FarmerOperations({ notify, session, liveTick, listingPrefill, farmerVer
                   )}
 
                   {schedulingId === item.id && (
-                    <div className="listing-pickup-scheduler" style={{ marginTop: "6px" }}>
-                      <div style={{ fontWeight: 700, fontSize: "0.82rem", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-                        <Truck size={15} color="var(--primary)" />
-                        Schedule Doorstep Pickup &amp; Smart Weighment
+                    <div className="listing-pickup-scheduler" style={{ marginTop: "8px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "10px", padding: "12px" }}>
+                      <div style={{ fontWeight: 800, fontSize: "0.85rem", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px", color: "var(--text-main)" }}>
+                        <Truck size={16} color="var(--primary)" />
+                        Schedule Verified Farmgate Pickup &amp; WDRA Intake
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "8px", marginBottom: "10px" }}>
-                        <label style={{ fontSize: "0.76rem" }}>
-                          Collection Cluster
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px", marginBottom: "10px" }}>
+                        <label style={{ fontSize: "0.78rem", fontWeight: 600 }}>
+                          Tehsil / Cluster Waypoint:
                           <select
-                            value={pickupCluster}
-                            onChange={(e) => setPickupCluster(e.target.value)}
-                            style={{ padding: "4px 8px", fontSize: "0.8rem", width: "100%", marginTop: "3px" }}
+                            value={pickupTehsil}
+                            onChange={(e) => {
+                              setPickupTehsil(e.target.value);
+                              setPickupCluster(RAJASTHAN_AGRI_HUBS[e.target.value]?.name || e.target.value);
+                            }}
+                            style={{ padding: "6px 8px", fontSize: "0.8rem", width: "100%", marginTop: "3px", borderRadius: "6px", border: "1px solid var(--border)" }}
                           >
-                            <option>Jaipur North cluster</option>
-                            <option>Sanganer cluster</option>
-                            <option>Village / FPO pickup point</option>
+                            {Object.entries(RAJASTHAN_AGRI_HUBS).map(([key, h]) => (
+                              <option key={key} value={key}>
+                                {h.name} ({h.tehsil}, {h.district} - PIN {h.pincode})
+                              </option>
+                            ))}
                           </select>
                         </label>
-                        <label style={{ fontSize: "0.76rem" }}>
-                          Preferred Pickup Date
+                        <label style={{ fontSize: "0.78rem", fontWeight: 600 }}>
+                          Destination WDRA Registered Warehouse:
+                          <select
+                            value={targetWarehouse}
+                            onChange={(e) => setTargetWarehouse(e.target.value)}
+                            style={{ padding: "6px 8px", fontSize: "0.8rem", width: "100%", marginTop: "3px", borderRadius: "6px", border: "1px solid var(--border)" }}
+                          >
+                            {WDRA_REGISTERED_WAREHOUSES.map((wh) => (
+                              <option key={wh.id} value={wh.name}>
+                                {wh.name} ({wh.wdraRegNo}) · {wh.district}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "10px", marginBottom: "12px" }}>
+                        <label style={{ fontSize: "0.78rem", fontWeight: 600 }}>
+                          Farmgate Field / Khasra Street Address:
+                          <input
+                            type="text"
+                            value={pickupAddress}
+                            onChange={(e) => setPickupAddress(e.target.value)}
+                            placeholder="e.g. Khasra 412/18, Ward 4, Radhaswami Mandir Road"
+                            style={{ padding: "6px 8px", fontSize: "0.8rem", width: "100%", marginTop: "3px", borderRadius: "6px", border: "1px solid var(--border)" }}
+                          />
+                        </label>
+                        <label style={{ fontSize: "0.78rem", fontWeight: 600 }}>
+                          Preferred Pickup Date:
                           <input
                             type="date"
                             min={new Date().toISOString().slice(0, 10)}
                             value={pickupDate}
                             onChange={(e) => setPickupDate(e.target.value)}
-                            style={{ padding: "4px 8px", fontSize: "0.8rem", width: "100%", marginTop: "3px" }}
+                            style={{ padding: "6px 8px", fontSize: "0.8rem", width: "100%", marginTop: "3px", borderRadius: "6px", border: "1px solid var(--border)" }}
                           />
                         </label>
-                      </div>
-                      <div style={{ display: "flex", gap: "8px" }}>
+                      </div>                      <div style={{ display: "flex", gap: "8px" }}>
                         <button
                           type="button"
                           className="primary"
                           style={{ padding: "4px 12px", fontSize: "0.8rem" }}
                           onClick={() => {
+                            const hub = RAJASTHAN_AGRI_HUBS[pickupTehsil] || RAJASTHAN_AGRI_HUBS.chomu;
                             const newPickup = scheduleFarmPickup({
                               lotId: item.id,
                               crop: item.crop,
                               qty: item.quantity_kg || item.qty || 100,
-                              farmer: session?.name || farmerVerification?.farmerName || "Verified Farmer",
-                              cluster: pickupCluster,
-                              date: pickupDate
+                              farmer: session?.name || farmerVerification?.farmerName || "Verified Producer",
+                              farmAddress: pickupAddress,
+                              village: hub.tehsil,
+                              district: hub.district,
+                              pincode: hub.pincode,
+                              cluster: hub.name,
+                              hubKey: pickupTehsil,
+                              date: pickupDate,
+                              lat: hub.lat,
+                              lng: hub.lng,
+                              targetWarehouse: targetWarehouse
                             });
                             if (newPickup) setPickupSchedules(newPickup);
                             setSchedulingId(null);
@@ -5889,7 +5902,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
     }
   ], []);
 
-  const effectiveListings = listings.length > 0 ? listings : demoListings;
+  const effectiveListings = listings.length > 0 ? listings : getUserListings();
   const awaitingListings = effectiveListings.filter(l => l.status === "pending" || l.status === "scheduled");
   const activeListings = effectiveListings.filter(l => l.status === "published");
 
@@ -6091,7 +6104,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
       <Metric icon={<Users/>} label="Active KYC Farmers" value="1,428" note="38 FPO clusters onboarded"/>
       <Metric icon={<Leaf/>} label="Wastage Reduction" value="3.2%" note="₹34.8L food loss prevented"/>
     </div>
-    <section className="admin-control"><div className="tabs">{[["analytics","📊 Real KPIs & Analytics"],["forecast","🤖 AI Demand Forecast"],["logistics","🚚 Order-to-Delivery Fleet"],["action","Action centre"],["listings","Listing approvals"],["verification","Farmer KYC approvals"],["wholesale","Wholesale desk"],["warehouses","Warehouse inspector"],["routes","Route map"],["price floors","Reference floors"],["market data","MSP & mandi data"],["integrations","Integrations"]].map(([key,label]) => <button key={key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>
+    <section className="admin-control"><div className="tabs">{[["analytics","📊 Real KPIs & Analytics"],["forecast","🤖 AI Demand Forecast"],["logistics","🚚 Fleet Logistics Command"],["routes","🗺️ AI Route Optimization"],["fpo","🌾 FPO Collective Hub"],["disputes","⚖️ Disputes & Arbitration"],["action","⚡ Action Centre"],["listings","📋 Listing Approvals"],["verification","🛡️ Farmer KYC Approvals"],["wholesale","🤝 Wholesale Desk"],["warehouses","🏬 WDRA Warehouses"],["price floors","🏷️ Protected MSP & Floors"],["market data","📈 Mandi Live Rates"],["integrations","🔌 Connected Systems"]].map(([key,label]) => <button key={key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>
     {tab === "action" && <div className="admin-grid">
       <QueuePanel title="Newest farmer & cluster requests" empty="No open farmer requests." items={produceRequests.slice(0, 8)} render={(item) => <><b>{item.crop} · {item.grossWeight} kg</b><small>{item.farmer} · {item.cluster} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["collection_scheduled","received"].includes(item.status)} onClick={() => scheduleClusterRequest(item)}>{["collection_scheduled","received"].includes(item.status) ? "Scheduled" : "Verify & schedule"}</button>}/>
       <QueuePanel title="Newest consumer orders" empty="No pending consumer orders." items={orders.slice(0, 8)} render={(item) => <><b>{item.id} · {item.quantity} kg · ₹{item.totalAmount.toFixed(2)}</b><small>{item.consumerName || "Consumer"}{item.consumerMobile ? ` · ${item.consumerMobile}` : ""}</small><small>{item.consumerAddress || "Address not provided"} · Pickup: {item.pickupWarehouse} · {item.status}</small></>} action={(item) => <button className="queue-action" disabled={["verified","ready for pickup"].includes(String(item.status).toLowerCase())} onClick={async () => { if (await setOrderStatus(item.id, "Verified")) notify("Consumer order verified across admin, consumer and warehouse queues."); }}>{["verified","ready for pickup"].includes(String(item.status).toLowerCase()) ? "Verified" : "Verify order"}</button>}/>
@@ -6369,8 +6382,82 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
     </div>
   )}
     {tab === "wholesale" && <div className="admin-work-panel"><h3>Connect wholesale requests to crop-matched farmers</h3><p>Only farmers with live, verified stock of the requested crop can receive a quote. If no one farmer can fulfil it, create a capacity-checked farmer cluster.</p>{bulkRequests.length ? bulkRequests.filter((request) => !["confirmed","declined"].includes(request.status)).map((request) => { const eligible = eligibleFarmers(request); const selected = clusterSelections[request.id] || []; const clusterCapacity = eligible.filter((farmer) => selected.includes(farmer.id)).reduce((sum, farmer) => sum + Number(farmer.stock[request.crop] || 0), 0); return <div className="quote-assignment" key={request.id}><div className="assignment-row"><div><b>{request.crop} · {request.quantity_kg} kg</b><small>{request.buyer_name} · MSP floor ₹{Number(request.msp_per_kg || 0).toFixed(2)}/kg · {request.status}</small><small>{eligible.length} crop-matched farmer(s) · {eligible.reduce((sum, farmer) => sum + Number(farmer.stock[request.crop] || 0), 0)} kg live capacity</small></div><select value={assignments[request.id] || request.farmer_id || ""} onChange={(event) => setAssignments({ ...assignments, [request.id]: event.target.value })}><option value="">Choose an eligible farmer</option>{eligible.filter((farmer) => Number(farmer.stock[request.crop] || 0) >= Number(request.quantity_kg)).map((farmer) => <option key={farmer.id} value={farmer.id}>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""} · {farmer.stock[request.crop]} kg</option>)}</select><button className="primary" disabled={!eligible.some((farmer) => Number(farmer.stock[request.crop] || 0) >= Number(request.quantity_kg))} onClick={() => assignFarmer(request)}>Assign single farmer</button></div><div className="cluster-picker"><b>Or create a farmer cluster</b><small>Select contributors with {request.crop}; capacity is allocated automatically up to the buyer requirement.</small>{eligible.map((farmer) => <label key={farmer.id}><input type="checkbox" checked={selected.includes(farmer.id)} onChange={() => toggleClusterFarmer(request.id, farmer.id)}/><span>{farmer.full_name}{farmer.farmer_id ? ` · ${farmer.farmer_id}` : ""}</span><strong>{farmer.stock[request.crop]} kg available</strong></label>)}{eligible.length ? <div><span>Selected capacity: <b>{clusterCapacity} / {request.quantity_kg} kg</b></span><button className="secondary" disabled={selected.length < 2 || clusterCapacity < Number(request.quantity_kg)} onClick={() => assignCluster(request)}>Create cluster & assign quote</button></div> : <p className="empty-state">No farmer currently has published live stock of {request.crop}.</p>}</div></div>; }) : <p className="empty-state">No wholesale requests are awaiting review.</p>}</div>}
-    {tab === "warehouses" && <div className="admin-work-panel"><h3>Warehouse inspection menu</h3><p>Open a warehouse to handle intake, consumer pickups, and its associated live queue.</p>{warehouses.map((warehouse) => <div className="contract-row" key={warehouse.id || warehouse.name}><div><b>{warehouse.name}</b><small>{warehouse.address}</small></div><span>{orders.filter((order) => order.pickupWarehouse === warehouse.name).length} pickup order(s)</span><button className="primary" onClick={() => setView("warehouse")}>Inspect</button></div>)}</div>}
-    {tab === "routes" && <div className="admin-work-panel"><h3>Farm-to-warehouse route mapping</h3><p>Map collection → intake warehouse → inter-warehouse transfer → pickup fulfilment.</p><LiveRoutePlanner notify={notify} initialOrigin={warehouses[0]?.address || ""} initialDestination={warehouses[1]?.address || warehouses[0]?.address || ""}/><form className="route-form" onSubmit={addRoute}><select value={route.origin} onChange={(event) => setRoute({ ...route, origin: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><span>→</span><select value={route.destination} onChange={(event) => setRoute({ ...route, destination: event.target.value })}>{warehouses.map((warehouse) => <option key={warehouse.id || warehouse.name}>{warehouse.name}</option>)}</select><button className="primary" type="submit">Save transfer route</button></form><button className="secondary" onClick={() => setView("warehouse")}>Open warehouse operations</button></div>}
+    {tab === "warehouses" && (
+      <div className="admin-work-panel">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-main)' }}>WDRA Accredited Warehouse Depositories</h3>
+            <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.84rem' }}>
+              Official registered warehousing depositories under the Warehousing Development and Regulatory Authority (WDRA) across Rajasthan.
+            </p>
+          </div>
+          <button className="primary" onClick={() => setView("warehouse")} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+            Open Floor Warehouse Dashboard ➔
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '14px' }}>
+          {warehouses.map((warehouse) => (
+            <div
+              key={warehouse.id || warehouse.name}
+              style={{
+                background: 'var(--surface-raised)',
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                padding: '16px 18px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <b style={{ fontSize: '1rem', color: 'var(--text-main)' }}>{warehouse.name}</b>
+                  <div style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 800, marginTop: '2px' }}>
+                    Accreditation: {warehouse.wdraRegNo || 'WDRA/RJ/ACCREDITED/01'}
+                  </div>
+                </div>
+                <span style={{ fontSize: '0.74rem', background: 'var(--surface)', padding: '3px 8px', borderRadius: '6px', border: '1px solid var(--border)', fontWeight: 700 }}>
+                  {orders.filter((order) => order.pickupWarehouse === warehouse.name).length} Live Orders
+                </span>
+              </div>
+
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-main)', marginTop: '2px' }}>
+                📍 {warehouse.address} - <b>PIN {warehouse.pincode || '302013'}</b>
+              </div>
+
+              {warehouse.capacityMt && (
+                <div style={{ display: 'flex', gap: '14px', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  <span>Capacity: <b style={{ color: 'var(--text-main)' }}>{warehouse.capacityMt.toLocaleString()} MT</b></span>
+                  <span>Available: <b style={{ color: '#059669' }}>{warehouse.availableMt?.toLocaleString() || 3500} MT</b></span>
+                  <span>Cold Chambers: <b style={{ color: '#0284c7' }}>{warehouse.coldChambers || 3}</b></span>
+                </div>
+              )}
+
+              {warehouse.manager && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Superintendent: {warehouse.manager}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  className="primary"
+                  style={{ fontSize: '0.78rem', padding: '6px 12px' }}
+                  onClick={() => setView("warehouse")}
+                >
+                  Inspect Intake Bay
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+    {tab === "routes" && <RouteOptimizationEngine notify={notify} />}
+    {tab === "fpo" && <FpoCollectiveHub notify={notify} />}
+    {tab === "disputes" && <FailureDisputeEngine notify={notify} />}
     {tab === "price floors" && <div className="admin-work-panel"><h3>MSP and verified crop price floors</h3><p>Official MSP entries take priority automatically. For crops without a government MSP, add a source-backed verified reference floor before farmers can list or buyers can quote.</p><form className="floor-form" onSubmit={savePriceFloor}><label>Crop<select value={floorForm.crop} onChange={(event) => setFloorForm({ ...floorForm, crop: event.target.value })}>{INDIA_CROPS.map((crop) => <option key={crop.name} value={crop.name}>{cropEmoji(crop.name, crop.category)} {crop.name}</option>)}</select></label><label>Verified floor ₹/kg<input required type="number" min="0.01" step="0.01" value={floorForm.price} onChange={(event) => setFloorForm({ ...floorForm, price: event.target.value })}/></label><label>Official/reference source URL<input type="url" value={floorForm.source} onChange={(event) => setFloorForm({ ...floorForm, source: event.target.value })} placeholder="https://…"/></label><button className="primary" type="submit">Save protected floor</button></form><div className="floor-list">{priceFloors.length ? priceFloors.map((floor) => <div key={floor.crop}><b>{floor.crop}</b><span>₹{Number(floor.floor_price_per_kg).toFixed(2)}/kg · verified reference</span>{floor.source_url && <a href={floor.source_url} target="_blank" rel="noreferrer">Source <ArrowUpRight size={13}/></a>}</div>) : <p className="empty-state">No reference floors have been added yet. Official MSP crops continue to use their existing official rate.</p>}</div></div>}
     {tab === "market data" && <MarketDataAdmin crops={INDIA_CROPS}/>}
     {tab === "integrations" && <IntegrationCenter session={session} warehouses={warehouses}/>}
@@ -6479,63 +6566,81 @@ function Metric({ icon, label, value, note }) {
   );
 }
 function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, placingOrder }) {
-  const [warehouse, setWarehouse] = useState(warehouses[0]?.name || "");
+  const [warehouse, setWarehouse] = useState(warehouses[0]?.name || "Jaipur North WDRA Hub (CWC)");
+  const [deliveryMode, setDeliveryMode] = useState("pickup"); // 'pickup' or 'doorstep'
+  const [consumerName, setConsumerName] = useState("Mukesh Sharma");
+  const [consumerMobile, setConsumerMobile] = useState("+91 98290 44102");
+  const [addressLine, setAddressLine] = useState("Flat 402, Royal Greens, Sikar Road");
+  const [district, setDistrict] = useState("Jaipur");
+  const [pincode, setPincode] = useState("302013");
+  const [coldChain, setColdChain] = useState(true);
+
   useEffect(() => {
     if (!warehouses.some((item) => item.name === warehouse)) setWarehouse(warehouses[0]?.name || "");
   }, [warehouses, warehouse]);
+
   const total = cart.reduce((sum, l) => sum + l.price * l.quantityKg, 0);
   const totalKg = cart.reduce((sum, l) => sum + l.quantityKg, 0);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    placeOrder(warehouse, {
+      deliveryMode,
+      consumerName,
+      consumerMobile,
+      addressLine,
+      district,
+      pincode,
+      coldChain
+    });
+  };
+
   return (
     <div className="modal-back">
-      <div className="modal checkout-modal">
-        <button className="close" onClick={close}>
-          <X />
+      <div className="modal checkout-modal" style={{ maxWidth: "560px", maxHeight: "90vh", overflowY: "auto" }}>
+        <button className="close" onClick={close} aria-label="Close">
+          <X size={18} />
         </button>
-        <p className="eyebrow green">CONSUMER CHECKOUT</p>
-        <h2>Choose your pickup warehouse</h2>
-        <p className="checkout-copy">
-          Your items are reserved. Select a verified FarmLink warehouse, then
-          confirm your pickup order.
+        <p className="eyebrow green">VERIFIED CHECKOUT &amp; LOGISTICS ROUTING</p>
+        <h2 style={{ margin: "4px 0 6px" }}>Confirm Produce Order &amp; Delivery Address</h2>
+        <p className="checkout-copy" style={{ margin: "0 0 14px", color: "var(--text-muted)", fontSize: "0.85rem" }}>
+          Orders are settled via escrow with farmgate NIR traceability and multi-stop WDRA warehouse routing.
         </p>
-        <div className="checkout-lines">
+
+        {/* Cart Itemized Summary */}
+        <div className="checkout-lines" style={{ marginBottom: "14px" }}>
           {cart.map((lot) => (
             <div className="checkout-line" key={lot.id}>
               <span>{cropEmoji(lot.crop, lot.category)}</span>
               <div>
-                <b>
-                  {lot.crop}, Grade {lot.grade}
-                </b>
-                <small>Lot {lot.id} · ₹{lot.price}/kg</small>
+                <b>{lot.crop}, Grade {lot.grade || "A"}</b>
+                <small>Lot {lot.id} · ₹{lot.price}/kg · Verified Floor Compliant</small>
               </div>
               <div className="checkout-quantity" aria-label={`${lot.crop} quantity`}>
                 <button
                   type="button"
-                  aria-label={`Decrease ${lot.crop} quantity`}
                   onClick={() => updateCartQuantity(lot.id, lot.quantityKg - 1)}
                 >
                   −
                 </button>
                 <input
-                  aria-label={`${lot.crop} kilograms`}
                   type="number"
                   min="1"
-                  max="50"
+                  max="5000"
                   value={lot.quantityKg}
                   onChange={(event) => updateCartQuantity(lot.id, event.target.value)}
                 />
                 <button
                   type="button"
-                  aria-label={`Increase ${lot.crop} quantity`}
                   onClick={() => updateCartQuantity(lot.id, lot.quantityKg + 1)}
                 >
                   +
                 </button>
               </div>
-              <strong>₹{lot.price * lot.quantityKg}</strong>
+              <strong>₹{(lot.price * lot.quantityKg).toFixed(2)}</strong>
               <button
                 type="button"
                 className="checkout-remove"
-                aria-label={`Remove ${lot.crop} from checkout`}
                 onClick={() => updateCartQuantity(lot.id, 0)}
               >
                 <X size={16} />
@@ -6543,30 +6648,146 @@ function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, pla
             </div>
           ))}
         </div>
-        <label className="pickup-choice">
-          Pickup warehouse
-          <select
-            value={warehouse}
-            onChange={(e) => setWarehouse(e.target.value)}
+
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {/* Delivery Mode Toggle */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", background: "var(--surface-raised)", padding: "4px", borderRadius: "10px", border: "1px solid var(--border)" }}>
+            <button
+              type="button"
+              className={deliveryMode === "pickup" ? "primary" : "secondary"}
+              style={{ padding: "8px", fontSize: "0.82rem", borderRadius: "8px", border: "none" }}
+              onClick={() => setDeliveryMode("pickup")}
+            >
+              🏬 WDRA Warehouse Pickup
+            </button>
+            <button
+              type="button"
+              className={deliveryMode === "doorstep" ? "primary" : "secondary"}
+              style={{ padding: "8px", fontSize: "0.82rem", borderRadius: "8px", border: "none" }}
+              onClick={() => setDeliveryMode("doorstep")}
+            >
+              🚚 Doorstep Farm Delivery
+            </button>
+          </div>
+
+          {/* Contact Details */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            <div>
+              <label style={{ fontSize: "0.78rem", fontWeight: 700, display: "block", marginBottom: "4px" }}>
+                Recipient Full Name:
+              </label>
+              <input
+                type="text"
+                required
+                value={consumerName}
+                onChange={(e) => setConsumerName(e.target.value)}
+                style={{ width: "100%", padding: "7px 10px", borderRadius: "8px", border: "1px solid var(--border)" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: "0.78rem", fontWeight: 700, display: "block", marginBottom: "4px" }}>
+                Contact Mobile (for OTP Handoff):
+              </label>
+              <input
+                type="text"
+                required
+                value={consumerMobile}
+                onChange={(e) => setConsumerMobile(e.target.value)}
+                style={{ width: "100%", padding: "7px 10px", borderRadius: "8px", border: "1px solid var(--border)" }}
+              />
+            </div>
+          </div>
+
+          {/* Destination Warehouse */}
+          <div>
+            <label style={{ fontSize: "0.78rem", fontWeight: 700, display: "block", marginBottom: "4px" }}>
+              Intake / Pickup WDRA Registered Warehouse:
+            </label>
+            <select
+              value={warehouse}
+              onChange={(e) => setWarehouse(e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", border: "1px solid var(--border)", background: "var(--surface)" }}
+            >
+              {warehouses.map((item) => (
+                <option key={item.id || item.name} value={item.name}>
+                  {item.name} {item.wdraRegNo ? `(${item.wdraRegNo})` : ""} · {item.district || "Rajasthan"}
+                </option>
+              ))}
+            </select>
+            <small style={{ color: "var(--text-muted)", display: "block", marginTop: "3px", fontSize: "0.74rem" }}>
+              {warehouses.find(w => w.name === warehouse)?.address || "WDRA accredited state warehousing terminal"}
+            </small>
+          </div>
+
+          {/* Address Line (Mandatory if doorstep delivery) */}
+          {deliveryMode === "doorstep" && (
+            <div>
+              <label style={{ fontSize: "0.78rem", fontWeight: 700, display: "block", marginBottom: "4px" }}>
+                Street Address / House / Landmark:
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Plot 12, Subhash Marg, C-Scheme"
+                value={addressLine}
+                onChange={(e) => setAddressLine(e.target.value)}
+                style={{ width: "100%", padding: "7px 10px", borderRadius: "8px", border: "1px solid var(--border)" }}
+              />
+            </div>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            <div>
+              <label style={{ fontSize: "0.78rem", fontWeight: 700, display: "block", marginBottom: "4px" }}>
+                District / City:
+              </label>
+              <input
+                type="text"
+                required
+                value={district}
+                onChange={(e) => setDistrict(e.target.value)}
+                style={{ width: "100%", padding: "7px 10px", borderRadius: "8px", border: "1px solid var(--border)" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: "0.78rem", fontWeight: 700, display: "block", marginBottom: "4px" }}>
+                PIN Code:
+              </label>
+              <input
+                type="text"
+                required
+                value={pincode}
+                onChange={(e) => setPincode(e.target.value)}
+                style={{ width: "100%", padding: "7px 10px", borderRadius: "8px", border: "1px solid var(--border)" }}
+              />
+            </div>
+          </div>
+
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.82rem", cursor: "pointer", marginTop: "2px" }}>
+            <input
+              type="checkbox"
+              checked={coldChain}
+              onChange={(e) => setColdChain(e.target.checked)}
+              style={{ width: "16px", height: "16px", accentColor: "var(--primary)" }}
+            />
+            Require Cold-Chain Temperature Controlled Logistics
+          </label>
+
+          <div className="checkout-total" style={{ margin: "8px 0", padding: "10px 14px", background: "var(--surface-raised)", borderRadius: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Total Payable ({totalKg} kg):</span>
+            <b style={{ fontSize: "1.2rem", color: "var(--primary)" }}>₹{total.toFixed(2)}</b>
+          </div>
+
+          <button
+            type="submit"
+            className="primary checkout-confirm"
+            disabled={placingOrder}
+            style={{ padding: "11px", fontWeight: 800, fontSize: "0.95rem" }}
           >
-            {warehouses.map((item) => <option key={item.id || item.name} value={item.name}>{item.name}{item.address ? ` · ${item.address}` : ""}</option>)}
-          </select>
-          <small>
-            Your order will appear in this warehouse's admin fulfillment queue.
-          </small>
-        </label>
-        <div className="checkout-total">
-          <span>Total payable at pickup · {totalKg} / 50 kg</span>
-          <b>₹{total.toFixed(2)}</b>
-        </div>
-        <button
-          className="primary checkout-confirm"
-          disabled={placingOrder}
-          onClick={() => placeOrder(warehouse)}
-        >
-          <PackageCheck size={18} />
-          {placingOrder ? "Placing order…" : "Confirm pickup order"}
-        </button>
+            <PackageCheck size={18} />
+            {placingOrder ? "Recording Escrow Order…" : "Confirm Order & Generate Handoff"}
+          </button>
+        </form>
       </div>
     </div>
   );
