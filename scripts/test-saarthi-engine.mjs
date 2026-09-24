@@ -118,6 +118,49 @@ async function runTests() {
   assert(!step5.response.toLowerCase().includes('password'), 'Refuses to leak credentials');
   assert(!step5.response.toLowerCase().includes('database'), 'Refuses to reveal database internals');
 
+  // Test 9: Colloquial Natural Inputs ("dhai quintal ke aas paas", "teen kuntal")
+  console.log('\n--- Test 9: Colloquial Natural Inputs ---');
+  assert(normalizeQuantityToKg('dhai quintal ke aas paas') === 250, '"dhai quintal ke aas paas" normalizes to 250 kg');
+  assert(normalizeQuantityToKg('teen kuntal') === 300, '"teen kuntal" normalizes to 300 kg');
+  assert(normalizeQuantityToKg('dedh quintal') === 150, '"dedh quintal" normalizes to 150 kg');
+
+  // Test 10: Confused Farmer Empathy
+  console.log('\n--- Test 10: Confused Farmer Empathy ---');
+  const confusedStep = await engine.handleTurn({
+    sessionId: `confused-${Date.now()}`,
+    message: 'bhai mujhe kuch samajh nahi aa raha kaise bechu',
+    farmerId: 'farmer-kishan',
+    farmerName: 'Kishan Lal'
+  });
+  console.log('Saarthi response (Confused):', confusedStep.response);
+  assert(confusedStep.intent === 'PLATFORM_HELP', 'Recognizes platform help / confusion intent');
+  assert(confusedStep.response.toLowerCase().includes('chinta') || confusedStep.response.includes('मदद') || confusedStep.response.includes('फसल'), 'Warm empathetic explanation without scolding');
+
+  // Test 11: Smooth Corrections ("Nahi, 4 quintal hai")
+  console.log('\n--- Test 11: Smooth Correction Handling ---');
+  const corrSession = `corr-${Date.now()}`;
+  await engine.handleTurn({
+    sessionId: corrSession,
+    message: 'mere paas 5 quintal gehu hai bechna hai',
+    farmerId: 'farmer-corr',
+    farmerName: 'Sohan Singh'
+  });
+  const correctionStep = await engine.handleTurn({
+    sessionId: corrSession,
+    message: 'nahi, 4 quintal hai',
+    farmerId: 'farmer-corr',
+    farmerName: 'Sohan Singh'
+  });
+  console.log('Saarthi response (Correction):', correctionStep.response);
+  assert(correctionStep.entities.quantityKg === 400, 'Quantity smoothly updated to 400 kg (4 quintal)');
+  assert(correctionStep.intent === 'SELL_CROP', 'Intent preserved as SELL_CROP, not canceled');
+  assert(correctionStep.response.includes('400') || correctionStep.response.includes('4 quintal') || correctionStep.response.includes('4'), 'Acknowledges updated quantity smoothly');
+
+  // Test 12: Brevity Constraint (<= 2 sentences)
+  console.log('\n--- Test 12: Speech Brevity Constraint ---');
+  const sentenceCount = correctionStep.response.split(/[।!?.]+/).filter(Boolean).length;
+  assert(sentenceCount <= 2, `Response is concise (${sentenceCount} sentences <= 2)`);
+
   console.log(`\n=== TEST RESULTS: ${passedTests} PASSED, ${failedTests} FAILED ===\n`);
   if (failedTests > 0) {
     process.exit(1);

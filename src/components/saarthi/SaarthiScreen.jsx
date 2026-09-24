@@ -35,7 +35,7 @@ export default function SaarthiScreen({
 }) {
   const [status, setStatus] = useState('IDLE'); // 'IDLE' | 'LISTENING' | 'PROCESSING' | 'SPEAKING' | 'ERROR'
   const [currentResponse, setCurrentResponse] = useState(
-    'नमस्ते किसान भाई! मैं फार्मलिंक सारथी हूँ। बताइए, मैं आपकी क्या मदद कर सकता हूँ?'
+    'राम राम किसान भाई! बताइए, आज क्या बेचना है या मंडी भाव जानना है?'
   );
   const [pendingAction, setPendingAction] = useState(null);
   const [quickActions, setQuickActions] = useState([
@@ -320,7 +320,7 @@ export default function SaarthiScreen({
                   onClick={() => handleConfirm(true)}
                   disabled={status === 'PROCESSING'}
                 >
-                  <Check size={20} /> हाँ, बना दो
+                  <Check size={20} /> हाँ, ठीक है
                 </button>
                 <button
                   type="button"
@@ -328,7 +328,7 @@ export default function SaarthiScreen({
                   onClick={() => handleConfirm(false)}
                   disabled={status === 'PROCESSING'}
                 >
-                  <X size={20} /> नहीं, रोकें
+                  <X size={20} /> नहीं, बदलो
                 </button>
               </div>
             </div>

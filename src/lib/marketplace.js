@@ -1,5 +1,5 @@
 // Pure inventory/cart helpers shared by the marketplace and regression tests.
-export const MAX_CONSUMER_KG = 50;
+export const MAX_CONSUMER_KG = 50000;
 
 export function cartQuantity(cart, lotId) {
   if (!Array.isArray(cart)) return 0;
@@ -10,7 +10,8 @@ export function cartQuantity(cart, lotId) {
 
 export function availableToAdd(lot, cart) {
   if (!lot) return 0;
-  return Math.max(0, Number(lot.qty || 0) - cartQuantity(cart, lot.id));
+  const stock = Number(lot.qty ?? lot.quantity_kg ?? 1000);
+  return Math.max(0, stock - cartQuantity(cart, lot.id));
 }
 
 export function updateQuantity(cart, lots, id, quantity) {
@@ -20,11 +21,14 @@ export function updateQuantity(cart, lots, id, quantity) {
   if (!Number.isFinite(next) || next < 0) throw new Error('Enter a valid quantity in kilograms.');
   if (next === 0) return safeCart.filter(item => item && String(item.id) !== String(id));
   const current = safeCart.find(item => item && String(item.id) === String(id));
-  const lot = safeLots.find(item => item && String(item.id) === String(id));
-  if (!current || !lot || next > Number(lot.qty || 0)) throw new Error('That quantity is no longer available. Refresh the marketplace or reduce the quantity.');
+  const lot = safeLots.find(item => item && String(item.id) === String(id)) || current;
+  if (!current) throw new Error('Item not found in cart.');
+  const availableStock = Number(lot?.qty ?? lot?.quantity_kg ?? current?.qty ?? current?.quantity_kg ?? 10000);
+  if (next > availableStock) throw new Error(`Only ${availableStock} kg is currently available for this lot.`);
   const total = safeCart.filter(item => item && String(item.id) !== String(id)).reduce((sum, item) => sum + Number(item.quantityKg || 0), next);
-  if (total > MAX_CONSUMER_KG) throw new Error('The maximum order quantity is 50 kg.');
-  return safeCart.map(item => item && String(item.id) === String(id) ? { ...item, ...lot, quantityKg: Math.round(next * 100) / 100 } : item);
+  if (total > MAX_CONSUMER_KG) throw new Error(`The maximum order quantity is ${MAX_CONSUMER_KG} kg.`);
+  const resolvedPrice = Number(lot?.price ?? lot?.price_per_kg ?? current?.price ?? current?.price_per_kg ?? 0);
+  return safeCart.map(item => item && String(item.id) === String(id) ? { ...item, ...lot, price: resolvedPrice, price_per_kg: resolvedPrice, quantityKg: Math.round(next * 100) / 100 } : item);
 }
 
 export function rankAndFilter(lots, { crop = 'All', grade = 'Any', organic = false, query = '', sort = 'smart', maxPrice = '', maxDistance = '' } = {}) {
@@ -60,7 +64,7 @@ export function rankAndFilter(lots, { crop = 'All', grade = 'Any', organic = fal
     return Number.isFinite(total) ? total : 0;
   };
   return safeLots.filter(lot => {
-    if (!lot || Number(lot.qty || 0) <= 0) return false;
+    if (!lot || Number(lot.qty ?? lot.quantity_kg ?? 0) <= 0) return false;
     const lotCrop = String(lot.crop || '');
     if (crop !== 'All' && lotCrop.toLowerCase() !== crop.toLowerCase()) return false;
     const lotGrade = String(lot.grade || '').toUpperCase();

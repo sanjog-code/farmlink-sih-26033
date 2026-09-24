@@ -79,7 +79,53 @@ async function testFlagshipDemos() {
     throw new Error('Demo 3 failed: Official MSP rate not quoted');
   }
 
-  console.log('\n🎉 ALL 3 FLAGSHIP DEMOS PASSED WITH 100% SUCCESS!');
+  // ─── FLAGSHIP DEMO 4: COLLOQUIAL HINGLISH ────────────────────────────────
+  console.log('\n🌟 [DEMO 4]: Farmer says: "bhai dhai quintal ke aas paas tamatar bechna hai"');
+  const turn5 = await defaultSaarthiEngine.handleTurn({
+    sessionId: `colloquial-${Date.now()}`,
+    message: 'bhai dhai quintal ke aas paas tamatar bechna hai',
+    farmerId,
+    farmerName
+  });
+  console.log('🤖 Saarthi Spoken Response:', turn5.response);
+  if (turn5.entities.quantityKg !== 250 || turn5.entities.crop !== 'Tomato') {
+    throw new Error(`Demo 4 failed: Expected 250 kg Tomato, got ${turn5.entities.quantityKg} kg ${turn5.entities.crop}`);
+  }
+
+  // ─── FLAGSHIP DEMO 5: CONFUSED / HESITANT FARMER ────────────────────────────
+  console.log('\n🌟 [DEMO 5]: Farmer says: "kuch samajh nahi aa raha kaise bechu"');
+  const turn6 = await defaultSaarthiEngine.handleTurn({
+    sessionId: `confused-${Date.now()}`,
+    message: 'kuch samajh nahi aa raha kaise bechu',
+    farmerId,
+    farmerName
+  });
+  console.log('🤖 Saarthi Spoken Response:', turn6.response);
+  if (turn6.intent !== 'PLATFORM_HELP' || !turn6.response.toLowerCase().includes('chinta')) {
+    throw new Error('Demo 5 failed: Expected warm empathetic representative guidance');
+  }
+
+  // ─── FLAGSHIP DEMO 6: SMOOTH CORRECTION WITHOUT RESTARTING ──────────────────
+  console.log('\n🌟 [DEMO 6]: Farmer says: "5 quintal gehu hai" then "nahi, 4 quintal hai"');
+  const corrId = `corr-${Date.now()}`;
+  await defaultSaarthiEngine.handleTurn({
+    sessionId: corrId,
+    message: 'mere paas 5 quintal gehu hai bechna hai',
+    farmerId,
+    farmerName
+  });
+  const turn7 = await defaultSaarthiEngine.handleTurn({
+    sessionId: corrId,
+    message: 'nahi, 4 quintal hai',
+    farmerId,
+    farmerName
+  });
+  console.log('🤖 Saarthi Spoken Response:', turn7.response);
+  if (turn7.entities.quantityKg !== 400 || turn7.intent !== 'SELL_CROP') {
+    throw new Error(`Demo 6 failed: Expected 400 kg under SELL_CROP, got ${turn7.entities.quantityKg} kg under ${turn7.intent}`);
+  }
+
+  console.log('\n🎉 ALL 6 FLAGSHIP DEMOS PASSED WITH 100% SUCCESS!');
 }
 
 testFlagshipDemos().catch(err => {

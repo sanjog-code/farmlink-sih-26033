@@ -59,23 +59,70 @@ export function normalizeCropName(inputCrop) {
   return { canonical: title, category: 'Agricultural Produce', hindi: title };
 }
 
-// Canonical unit converter to kg
+// Canonical unit converter to kg with rural Indian phrase understanding
 export function normalizeQuantityToKg(amount, unit = 'kg') {
-  const num = Number(amount);
-  if (!Number.isFinite(num) || num <= 0) return 0;
+  if (amount === undefined || amount === null) return 0;
+  
+  let str = String(amount).trim().toLowerCase();
+  let explicitUnit = String(unit || 'kg').trim().toLowerCase();
 
-  const u = String(unit || 'kg').trim().toLowerCase();
-  if (u.includes('quintal') || u.includes('kuntal') || u.includes('qtl') || u.includes('क्विंटल') || u.includes('कुंतल')) {
-    return Math.round(num * 100);
+  // If unit not passed explicitly, check if embedded in amount string
+  const isQuintal = explicitUnit.includes('quintal') || explicitUnit.includes('kuntal') || explicitUnit.includes('qtl') || explicitUnit.includes('क्विंटल') || explicitUnit.includes('कुंतल') ||
+    str.includes('quintal') || str.includes('kuntal') || str.includes('qtl') || str.includes('क्विंटल') || str.includes('कुंतल');
+
+  const isTon = explicitUnit.includes('ton') || explicitUnit.includes('टन') || str.includes('ton') || str.includes('टन');
+
+  // Check colloquial fractional phrases
+  let val = null;
+  if (str.includes('dhai') || str.includes('ढाई')) {
+    val = 2.5;
+  } else if (str.includes('dedh') || str.includes('डेढ़')) {
+    val = 1.5;
+  } else if (str.includes('paune do') || str.includes('पौने दो')) {
+    val = 1.75;
+  } else if (str.includes('paune teen') || str.includes('पौने तीन')) {
+    val = 2.75;
+  } else if (str.includes('sawa') || str.includes('सवा')) {
+    val = 1.25;
+  } else if (str.includes('aadha') || str.includes('adha') || str.includes('आधा')) {
+    val = 0.5;
+  } else {
+    // Check number words
+    const wordNums = {
+      'ek': 1, 'एक': 1, 'do': 2, 'दो': 2, 'teen': 3, 'तीन': 3, 'chaar': 4, 'चार': 4,
+      'paanch': 5, 'पांच': 5, 'chhah': 6, 'छह': 6, 'saat': 7, 'सात': 7, 'aath': 8, 'आठ': 8,
+      'nau': 9, 'नौ': 9, 'das': 10, 'दस': 10, 'bees': 20, 'बीस': 20, 'pachas': 50, 'पचास': 50, 'sau': 100, 'सौ': 100
+    };
+    for (const [w, n] of Object.entries(wordNums)) {
+      const regex = new RegExp(`\\b${w}\\b`, 'i');
+      if (regex.test(str)) {
+        val = n;
+        break;
+      }
+    }
   }
-  if (u.includes('tonne') || u.includes('ton') || u.includes('टन')) {
-    return Math.round(num * 1000);
+
+  // If no word matched, extract digits/decimal from string
+  if (val === null) {
+    const match = str.match(/([0-9]+(?:\.[0-9]+)?)/);
+    if (match) {
+      val = parseFloat(match[1]);
+    }
   }
-  if (u.includes('gram') && !u.includes('kilo')) {
-    return Math.round(num / 1000);
+
+  if (val === null || !Number.isFinite(val) || val <= 0) {
+    const directNum = Number(amount);
+    if (Number.isFinite(directNum) && directNum > 0) val = directNum;
+    else return 0;
   }
-  // Default is kg
-  return Math.round(num);
+
+  if (isQuintal) {
+    return Math.round(val * 100);
+  }
+  if (isTon) {
+    return Math.round(val * 1000);
+  }
+  return Math.round(val);
 }
 
 // ─── TOOL IMPLEMENTATIONS ───────────────────────────────────────────────────
