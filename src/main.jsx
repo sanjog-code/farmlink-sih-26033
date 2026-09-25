@@ -82,6 +82,7 @@ import AgenticCopilot, { AgenticDockLauncher } from "./ai/AgenticCopilot.jsx";
 import SaarthiScreen from "./components/saarthi/SaarthiScreen.jsx";
 import FarmerExperience from "./components/farmer/FarmerExperience.jsx";
 import FormattedAiMessage from "./components/common/FormattedAiMessage.jsx";
+import IntermediaryPriceBreakdown from "./components/common/IntermediaryPriceBreakdown.jsx";
 import { transcribeWithSarvam, speakHybrid, stopAllSpeech, DEFAULT_SARVAM_KEY } from "./ai/speechEngine.js";
 import MspFloorBadge from "./components/MspFloorBadge";
 import { getMspFloorForCrop } from "./lib/mspRates";
@@ -707,7 +708,7 @@ class ErrorBoundary extends React.Component {
       return (
         <section className="page" style={{ padding: "48px 24px", textAlign: "center", maxWidth: "680px", margin: "40px auto" }}>
           <h2>Something went wrong displaying this view</h2>
-          <p style={{ color: "#666", margin: "12px 0 24px", fontSize: "15px" }}>
+          <p style={{ color: "var(--text-muted)", margin: "12px 0 24px", fontSize: "15px" }}>
             {this.props.fallbackMessage || "An unexpected error occurred while rendering this page."}
           </p>
           <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
@@ -1214,6 +1215,12 @@ function App() {
       }
 
       addUserOrder(order);
+      // Broadcast cross-tab order notification for Farmer & Warehouse dashboards
+      try {
+        const orderPayload = JSON.stringify({ ...order, _event: 'farmlink_order_created', _ts: Date.now() });
+        localStorage.setItem('farmlink_orders_store_latest', orderPayload);
+        window.dispatchEvent(new CustomEvent('farmlink_order_created', { detail: order }));
+      } catch (_) { /* ignore broadcast errors */ }
       setOrders((existing) => [order, ...existing.filter((x) => x.id !== order.id)]);
       setCart([]);
       setLiveTick((tick) => tick + 1);
@@ -1887,6 +1894,10 @@ function Home({ t, lots, setView, access, reserve, setModal, lang, tUI }) {
               <CheckCircle2 size={18} />
               <span>{tr("Zero Distress Sales")}</span>
             </div>
+          </div>
+
+          <div style={{ marginTop: "18px", maxWidth: "560px" }}>
+            <IntermediaryPriceBreakdown crop="Mustard" farmerPrice={82} />
           </div>
         </div>
 
@@ -2649,6 +2660,7 @@ function ProductDetail({
             micronutrients. Store cool and consume promptly.
           </p>
         </article>
+        <IntermediaryPriceBreakdown crop={cropName} farmerPrice={Number(lot.price || 0)} />
       </div>
     </section>
   );
@@ -4753,7 +4765,7 @@ function FarmerVerificationWorkflow({ farmerVerification, setFarmerVerification,
               <span className="verification-badge unverified"><ShieldCheck size={14} /> Verification Required</span>
             )}
           </div>
-          <p style={{ margin: 0, color: "#2d4539", fontSize: "0.88rem" }}>
+          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.88rem" }}>
             {status === "verified"
               ? `Verification ID: ${farmerVerification?.id || "KYC-RJ-2026-9812"} · Verified on ${farmerVerification?.reviewedAt ? new Date(farmerVerification.reviewedAt).toLocaleDateString("en-IN") : "Sep 19, 2026"}`
               : status === "under_review"
@@ -4839,7 +4851,7 @@ function FarmerVerificationWorkflow({ farmerVerification, setFarmerVerification,
 
           {step === 1 && (
             <div>
-              <h4 style={{ margin: "0 0 14px", color: "#143d2c" }}>Personal Identity &amp; Government KYC</h4>
+              <h4 style={{ margin: "0 0 14px", color: "var(--text-main)" }}>Personal Identity &amp; Government KYC</h4>
               <div className="form-row-2">
                 <label>
                   Full Legal Name (as per Aadhaar / Bank)
@@ -4888,7 +4900,7 @@ function FarmerVerificationWorkflow({ farmerVerification, setFarmerVerification,
                 <div className="doc-upload-zone" onClick={() => notify("Document selected: " + form.idDocName)}>
                   <ScanLine size={24} style={{ color: "#176b49", margin: "0 auto 6px" }} />
                   <b>{form.idDocName ? `Attached: ${form.idDocName}` : "Click or tap to upload Aadhaar / KCC photo"}</b>
-                  <small style={{ display: "block", color: "#666" }}>Supported formats: PDF, JPEG, PNG (max 5MB)</small>
+                  <small style={{ display: "block", color: "var(--text-muted)" }}>Supported formats: PDF, JPEG, PNG (max 5MB)</small>
                 </div>
               </label>
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
@@ -4901,7 +4913,7 @@ function FarmerVerificationWorkflow({ farmerVerification, setFarmerVerification,
 
           {step === 2 && (
             <div>
-              <h4 style={{ margin: "0 0 14px", color: "#143d2c" }}>Farm Land &amp; Cultivation Records</h4>
+              <h4 style={{ margin: "0 0 14px", color: "var(--text-main)" }}>Farm Land &amp; Cultivation Records</h4>
               <div className="form-row-3">
                 <label>
                   State
@@ -4967,7 +4979,7 @@ function FarmerVerificationWorkflow({ farmerVerification, setFarmerVerification,
                 <div className="doc-upload-zone" onClick={() => notify("Document selected: " + form.landDocName)}>
                   <MapPin size={24} style={{ color: "#176b49", margin: "0 auto 6px" }} />
                   <b>{form.landDocName ? `Attached: ${form.landDocName}` : "Click or tap to upload Land Passbook / Khasra document"}</b>
-                  <small style={{ display: "block", color: "#666" }}>Supported formats: PDF, JPEG, PNG (max 5MB)</small>
+                  <small style={{ display: "block", color: "var(--text-muted)" }}>Supported formats: PDF, JPEG, PNG (max 5MB)</small>
                 </div>
               </label>
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: "16px" }}>
@@ -4983,7 +4995,7 @@ function FarmerVerificationWorkflow({ farmerVerification, setFarmerVerification,
 
           {step === 3 && (
             <div>
-              <h4 style={{ margin: "0 0 14px", color: "#143d2c" }}>Bank Account &amp; Direct Payout Details</h4>
+              <h4 style={{ margin: "0 0 14px", color: "var(--text-main)" }}>Bank Account &amp; Direct Payout Details</h4>
               <div className="form-row-2">
                 <label>
                   Bank Name
@@ -5049,31 +5061,31 @@ function FarmerVerificationWorkflow({ farmerVerification, setFarmerVerification,
         </form>
       ) : (
         <div className="verification-form-box">
-          <h4 style={{ margin: "0 0 12px", color: "#143d2c" }}>Verified Profile Information</h4>
+          <h4 style={{ margin: "0 0 12px", color: "var(--text-main)" }}>Verified Profile Information</h4>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
             <div>
-              <small style={{ color: "#666" }}>Farmer Legal Name</small>
-              <b style={{ display: "block", color: "#133827" }}>{farmerVerification?.farmerName || session?.name || "Registered Producer"}</b>
-              <small style={{ color: "#666" }}>{farmerVerification?.mobile || "Not specified"}</small>
+              <small style={{ color: "var(--text-muted)" }}>Farmer Legal Name</small>
+              <b style={{ display: "block", color: "var(--text-main)" }}>{farmerVerification?.farmerName || session?.name || "Registered Producer"}</b>
+              <small style={{ color: "var(--text-muted)" }}>{farmerVerification?.mobile || "Not specified"}</small>
             </div>
             <div>
-              <small style={{ color: "#666" }}>Identity Record</small>
-              <b style={{ display: "block", color: "#133827" }}>{farmerVerification?.idType || "Aadhaar Card"}</b>
-              <small style={{ color: "#666" }}>ID: {farmerVerification?.idNumber ? `XXXX-XXXX-${farmerVerification.idNumber.slice(-4)}` : "Verified"}</small>
+              <small style={{ color: "var(--text-muted)" }}>Identity Record</small>
+              <b style={{ display: "block", color: "var(--text-main)" }}>{farmerVerification?.idType || "Aadhaar Card"}</b>
+              <small style={{ color: "var(--text-muted)" }}>ID: {farmerVerification?.idNumber ? `XXXX-XXXX-${farmerVerification.idNumber.slice(-4)}` : "Verified"}</small>
             </div>
             <div>
-              <small style={{ color: "#666" }}>Farm Survey (Khasra)</small>
-              <b style={{ display: "block", color: "#133827" }}>{farmerVerification?.khasraNumber ? `Khasra ${farmerVerification.khasraNumber}` : "Registered Land"}</b>
-              <small style={{ color: "#666" }}>{farmerVerification?.village ? `${farmerVerification.village}, ${farmerVerification.landDistrict || "Jaipur"}` : "Rajasthan Cluster"} {farmerVerification?.landAcres ? `(${farmerVerification.landAcres} acres)` : ""}</small>
+              <small style={{ color: "var(--text-muted)" }}>Farm Survey (Khasra)</small>
+              <b style={{ display: "block", color: "var(--text-main)" }}>{farmerVerification?.khasraNumber ? `Khasra ${farmerVerification.khasraNumber}` : "Registered Land"}</b>
+              <small style={{ color: "var(--text-muted)" }}>{farmerVerification?.village ? `${farmerVerification.village}, ${farmerVerification.landDistrict || "Jaipur"}` : "Rajasthan Cluster"} {farmerVerification?.landAcres ? `(${farmerVerification.landAcres} acres)` : ""}</small>
             </div>
             <div>
-              <small style={{ color: "#666" }}>Bank Payout Destination</small>
-              <b style={{ display: "block", color: "#133827" }}>{farmerVerification?.bankName || "Verified Bank Account"}</b>
-              <small style={{ color: "#666" }}>{farmerVerification?.accountNumber ? `A/C: XXXXXX${farmerVerification.accountNumber.slice(-4)}` : ""} {farmerVerification?.ifsc ? `· IFSC: ${farmerVerification.ifsc}` : ""} {farmerVerification?.upiId ? `· UPI: ${farmerVerification.upiId}` : ""}</small>
+              <small style={{ color: "var(--text-muted)" }}>Bank Payout Destination</small>
+              <b style={{ display: "block", color: "var(--text-main)" }}>{farmerVerification?.bankName || "Verified Bank Account"}</b>
+              <small style={{ color: "var(--text-muted)" }}>{farmerVerification?.accountNumber ? `A/C: XXXXXX${farmerVerification.accountNumber.slice(-4)}` : ""} {farmerVerification?.ifsc ? `· IFSC: ${farmerVerification.ifsc}` : ""} {farmerVerification?.upiId ? `· UPI: ${farmerVerification.upiId}` : ""}</small>
             </div>
           </div>
           {farmerVerification?.reviewerNote && (
-            <div style={{ marginTop: "14px", padding: "10px 14px", borderRadius: "8px", background: "#f0f8ee", border: "1px solid #d2e7ce", fontSize: "0.84rem", color: "#255738" }}>
+            <div style={{ marginTop: "14px", padding: "10px 14px", borderRadius: "8px", background: "var(--surface-raised)", border: "1px solid #d2e7ce", fontSize: "0.84rem", color: "var(--text-muted)" }}>
               <b>Admin Verification Note:</b> {farmerVerification.reviewerNote}
             </div>
           )}
@@ -5655,6 +5667,9 @@ function FarmerOperations({ notify, session, liveTick, listingPrefill, farmerVer
             </small>
           </label>
           {previews.length > 0 && <div className="intake-image-compare">{previews.map((preview, index) => <figure key={preview}><img className="listing-preview" src={preview} alt={`Selected produce preview ${index + 1}`}/><figcaption>Photo {index + 1}</figcaption></figure>)}</div>}
+          <div style={{ margin: "12px 0" }}>
+            <IntermediaryPriceBreakdown crop={listing.crop} farmerPrice={Number(listing.price) || 24} />
+          </div>
           <button
             className="primary"
             disabled={saving || (listingFloor?.price > 0 && Number(listing.price) > 0 && Number(listing.price) < listingFloor.price)}
@@ -6159,7 +6174,7 @@ function AuthView({ initialRole = "consumer", setSession, setView, notify }) {
           </p>
         )}
         <div style={{ marginTop: "16px", borderTop: "1px solid #e1eee3", paddingTop: "12px" }}>
-          <small style={{ display: "block", color: "#555", marginBottom: "8px", fontWeight: 700 }}>Quick Demo Sign-in:</small>
+          <small style={{ display: "block", color: "var(--text-muted)", marginBottom: "8px", fontWeight: 700 }}>Quick Demo Sign-in:</small>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <button
               type="button"
@@ -6451,7 +6466,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "8px" }}>
         <div>
           <h3>Farmer listings &amp; marketplace approvals</h3>
-          <p style={{ margin: "2px 0 0", color: "#555" }}>
+          <p style={{ margin: "2px 0 0", color: "var(--text-muted)" }}>
             Review submitted produce photos, schedule warehouse intake, and manage live marketplace listings.
           </p>
         </div>
@@ -6494,8 +6509,8 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
       {listingCategory === "pending" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-            <h4 style={{ margin: 0, color: "#143823" }}>Listings awaiting approval ({awaitingListings.length})</h4>
-            <small style={{ color: "#666" }}>Inspect farmer photos, verify quality, and schedule warehouse intake</small>
+            <h4 style={{ margin: 0, color: "var(--text-main)" }}>Listings awaiting approval ({awaitingListings.length})</h4>
+            <small style={{ color: "var(--text-muted)" }}>Inspect farmer photos, verify quality, and schedule warehouse intake</small>
           </div>
 
           {awaitingListings.length ? awaitingListings.map((item) => (
@@ -6537,8 +6552,8 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
       {listingCategory === "active" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-            <h4 style={{ margin: 0, color: "#143823" }}>Active marketplace listings ({activeListings.length})</h4>
-            <small style={{ color: "#666" }}>Traceable lots live in the consumer &amp; buyer catalogue</small>
+            <h4 style={{ margin: 0, color: "var(--text-main)" }}>Active marketplace listings ({activeListings.length})</h4>
+            <small style={{ color: "var(--text-muted)" }}>Traceable lots live in the consumer &amp; buyer catalogue</small>
           </div>
 
           {activeListings.length ? activeListings.map((item) => (
@@ -6571,7 +6586,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "14px" }}>
           <div>
             <h3>Farmer identity &amp; land record verification (KYC)</h3>
-            <p style={{ margin: "2px 0 0", color: "#555" }}>
+            <p style={{ margin: "2px 0 0", color: "var(--text-muted)" }}>
               Verify government identity, land titles (Khasra/7/12 extract), and bank payout credentials before granting trusted farmer badges.
             </p>
           </div>
@@ -6601,11 +6616,11 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
           <div className="verification-card" style={{ background: "#ffffff", border: "1px solid #c8d9cb", borderRadius: "10px", padding: "18px", marginBottom: "18px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px", borderBottom: "1px solid #e5ede7", paddingBottom: "14px", marginBottom: "16px" }}>
               <div>
-                <h4 style={{ margin: 0, color: "#133827", fontSize: "1.1rem" }}>{farmerVerification.farmerName}</h4>
-                <small style={{ color: "#555" }}>Application ID: <b>{farmerVerification.id || "KYC-PENDING"}</b> · Mobile: <b>{farmerVerification.mobile || "Not provided"}</b></small>
+                <h4 style={{ margin: 0, color: "var(--text-main)", fontSize: "1.1rem" }}>{farmerVerification.farmerName}</h4>
+                <small style={{ color: "var(--text-muted)" }}>Application ID: <b>{farmerVerification.id || "KYC-PENDING"}</b> · Mobile: <b>{farmerVerification.mobile || "Not provided"}</b></small>
               </div>
               <div style={{ textAlign: "right" }}>
-                <small style={{ display: "block", color: "#666" }}>Submitted: {farmerVerification.submittedAt ? new Date(farmerVerification.submittedAt).toLocaleDateString("en-IN") : "Recently"}</small>
+                <small style={{ display: "block", color: "var(--text-muted)" }}>Submitted: {farmerVerification.submittedAt ? new Date(farmerVerification.submittedAt).toLocaleDateString("en-IN") : "Recently"}</small>
                 {farmerVerification.reviewedAt && (
                   <small style={{ display: "block", color: "#15803d" }}>Reviewed: {new Date(farmerVerification.reviewedAt).toLocaleDateString("en-IN")}</small>
                 )}
@@ -6614,8 +6629,8 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
               <div style={{ background: "#f9fcf9", padding: "12px", borderRadius: "8px", border: "1px solid #e1eee3" }}>
-                <strong style={{ color: "#175034", display: "block", marginBottom: "6px" }}>🪪 Identity Record</strong>
-                <div style={{ fontSize: "0.88rem", color: "#333", lineHeight: "1.6" }}>
+                <strong style={{ color: "var(--primary)", display: "block", marginBottom: "6px" }}>🪪 Identity Record</strong>
+                <div style={{ fontSize: "0.88rem", color: "var(--text-main)", lineHeight: "1.6" }}>
                   <div>Document: <b>{farmerVerification.idType || "Aadhaar Card"}</b></div>
                   <div>ID Number: <b>{farmerVerification.idNumber ? `XXXX-XXXX-${farmerVerification.idNumber.slice(-4)}` : "Verified"}</b></div>
                   <div style={{ marginTop: "4px" }}>
@@ -6627,8 +6642,8 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
               </div>
 
               <div style={{ background: "#f9fcf9", padding: "12px", borderRadius: "8px", border: "1px solid #e1eee3" }}>
-                <strong style={{ color: "#175034", display: "block", marginBottom: "6px" }}>🌾 Land Title &amp; Survey (Khasra)</strong>
-                <div style={{ fontSize: "0.88rem", color: "#333", lineHeight: "1.6" }}>
+                <strong style={{ color: "var(--primary)", display: "block", marginBottom: "6px" }}>🌾 Land Title &amp; Survey (Khasra)</strong>
+                <div style={{ fontSize: "0.88rem", color: "var(--text-main)", lineHeight: "1.6" }}>
                   <div>Location: <b>{farmerVerification.village || "Rural Cluster"}, {farmerVerification.landDistrict || "District"}, {farmerVerification.landState || "State"}</b></div>
                   <div>Khasra Survey: <b>{farmerVerification.khasraNumber ? `Khasra ${farmerVerification.khasraNumber}` : "Registered Land"}</b> ({farmerVerification.landAcres || "0"} Acres)</div>
                   <div>Crops: <b>{farmerVerification.cropsGrown || "Seasonal Produce"}</b></div>
@@ -6641,8 +6656,8 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
               </div>
 
               <div style={{ background: "#f9fcf9", padding: "12px", borderRadius: "8px", border: "1px solid #e1eee3" }}>
-                <strong style={{ color: "#175034", display: "block", marginBottom: "6px" }}>🏦 Bank Payout &amp; FPO</strong>
-                <div style={{ fontSize: "0.88rem", color: "#333", lineHeight: "1.6" }}>
+                <strong style={{ color: "var(--primary)", display: "block", marginBottom: "6px" }}>🏦 Bank Payout &amp; FPO</strong>
+                <div style={{ fontSize: "0.88rem", color: "var(--text-main)", lineHeight: "1.6" }}>
                   <div>Bank: <b>{farmerVerification.bankName || "Verified Bank"}</b></div>
                   <div>Account: <b>{farmerVerification.accountNumber ? `XXXXXX${farmerVerification.accountNumber.slice(-4)}` : "Registered"}</b></div>
                   <div>IFSC: <b>{farmerVerification.ifsc || "Registered"}</b> · UPI: <b>{farmerVerification.upiId || "Registered"}</b></div>
@@ -6652,7 +6667,7 @@ function AdminView({ session, lots, orders, produceRequests, bulkRequests, logis
             </div>
 
           {farmerVerification?.reviewerNote && (
-            <div style={{ marginTop: "14px", padding: "10px 14px", borderRadius: "8px", background: "#f0f8ee", border: "1px solid #d2e7ce", fontSize: "0.86rem", color: "#255738" }}>
+            <div style={{ marginTop: "14px", padding: "10px 14px", borderRadius: "8px", background: "var(--surface-raised)", border: "1px solid #d2e7ce", fontSize: "0.86rem", color: "var(--text-muted)" }}>
               <b>Current Review Note:</b> {farmerVerification.reviewerNote}
             </div>
           )}

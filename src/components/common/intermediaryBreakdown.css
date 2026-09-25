@@ -1,0 +1,167 @@
+/* IntermediaryPriceBreakdown — SIH PS 26033
+   Visually proves FarmLink eliminates intermediaries that reduce farmer earnings
+   and inflate consumer prices. */
+
+.intermediary-breakdown-card {
+  border: 2px solid #059669;
+  border-radius: 16px;
+  overflow: hidden;
+  margin: 20px 0;
+  background: var(--surface-raised, #ffffff);
+}
+
+/* ── Header ── */
+.ib-header {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #ffffff;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ib-header-icon {
+  font-size: 1.1rem;
+}
+
+.ib-header-title {
+  font-weight: 800;
+  font-size: 0.9rem;
+  flex: 1;
+  letter-spacing: 0.03em;
+}
+
+.ib-sih-badge {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ── Two-column layout ── */
+.ib-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+.ib-col {
+  padding: 16px;
+}
+
+.ib-col-traditional {
+  background: #fff5f5;
+  border-right: 1px solid #e2e8f0;
+}
+
+.ib-col-farmlink {
+  background: #f0fdf4;
+}
+
+/* ── Column headers ── */
+.ib-col-header {
+  font-weight: 800;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.ib-col-traditional .ib-col-header {
+  color: #dc2626;
+}
+
+.ib-col-farmlink .ib-col-header {
+  color: #059669;
+}
+
+/* ── Row items ── */
+.ib-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 0.82rem;
+}
+
+.ib-label {
+  color: var(--text-muted, #6b7280);
+}
+
+.ib-value {
+  font-weight: 600;
+}
+
+.ib-value-low {
+  color: #dc2626;
+}
+
+.ib-value-high {
+  color: #059669;
+  font-weight: 800;
+}
+
+/* ── Eliminated row ── */
+.ib-row-eliminated .ib-label {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.ib-eliminated {
+  color: #059669;
+  font-weight: 800;
+  font-size: 0.78rem;
+}
+
+/* ── Consumer total row ── */
+.ib-consumer-row {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 2px solid rgba(0, 0, 0, 0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.ib-consumer-price {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.ib-price-high {
+  color: #dc2626;
+}
+
+.ib-price-low {
+  color: #059669;
+}
+
+/* ── Dark mode ── */
+[data-theme="dark"] .ib-col-traditional {
+  background: #1a0000;
+}
+
+[data-theme="dark"] .ib-col-farmlink {
+  background: #001a0a;
+}
+
+[data-theme="dark"] .ib-col-traditional,
+[data-theme="dark"] .ib-col-farmlink {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .ib-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .ib-col-traditional {
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
+}

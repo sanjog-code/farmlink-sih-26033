@@ -8,29 +8,74 @@ import { CROP_INTELLIGENCE } from './cropIntelligence.js';
 export function parseGoalEntities(text = '') {
   const lower = text.toLowerCase();
 
-  // Match crop with safe resolver
-  const resolved = tools.getCropProfile ? tools.getCropProfile(text) : null;
-  let matchedCrop = resolved ? resolved.name : 'Rapeseed & mustard';
+  // Match crop with dynamic scanner
+  let matchedCrop = null;
 
-  // Explicit Hindi / common aliases override
-  if (lower.includes('सरसों') || lower.includes('sarson') || lower.includes('mustard')) matchedCrop = 'Rapeseed & mustard';
-  else if (lower.includes('गेहूं') || lower.includes('गेहूँ') || lower.includes('gehu') || lower.includes('wheat')) matchedCrop = 'Wheat';
+  // 1. Direct check against CROP_INTELLIGENCE keys
+  if (typeof CROP_INTELLIGENCE === 'object') {
+    for (const cropKey of Object.keys(CROP_INTELLIGENCE)) {
+      if (lower.includes(cropKey.toLowerCase())) {
+        matchedCrop = cropKey;
+        break;
+      }
+    }
+  }
+
+  // 2. Comprehensive Hindi / regional aliases
+  if (lower.includes('सरसों') || lower.includes('sarson') || lower.includes('mustard') || lower.includes('raya')) matchedCrop = 'Rapeseed & mustard';
+  else if (lower.includes('गेहूं') || lower.includes('गेहूँ') || lower.includes('gehu') || lower.includes('wheat') || lower.includes('kanak')) matchedCrop = 'Wheat';
   else if (lower.includes('टमाटर') || lower.includes('tamatar') || lower.includes('tomato')) matchedCrop = 'Tomato';
   else if (lower.includes('चना') || lower.includes('chana') || lower.includes('gram') || lower.includes('chickpea')) matchedCrop = 'Chickpea (Gram)';
-  else if (lower.includes('मक्का') || lower.includes('makka') || lower.includes('maize')) matchedCrop = 'Maize';
+  else if (lower.includes('मक्का') || lower.includes('makka') || lower.includes('maize') || lower.includes('corn')) matchedCrop = 'Maize';
   else if (lower.includes('बाजरा') || lower.includes('bajra')) matchedCrop = 'Pearl millet (Bajra)';
+  else if (lower.includes('ज्वार') || lower.includes('jowar') || lower.includes('sorghum')) matchedCrop = 'Sorghum (Jowar)';
   else if (lower.includes('मूंग') || lower.includes('moong')) matchedCrop = 'Green gram (Moong)';
-  else if (lower.includes('प्याज') || lower.includes('pyaz') || lower.includes('onion')) matchedCrop = 'Onion';
-  else if (lower.includes('आलू') || lower.includes('aaloo') || lower.includes('potato')) matchedCrop = 'Potato';
+  else if (lower.includes('उड़द') || lower.includes('urad')) matchedCrop = 'Black gram (Urad)';
+  else if (lower.includes('प्याज') || lower.includes('pyaz') || lower.includes('onion') || lower.includes('kanda')) matchedCrop = 'Onion';
+  else if (lower.includes('आलू') || lower.includes('aaloo') || lower.includes('potato') || lower.includes('aalu')) matchedCrop = 'Potato';
+  else if (lower.includes('लहसुन') || lower.includes('garlic') || lower.includes('lahsun')) matchedCrop = 'Garlic';
+  else if (lower.includes('अदरक') || lower.includes('ginger') || lower.includes('adrak')) matchedCrop = 'Ginger';
+  else if (lower.includes('धान') || lower.includes('चावल') || lower.includes('rice') || lower.includes('paddy')) matchedCrop = 'Rice';
+  else if (lower.includes('सोयाबीन') || lower.includes('soybean') || lower.includes('soya')) matchedCrop = 'Soybean';
+  else if (lower.includes('कपास') || lower.includes('cotton') || lower.includes('kapas')) matchedCrop = 'Cotton';
+  else if (lower.includes('जीरा') || lower.includes('cumin') || lower.includes('jeera')) matchedCrop = 'Cumin';
+  else if (lower.includes('हल्दी') || lower.includes('turmeric') || lower.includes('haldi')) matchedCrop = 'Turmeric';
+  else if (lower.includes('धनिया') || lower.includes('coriander')) matchedCrop = 'Coriander seed';
+  else if (lower.includes('सेब') || lower.includes('apple')) matchedCrop = 'Apple';
+  else if (lower.includes('केला') || lower.includes('banana')) matchedCrop = 'Banana';
+  else if (lower.includes('अनार') || lower.includes('pomegranate')) matchedCrop = 'Pomegranate';
 
-  // Extract quantity if mentioned (e.g. "500kg", "500 kg", "2 टन", "2 ton", "5 quintal")
+  // 3. Fallback to tools.getCropProfile
+  if (!matchedCrop && tools.getCropProfile) {
+    const resolved = tools.getCropProfile(text);
+    if (resolved?.name) matchedCrop = resolved.name;
+  }
+
+  const hasExplicitCrop = Boolean(matchedCrop);
+  if (!matchedCrop) {
+    if (lower.includes('सब्जी') || lower.includes('vegetable')) matchedCrop = 'Tomato';
+    else if (lower.includes('दाल') || lower.includes('pulse')) matchedCrop = 'Chickpea (Gram)';
+    else if (lower.includes('तेल') || lower.includes('oilseed')) matchedCrop = 'Rapeseed & mustard';
+    else matchedCrop = 'Wheat'; // Natural primary staple for North India
+  }
+
+  // Extract quantity if mentioned (e.g. "500kg", "500 kg", "2 टन", "2 ton", "5 quintal", "100")
   let quantityKg = 500;
-  const numMatch = lower.match(/(\d+)\s*(?:kg|किलो|किग्रा|कट्टा|बोरी|ton|टन|quintal|क्विंटल)/);
+  let hasExplicitQuantity = false;
+  const numMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:kg|किलो|किग्रा|कट्टा|बोरी|ton|टन|quintal|क्विंटल|qtl)/);
   if (numMatch) {
-    const rawVal = parseInt(numMatch[1], 10);
-    if (lower.includes('ton') || lower.includes('टन')) quantityKg = rawVal * 1000;
-    else if (lower.includes('quintal') || lower.includes('क्विंटल')) quantityKg = rawVal * 100;
-    else quantityKg = rawVal;
+    hasExplicitQuantity = true;
+    const rawVal = parseFloat(numMatch[1]);
+    if (lower.includes('ton') || lower.includes('टन')) quantityKg = Math.round(rawVal * 1000);
+    else if (lower.includes('quintal') || lower.includes('क्विंटल') || lower.includes('qtl')) quantityKg = Math.round(rawVal * 100);
+    else if (lower.includes('कट्टा') || lower.includes('बोरी')) quantityKg = Math.round(rawVal * 50);
+    else quantityKg = Math.round(rawVal);
+  } else {
+    const bareNum = lower.match(/\b(\d{2,5})\b/);
+    if (bareNum) {
+      hasExplicitQuantity = true;
+      quantityKg = parseInt(bareNum[1], 10);
+    }
   }
 
   // Detect primary intent
@@ -49,7 +94,7 @@ export function parseGoalEntities(text = '') {
     intent = 'SPOILAGE_AUDIT';
   }
 
-  return { matchedCrop, quantityKg, intent };
+  return { matchedCrop, quantityKg, intent, hasExplicitCrop, hasExplicitQuantity };
 }
 
 // Built-in Deterministic Agricultural ReAct Reasoning Loop
@@ -60,7 +105,7 @@ async function runAutonomousEdgeAgent({
   runtimeContext = {},
   onStep = () => {}
 }) {
-  const { matchedCrop, quantityKg, intent } = parseGoalEntities(goal);
+  const { matchedCrop, quantityKg, intent, hasExplicitCrop, hasExplicitQuantity } = parseGoalEntities(goal);
   const isHindi = language === 'hi';
 
   const steps = [];
@@ -73,11 +118,15 @@ async function runAutonomousEdgeAgent({
     await new Promise(r => setTimeout(r, 280));
   };
 
+  const entitySummary = hasExplicitCrop
+    ? (hasExplicitQuantity ? `${matchedCrop} (${quantityKg} kg)` : `${matchedCrop}`)
+    : `${matchedCrop} (Regional benchmark)`;
+
   await logStep({
     type: 'thought',
     content: isHindi
-      ? `प्राप्त उद्देश्य: "${goal}"। उपयोगकर्ता भूमिका: ${userRole.toUpperCase()}। फसल की पहचान: ${matchedCrop}, मात्रा: ${quantityKg} किग्रा। प्राथमिक विश्लेषण योजना तैयार की जा रही है...`
-      : `Received objective: "${goal}". User role: ${userRole.toUpperCase()}. Identified entity: ${matchedCrop}, quantity: ${quantityKg} kg. Formulating tool execution plan...`
+      ? `प्राप्त उद्देश्य: "${goal}"। उपयोगकर्ता भूमिका: ${userRole.toUpperCase()}। लक्षित संदर्भ: ${entitySummary}। प्राथमिक विश्लेषण योजना तैयार की जा रही है...`
+      : `Received objective: "${goal}". User role: ${userRole.toUpperCase()}. Identified context: ${entitySummary}. Formulating tool execution plan...`
   });
 
   // Step 1: Always check live Mandi vs MSP floor

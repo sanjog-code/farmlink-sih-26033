@@ -67,7 +67,7 @@ export default function AgenticCopilot({
       'AQ.Ab8RN6KcU5BBNvGVAZvk4UfYKkENTK70eRqkqUpT6L6gRUU2Cg'
     );
   });
-  const [geminiModel, setGeminiModel] = useState('gemini-3.6-flash');
+  const [geminiModel, setGeminiModel] = useState('gemini-1.5-flash');
   const [useGemini, setUseGemini] = useState(true);
   const [keyStatus, setKeyStatus] = useState('');
 
@@ -637,9 +637,9 @@ export default function AgenticCopilot({
                       onChange={(e) => setGeminiModel(e.target.value)}
                       style={{ padding: '2px 6px', fontSize: '0.75rem' }}
                     >
-                      <option value="gemini-3.6-flash">Gemini 3.6 Flash (Recommended)</option>
-                      <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                      <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                      <option value="gemini-1.5-flash">KANAK AI 1.5 Flash (Recommended)</option>
+                      <option value="gemini-2.0-flash">KANAK AI 2.0 Flash</option>
+                      <option value="gemini-1.5-pro">KANAK AI 1.5 Pro</option>
                     </select>
                   </div>
                   {keyStatus && <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: '#203929' }}>{keyStatus}</p>}

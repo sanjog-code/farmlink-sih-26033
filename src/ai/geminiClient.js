@@ -5,9 +5,9 @@ import { AGENT_TOOLS_SPECS } from './agentTools.js';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-export async function testGeminiConnection(apiKey, model = 'gemini-3.6-flash') {
+export async function testGeminiConnection(apiKey, model = 'gemini-1.5-flash') {
   if (!apiKey || !apiKey.trim()) throw new Error('Gemini API key is required.');
-  const targetModel = (model === 'gemini-2.5-flash' || !model) ? 'gemini-3.6-flash' : model;
+  const targetModel = (model && model !== 'gemini-3.6-flash') ? model : 'gemini-1.5-flash';
   const url = `${GEMINI_API_BASE}/${targetModel}:generateContent?key=${apiKey.trim()}`;
   const res = await fetch(url, {
     method: 'POST',
@@ -64,7 +64,7 @@ export function executeToolByName(name, args, runtimeContext = {}) {
 // Master Gemini Function Calling Loop
 export async function runGeminiAgent({
   apiKey,
-  model = 'gemini-2.5-flash',
+  model = 'gemini-1.5-flash',
   goal,
   userRole = 'farmer',
   language = 'en',
@@ -95,7 +95,7 @@ Guidelines:
   };
 
   const geminiTools = getGeminiToolsDeclaration();
-  const targetModel = (!model || model === 'gemini-2.5-flash' || model === 'gemini-1.5-flash') ? 'gemini-3.6-flash' : model;
+  const targetModel = (model && model !== 'gemini-3.6-flash') ? model : 'gemini-1.5-flash';
   const url = `${GEMINI_API_BASE}/${targetModel}:generateContent?key=${apiKey.trim()}`;
 
   const contents = [

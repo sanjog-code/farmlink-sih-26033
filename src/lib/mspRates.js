@@ -18,14 +18,15 @@ const DEFAULT_MSP_RATES = {
   "Moong": { price: 86.82, season: "KMS 2025-26", source: "https://cacp.dacnet.nic.in", isOfficial: true },
   "Urad": { price: 74.00, season: "KMS 2025-26", source: "https://cacp.dacnet.nic.in", isOfficial: true },
   "Tur (Arhar)": { price: 75.50, season: "KMS 2025-26", source: "https://cacp.dacnet.nic.in", isOfficial: true },
-  // Perishables & Horticulture: Minimum Floor under Operation Greens & Market Intervention Scheme (MIS)
-  "Tomato": { price: 18.00, season: "MIS 2026", source: "https://agriwelfare.gov.in", isOfficial: true },
-  "Potato": { price: 14.50, season: "MIS 2026", source: "https://agriwelfare.gov.in", isOfficial: true },
-  "Onion": { price: 16.50, season: "MIS 2026", source: "https://agriwelfare.gov.in", isOfficial: true },
-  "Apple": { price: 65.00, season: "MIS 2026", source: "https://agriwelfare.gov.in", isOfficial: true },
-  "Garlic": { price: 95.00, season: "MIS 2026", source: "https://agriwelfare.gov.in", isOfficial: true },
-  "Ginger": { price: 55.00, season: "MIS 2026", source: "https://agriwelfare.gov.in", isOfficial: true },
-  "Turmeric": { price: 78.00, season: "MIS 2026", source: "https://agriwelfare.gov.in", isOfficial: true },
+  // Perishables: FarmLink Transparent Farmgate Benchmark (NOT CACP MSP)
+  // CACP does NOT notify MSP for vegetables or fruits — these are market-derived farmgate benchmarks
+  "Tomato": { price: 18.00, season: "Operation Greens 2026", source: "https://agriwelfare.gov.in", isOfficial: false, benchmarkType: "farmgate_benchmark" },
+  "Potato": { price: 14.50, season: "Operation Greens 2026", source: "https://agriwelfare.gov.in", isOfficial: false, benchmarkType: "farmgate_benchmark" },
+  "Onion": { price: 16.50, season: "Operation Greens 2026", source: "https://agriwelfare.gov.in", isOfficial: false, benchmarkType: "farmgate_benchmark" },
+  "Apple": { price: 65.00, season: "Market Benchmark 2026", source: "https://agriwelfare.gov.in", isOfficial: false, benchmarkType: "farmgate_benchmark" },
+  "Garlic": { price: 95.00, season: "Market Benchmark 2026", source: "https://agriwelfare.gov.in", isOfficial: false, benchmarkType: "farmgate_benchmark" },
+  "Ginger": { price: 55.00, season: "Market Benchmark 2026", source: "https://agriwelfare.gov.in", isOfficial: false, benchmarkType: "farmgate_benchmark" },
+  "Turmeric": { price: 78.00, season: "Market Benchmark 2026", source: "https://agriwelfare.gov.in", isOfficial: false, benchmarkType: "farmgate_benchmark" },
 };
 
 const STORAGE_KEY = "farmlink_live_msp_rates";
@@ -60,8 +61,8 @@ export function getMspFloorForCrop(cropName) {
     }
   }
 
-  // Fallback defaults for common agricultural goods
-  return { price: 15.00, season: "Market Floor", source: "https://agriwelfare.gov.in", isOfficial: false };
+  // Fallback: no recognised floor for this crop — hide the badge
+  return { price: null, season: '', source: '', isOfficial: false, benchmarkType: null };
 }
 
 export function updateMspRate(cropName, pricePerKg, season = "Updated 2026", source = "https://cacp.dacnet.nic.in") {
