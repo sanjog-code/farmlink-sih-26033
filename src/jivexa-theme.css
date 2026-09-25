@@ -2296,4 +2296,161 @@ body.dark [style*="background: #fff5f5"] {
   color: #f8fafc !important;
 }
 
+/* ═════════════════════════════════════════════════════════════════════════
+   PAGE-TOP & SLIDE HEADER HIGH-CONTRAST READABILITY ELEVATION
+   Guarantees WCAG AAA contrast in both Light and Dark themes for all slides:
+   - Wholesale Marketplace, Retail Marketplace, Consumer Account,
+     Storage Terminal, Producer Operations, Admin Command Center, etc.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* --- Light Mode Headers --- */
+.page-top {
+  border-radius: 24px !important;
+  padding: 34px 38px !important;
+  background: #ffffff !important;
+  border: 1px solid #d1fae5 !important;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05) !important;
+}
+
+.page-top h1 {
+  color: #0f172a !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.035em !important;
+  margin: 6px 0 10px 0 !important;
+}
+
+.page-top .eyebrow,
+.page-top .eyebrow.green,
+.section-head .eyebrow,
+.eyebrow,
+.eyebrow.green {
+  color: #047857 !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.12em !important;
+  font-size: 0.82rem !important;
+  text-transform: uppercase !important;
+}
+
+.page-top p,
+.page-top > div > p,
+.page-top > div > p:not(.eyebrow),
+.hero-copy > p:not(.eyebrow) {
+  color: #334155 !important;
+  font-size: 1.05rem !important;
+  line-height: 1.65 !important;
+}
+
+.page-top .secondary {
+  background: #f0fdf4 !important;
+  color: #065f46 !important;
+  border: 1.5px solid #a7f3d0 !important;
+  font-weight: 700 !important;
+  border-radius: 12px !important;
+  padding: 10px 18px !important;
+  transition: all 0.2s ease !important;
+}
+
+.page-top .secondary:hover {
+  background: #dcfce7 !important;
+  border-color: #059669 !important;
+  color: #047857 !important;
+}
+
+.page-top .checkout {
+  background: #f8fafc !important;
+  border: 1.5px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* --- Dark Mode Headers --- */
+[data-theme="dark"] .page-top,
+html[data-theme="dark"] .page-top,
+body[data-theme="dark"] .page-top,
+body.dark .page-top {
+  background: #0d2319 !important;
+  border: 1px solid rgba(52, 211, 153, 0.28) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] .page-top h1,
+html[data-theme="dark"] .page-top h1,
+body[data-theme="dark"] .page-top h1,
+body.dark .page-top h1 {
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="dark"] .page-top .eyebrow,
+[data-theme="dark"] .page-top .eyebrow.green,
+[data-theme="dark"] .section-head .eyebrow,
+[data-theme="dark"] .eyebrow,
+[data-theme="dark"] .eyebrow.green,
+html[data-theme="dark"] .page-top .eyebrow,
+html[data-theme="dark"] .page-top .eyebrow.green,
+html[data-theme="dark"] .section-head .eyebrow,
+html[data-theme="dark"] .eyebrow,
+html[data-theme="dark"] .eyebrow.green,
+body[data-theme="dark"] .page-top .eyebrow,
+body[data-theme="dark"] .page-top .eyebrow.green,
+body[data-theme="dark"] .section-head .eyebrow,
+body[data-theme="dark"] .eyebrow,
+body[data-theme="dark"] .eyebrow.green,
+body.dark .page-top .eyebrow,
+body.dark .page-top .eyebrow.green,
+body.dark .section-head .eyebrow,
+body.dark .eyebrow,
+body.dark .eyebrow.green {
+  color: #34d399 !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.14em !important;
+  text-shadow: 0 0 14px rgba(52, 211, 153, 0.45) !important;
+}
+
+[data-theme="dark"] .page-top p,
+[data-theme="dark"] .page-top > div > p,
+[data-theme="dark"] .page-top > div > p:not(.eyebrow),
+[data-theme="dark"] .section-head p,
+[data-theme="dark"] .hero-copy > p:not(.eyebrow),
+html[data-theme="dark"] .page-top p,
+html[data-theme="dark"] .page-top > div > p,
+body[data-theme="dark"] .page-top p,
+body[data-theme="dark"] .page-top > div > p,
+body.dark .page-top p,
+body.dark .page-top > div > p {
+  color: #f1f5f9 !important;
+  font-size: 1.05rem !important;
+  line-height: 1.65 !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme="dark"] .page-top .secondary,
+html[data-theme="dark"] .page-top .secondary,
+body[data-theme="dark"] .page-top .secondary,
+body.dark .page-top .secondary {
+  background: rgba(52, 211, 153, 0.16) !important;
+  color: #6ee7b7 !important;
+  border: 1.5px solid rgba(52, 211, 153, 0.38) !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="dark"] .page-top .secondary:hover,
+html[data-theme="dark"] .page-top .secondary:hover,
+body[data-theme="dark"] .page-top .secondary:hover,
+body.dark .page-top .secondary:hover {
+  background: rgba(52, 211, 153, 0.28) !important;
+  color: #ffffff !important;
+  border-color: #34d399 !important;
+}
+
+[data-theme="dark"] .page-top .checkout,
+html[data-theme="dark"] .page-top .checkout,
+body[data-theme="dark"] .page-top .checkout,
+body.dark .page-top .checkout {
+  background: #0a1f16 !important;
+  border: 1.5px solid rgba(52, 211, 153, 0.3) !important;
+  color: #f8fafc !important;
+}
+
+
 

@@ -16,15 +16,18 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 .eyebrow {
-  color: #136240 !important;
+  color: var(--primary, #047857);
   font-weight: 800 !important;
   letter-spacing: 0.12em !important;
+  font-size: 0.82rem !important;
+  text-transform: uppercase !important;
 }
 .page-top p, .hero-copy>p:not(.eyebrow) {
-  color: #243d31 !important;
+  color: var(--text-muted, #334155);
+  line-height: 1.6 !important;
 }
 small, .lot p, .bulk p, .service-card p {
-  color: #2d4539;
+  color: var(--text-muted, #334155);
 }
 label {
   color: #133827 !important;
