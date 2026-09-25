@@ -42,6 +42,17 @@ export default function FarmerExperience({
     }
   });
 
+  useEffect(() => {
+    const handleOpenListing = () => {
+      setFarmerMode('classic');
+      try {
+        localStorage.setItem(FARMER_MODE_STORAGE_KEY, 'classic');
+      } catch (_) {}
+    };
+    window.addEventListener('farmlink_open_listing_form', handleOpenListing);
+    return () => window.removeEventListener('farmlink_open_listing_form', handleOpenListing);
+  }, []);
+
   const handleSelectMode = (mode) => {
     setFarmerMode(mode);
     try {

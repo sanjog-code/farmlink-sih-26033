@@ -317,41 +317,89 @@ export default function SaarthiScreen({
           {/* ACTION CONFIRMATION CARD (IF REQUIRING USER APPROVAL) */}
           {pendingAction && (
             <div className="saarthi-confirmation-card">
-              <div className="saarthi-confirmation-summary">
-                <div className="saarthi-crop-badge">
-                  {pendingAction.crop === 'Wheat' ? '🌾' : pendingAction.crop === 'Onion' ? '🧅' : pendingAction.crop === 'Mustard' ? '🟡' : '🌱'}
-                </div>
-                <div className="saarthi-confirmation-details">
-                  <h4>{pendingAction.crop || 'फसल'} की लिस्टिंग पुष्टि</h4>
-                  <p>
-                    मात्रा: <b>{pendingAction.quantityKg} किग्रा ({Math.round(pendingAction.quantityKg / 100 * 10) / 10} क्विंटल)</b> · भाव: <b>₹{pendingAction.pricePerKg}/किग्रा</b>
-                    {pendingAction.mspProtected && (
-                      <span style={{ display: 'block', color: '#059669', fontWeight: 700, fontSize: '0.8rem', marginTop: '2px' }}>
-                        ✓ आधिकारिक सरकारी MSP सुरक्षित
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
+              {pendingAction.type === 'OPEN_LISTING_FORM' ? (
+                <>
+                  <div className="saarthi-confirmation-summary">
+                    <div className="saarthi-crop-badge">🌾</div>
+                    <div className="saarthi-confirmation-details">
+                      <h4>फसल लिस्टिंग फॉर्म खोलें</h4>
+                      <p>सीधे खेत से अपनी उपज बेचने के लिए लिस्टिंग फॉर्म खोलें।</p>
+                    </div>
+                  </div>
+                  <div className="saarthi-confirmation-buttons">
+                    <button
+                      type="button"
+                      className="saarthi-confirm-btn yes"
+                      onClick={() => {
+                        onClose();
+                        window.dispatchEvent(new CustomEvent('farmlink_open_listing_form'));
+                      }}
+                    >
+                      <PackageCheck size={20} /> लिस्टिंग फॉर्म खोलें ➔
+                    </button>
+                  </div>
+                </>
+              ) : pendingAction.type === 'SCROLL_ENWR' ? (
+                <>
+                  <div className="saarthi-confirmation-summary">
+                    <div className="saarthi-crop-badge">💰</div>
+                    <div className="saarthi-confirmation-details">
+                      <h4>50% e-NWR एडवांस ऋण</h4>
+                      <p>WDRA प्रमाणित गोदाम में अपनी फसल रखकर तुरंत 50% वर्किंग कैपिटल अग्रिम पाएं।</p>
+                    </div>
+                  </div>
+                  <div className="saarthi-confirmation-buttons">
+                    <button
+                      type="button"
+                      className="saarthi-confirm-btn yes"
+                      onClick={() => {
+                        onClose();
+                        window.dispatchEvent(new CustomEvent('farmlink_scroll_enwr'));
+                      }}
+                    >
+                      <Coins size={20} /> e-NWR एडवांस देखें ➔
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="saarthi-confirmation-summary">
+                    <div className="saarthi-crop-badge">
+                      {pendingAction.crop === 'Wheat' ? '🌾' : pendingAction.crop === 'Onion' ? '🧅' : pendingAction.crop === 'Mustard' ? '🟡' : '🌱'}
+                    </div>
+                    <div className="saarthi-confirmation-details">
+                      <h4>{pendingAction.crop || 'फसल'} की लिस्टिंग पुष्टि</h4>
+                      <p>
+                        मात्रा: <b>{pendingAction.quantityKg} किग्रा ({Math.round(pendingAction.quantityKg / 100 * 10) / 10} क्विंटल)</b> · भाव: <b>₹{pendingAction.pricePerKg}/किग्रा</b>
+                        {pendingAction.mspProtected && (
+                          <span style={{ display: 'block', color: '#059669', fontWeight: 700, fontSize: '0.8rem', marginTop: '2px' }}>
+                            ✓ आधिकारिक सरकारी MSP सुरक्षित
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
 
-              <div className="saarthi-confirmation-buttons">
-                <button
-                  type="button"
-                  className="saarthi-confirm-btn yes"
-                  onClick={() => handleConfirm(true)}
-                  disabled={status === 'PROCESSING'}
-                >
-                  <Check size={20} /> हाँ, ठीक है
-                </button>
-                <button
-                  type="button"
-                  className="saarthi-confirm-btn no"
-                  onClick={() => handleConfirm(false)}
-                  disabled={status === 'PROCESSING'}
-                >
-                  <X size={20} /> नहीं, बदलो
-                </button>
-              </div>
+                  <div className="saarthi-confirmation-buttons">
+                    <button
+                      type="button"
+                      className="saarthi-confirm-btn yes"
+                      onClick={() => handleConfirm(true)}
+                      disabled={status === 'PROCESSING'}
+                    >
+                      <Check size={20} /> हाँ, ठीक है
+                    </button>
+                    <button
+                      type="button"
+                      className="saarthi-confirm-btn no"
+                      onClick={() => handleConfirm(false)}
+                      disabled={status === 'PROCESSING'}
+                    >
+                      <X size={20} /> नहीं, बदलो
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

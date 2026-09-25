@@ -1067,6 +1067,43 @@ function App() {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+  // Live cross-tab and Saarthi action event listener
+  useEffect(() => {
+    const handleOrderCreated = () => {
+      setLiveTick((t) => t + 1);
+    };
+    const handleStorage = (e) => {
+      if (e.key === "farmlink_orders_store_latest" || e.key === "farmlink_data_sync") {
+        setLiveTick((t) => t + 1);
+      }
+    };
+    const handleOpenListing = () => {
+      if (!session || session.role !== "farmer") {
+        setSession({ role: "farmer", name: "Kisan Producer", label: "Farmer", userId: "farmer-saarthi-demo" });
+      }
+      setView("farmer");
+      notify("खेत से उपज लिस्टिंग फॉर्म खुल गया है।");
+    };
+    const handleScrollEnwr = () => {
+      if (!session || session.role !== "farmer") {
+        setSession({ role: "farmer", name: "Kisan Producer", label: "Farmer", userId: "farmer-saarthi-demo" });
+      }
+      setView("farmer");
+      notify("e-NWR 50% वर्किंग कैपिटल एडवांस अनुभाग खोला गया।");
+    };
+
+    window.addEventListener("farmlink_order_created", handleOrderCreated);
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("farmlink_open_listing_form", handleOpenListing);
+    window.addEventListener("farmlink_scroll_enwr", handleScrollEnwr);
+
+    return () => {
+      window.removeEventListener("farmlink_order_created", handleOrderCreated);
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("farmlink_open_listing_form", handleOpenListing);
+      window.removeEventListener("farmlink_scroll_enwr", handleScrollEnwr);
+    };
+  }, [session]);
   const toastTimerRef = useRef(null);
   const lastToastRef = useRef({ msg: "", time: 0 });
   const notify = (m) => {
@@ -5107,8 +5144,21 @@ function FarmerOperations({ notify, session, liveTick, listingPrefill, farmerVer
     [quotes, setQuotes] = useState([]),
     [counterOffers, setCounterOffers] = useState({}),
     [counterNotes, setCounterNotes] = useState({}),
-    [farmerListings, setFarmerListings] = useState(() => getUserListings()),
-    [farmerOrders, setFarmerOrders] = useState([]),
+    [farmerOrders, setFarmerOrders] = useState(() => {
+      const stored = getUserOrders();
+      return stored.map((o) => ({
+        id: o.id,
+        quantity_kg: o.quantity || o.items?.reduce((s, i) => s + (Number(i.quantityKg) || 0), 0) || 100,
+        unit_price: o.subtotal ? Math.round(o.subtotal / (o.quantity || 100)) : (o.lineItems?.[0]?.price || 25),
+        produce_lots: { crop: o.crop || o.lineItems?.[0]?.crop || "Fresh Produce" },
+        consumer_orders: {
+          order_code: o.id,
+          status: o.status || "Pending verification",
+          created_at: o.createdAt,
+          warehouses: { name: o.pickupWarehouse || "Jaipur North WDRA Hub" }
+        }
+      }));
+    }),
     [farmerJobs, setFarmerJobs] = useState([]),
     [listingFloor, setListingFloor] = useState(() => {
       const f = getMspFloorForCrop("Tomato");
@@ -5175,6 +5225,32 @@ function FarmerOperations({ notify, session, liveTick, listingPrefill, farmerVer
       if (jobsResult.error) console.warn("Farmer jobs load error:", jobsResult.error.message); else setFarmerJobs(jobsResult.data || []);
     });
   }, [session?.userId, liveTick]);
+  useEffect(() => {
+    const syncLocalOrders = () => {
+      const stored = getUserOrders();
+      if (!stored.length) return;
+      const mapped = stored.map((o) => ({
+        id: o.id,
+        quantity_kg: o.quantity || o.items?.reduce((s, i) => s + (Number(i.quantityKg) || 0), 0) || 100,
+        unit_price: o.subtotal ? Math.round(o.subtotal / (o.quantity || 100)) : (o.lineItems?.[0]?.price || 25),
+        produce_lots: { crop: o.crop || o.lineItems?.[0]?.crop || "Fresh Produce" },
+        consumer_orders: {
+          order_code: o.id,
+          status: o.status || "Pending verification",
+          created_at: o.createdAt,
+          warehouses: { name: o.pickupWarehouse || "Jaipur North WDRA Hub" }
+        }
+      }));
+      setFarmerOrders((prev) => {
+        const ids = new Set(prev.map(x => x.id));
+        const newOnes = mapped.filter(x => !ids.has(x.id));
+        return newOnes.length ? [...newOnes, ...prev] : prev;
+      });
+    };
+    syncLocalOrders();
+    window.addEventListener("farmlink_order_created", syncLocalOrders);
+    return () => window.removeEventListener("farmlink_order_created", syncLocalOrders);
+  }, [liveTick]);
   const respondToQuote = async (request, quote, action) => {
     const { error } = await supabase.rpc("respond_to_bulk_quote", { p_request_id: request.id, p_quote_id: quote.id, p_action: action });
     if (error) return notify(error.message);

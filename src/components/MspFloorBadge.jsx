@@ -33,11 +33,9 @@ export default function MspFloorBadge({ crop, enteredPrice, onFloorDetected }) {
         <span className="msp-badge-title">
           <ShieldCheck size={14} className="msp-icon" />
           {floorData.isOfficial === true ? (
-            <b>🏛️ CACP Minimum Support Price</b>
-          ) : floorData.isOfficial === false && floorData.benchmarkType === "farmgate_benchmark" ? (
-            <b>🌿 Farmgate Benchmark Price</b>
+            <b>🏛️ CACP Minimum Support Price: ₹{floor.toFixed(2)}/kg</b>
           ) : (
-            <b>Market Reference Price</b>
+            <b>🌿 Transparent Farmgate Benchmark: ₹{floor.toFixed(2)}/kg</b>
           )}
         </span>
         <span className="msp-live-tag">
