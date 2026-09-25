@@ -6,18 +6,77 @@ import './saarthiExperience.css';
 const FARMER_MODE_STORAGE_KEY = 'farmlink_farmer_mode';
 const FIRST_LOGIN_SHOWN_KEY = 'farmlink_first_login_choice_made';
 
-export default function FarmerExperience({
-  session,
-  lots,
-  setModal,
-  setAiInitialCrop,
-  listingPrefill,
-  produceRequests,
-  setProduceRequests,
-  liveTick,
-  notify,
-  farmerVerification,
-  setFarmerVerification,
+class FarmerErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('Farmer Screen Error caught:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '40px 20px', maxWidth: '600px', margin: '40px auto', textAlign: 'center', background: 'var(--surface, #fff)', borderRadius: '16px', border: '1px solid var(--border, #e2e8f0)', boxShadow: '0 8px 30px rgba(0,0,0,0.06)' }}>
+          <h2 style={{ fontSize: '1.4rem', color: '#059669', marginBottom: '12px' }}>🌾 किसान डैशबोर्ड पुनः लोड करें</h2>
+          <p style={{ color: 'var(--text-muted, #475569)', fontSize: '0.95rem', marginBottom: '20px', lineHeight: 1.6 }}>
+            डैशबोर्ड सुरक्षित रूप से लोड किया जा रहा है। कृपया नीचे दिए गए बटन से पुनः प्रयास करें।
+          </p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button
+              type="button"
+              className="primary"
+              style={{ padding: '10px 20px', borderRadius: '10px', background: '#059669', color: '#fff', fontWeight: 700 }}
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                window.location.reload();
+              }}
+            >
+              🔄 Refresh Dashboard
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              style={{ padding: '10px 20px', borderRadius: '10px', fontWeight: 700 }}
+              onClick={() => {
+                localStorage.setItem(FARMER_MODE_STORAGE_KEY, 'classic');
+                this.setState({ hasError: false, error: null });
+                window.location.reload();
+              }}
+            >
+              📱 Classic Mode
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function FarmerExperience(props) {
+  return (
+    <FarmerErrorBoundary>
+      <FarmerExperienceInner {...props} />
+    </FarmerErrorBoundary>
+  );
+}
+
+function FarmerExperienceInner({
+  session = null,
+  lots = [],
+  setModal = () => {},
+  setAiInitialCrop = () => {},
+  listingPrefill = null,
+  produceRequests = [],
+  setProduceRequests = () => {},
+  liveTick = 0,
+  notify = () => {},
+  farmerVerification = null,
+  setFarmerVerification = () => {},
   lang = 'hi',
   // Reference to existing Classic FarmerView component
   ClassicFarmerViewComponent = null
