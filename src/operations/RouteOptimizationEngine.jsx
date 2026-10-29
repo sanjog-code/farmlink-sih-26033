@@ -29,8 +29,10 @@ import {
   RAJASTHAN_AGRI_HUBS,
   haversineDistanceKm
 } from "../lib/dataSyncEngine";
+import { DEMO_NOTICE, isDemoMode } from '../lib/platformMode.js';
 
 export default function RouteOptimizationEngine({ notify = () => {} }) {
+  if (isDemoMode) return <section className="account-panel"><p className="eyebrow green">DEMONSTRATION SAFETY GATE</p><h2>Route planning is unavailable</h2><p>{DEMO_NOTICE}</p><p>Route costs, capacity, ETAs, contacts, and vehicle assignments require verified operator data and are disabled in this preview.</p></section>;
   const [selectedVehicle, setSelectedVehicle] = useState("tata407");
   const [selectedWarehouseId, setSelectedWarehouseId] = useState(WDRA_REGISTERED_WAREHOUSES[0].id);
   const [enableColdChain, setEnableColdChain] = useState(true);

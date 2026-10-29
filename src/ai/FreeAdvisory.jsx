@@ -4,6 +4,7 @@ import { BrainCircuit, ShieldCheck, TrendingUp, AlertTriangle, FileText, CheckCi
 import './ai.css';
 
 import { CROP_INTELLIGENCE } from './cropIntelligence.js';
+import { DEMO_NOTICE, isDemoMode } from '../lib/platformMode.js';
 export { CROP_INTELLIGENCE };
 
 
@@ -179,6 +180,15 @@ export function computeCropAdvisory(cropName, category = 'Vegetables', lotAgeDay
 
 // ─── COMPONENT ────────────────────────────────────────────────────────────────
 export default function FreeAdvisory({ close, myLots = [], initialCrop = null, onListCrop, onHoldCrop, notify }) {
+  if (isDemoMode) {
+    return <section className="account-panel" style={{ maxWidth: '680px', margin: 'auto' }}>
+      <p className="eyebrow green">DEMONSTRATION SAFETY GATE</p>
+      <h2>Decision support is unavailable</h2>
+      <p>{DEMO_NOTICE}</p>
+      <p>This preview does not have a verified price feed or a validated forecasting model. It will not recommend a sale, holding period, loan, warehouse receipt, or expected return.</p>
+      <button className="secondary" onClick={close}>Close</button>
+    </section>;
+  }
   // Pre-selected crops from farmer's actual inventory
   const farmerCrops = useMemo(() => {
     const map = new Map();

@@ -15,6 +15,7 @@ import {
   Filter,
   RefreshCw
 } from 'lucide-react';
+import { DEMO_NOTICE, isDemoMode } from '../lib/platformMode.js';
 
 // Comprehensive Historical & Machine Learning Dataset for Major Mandi Commodities
 export const CROP_FORECAST_DATASETS = {
@@ -286,6 +287,7 @@ export const CROP_FORECAST_DATASETS = {
 };
 
 export default function DemandForecastEngine({ initialCrop = 'Mustard', onSelectAction }) {
+  if (isDemoMode) return <section className="account-panel"><p className="eyebrow green">DEMONSTRATION SAFETY GATE</p><h2>Price forecasting is unavailable</h2><p>{DEMO_NOTICE}</p><p>Historical data, model outputs, confidence values, and returns are not connected to an authenticated source or validated model in this preview.</p></section>;
   const [selectedCrop, setSelectedCrop] = useState(initialCrop || 'Mustard');
   const [horizon, setHorizon] = useState(14); // 7, 14, 30, 60
   const [activeTab, setActiveTab] = useState('chart'); // chart, table, logic

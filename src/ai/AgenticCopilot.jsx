@@ -37,6 +37,7 @@ import {
 } from './speechEngine.js';
 import './agentic.css';
 import FormattedAiMessage from '../components/common/FormattedAiMessage.jsx';
+import { isDemoMode } from '../lib/platformMode.js';
 
 export default function AgenticCopilot({
   isOpen = false,
@@ -58,17 +59,11 @@ export default function AgenticCopilot({
   const [recording, setRecording] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
-  // Gemini API configuration (Preinstalled & Ready Out-of-the-Box)
-  const [geminiKey, setGeminiKey] = useState(() => {
-    return (
-      (typeof window !== 'undefined' && localStorage.getItem('farmlink_gemini_api_key')) ||
-      (import.meta.env?.VITE_GEMINI_API_KEY2 || '') ||
-      (import.meta.env?.VITE_GEMINI_API_KEY || '') ||
-      'AQ.Ab8RN6KcU5BBNvGVAZvk4UfYKkENTK70eRqkqUpT6L6gRUU2Cg'
-    );
-  });
-  const [geminiModel, setGeminiModel] = useState('gemini-1.5-flash');
-  const [useGemini, setUseGemini] = useState(true);
+  // Provider credentials must never be embedded in a browser bundle or saved in
+  // browser storage. Production calls will move through authenticated Edge APIs.
+  const [geminiKey, setGeminiKey] = useState('');
+  const [geminiModel, setGeminiModel] = useState('gemini-2.5-flash');
+  const [useGemini, setUseGemini] = useState(false);
   const [keyStatus, setKeyStatus] = useState('');
 
   // Speech & Voice AI Configuration (Hybrid WebSpeech + Sarvam + Whisper)
@@ -76,15 +71,11 @@ export default function AgenticCopilot({
   const [voiceProvider, setVoiceProvider] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('farmlink_voice_provider')) || 'auto';
   });
-  const [sarvamKey, setSarvamKey] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('farmlink_sarvam_api_key')) || (import.meta.env?.VITE_SARVAM_API_KEY || '') || 'sk_v9yrxpg0_ZzIdidU18EjUTGEFfkajp7OZ';
-  });
+  const [sarvamKey, setSarvamKey] = useState('');
   const [sarvamSpeaker, setSarvamSpeaker] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('farmlink_sarvam_speaker')) || 'aditya';
   });
-  const [openAiKey, setOpenAiKey] = useState(() => {
-    return (typeof window !== 'undefined' && (localStorage.getItem('farmlink_openai_api_key') || localStorage.getItem('farmlink_whisper_api_key'))) || (import.meta.env?.VITE_OPENAI_API_KEY || '');
-  });
+  const [openAiKey, setOpenAiKey] = useState('');
   const [openAiVoice, setOpenAiVoice] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('farmlink_openai_voice')) || 'nova';
   });
@@ -295,6 +286,16 @@ export default function AgenticCopilot({
     const targetGoal = (inputGoal || goal).trim();
     if (!targetGoal || running) return;
 
+    if (isDemoMode) {
+      setResult({
+        success: false,
+        source: 'demo-safety-gate',
+        actionCards: [],
+        text: 'AI guidance is unavailable in this demonstration. It will not create financial estimates, market forecasts, warehouse certificates, or operational actions. Please verify information with the relevant official source or partner.'
+      });
+      return;
+    }
+
     setRunning(true);
     setSteps([]);
     setResult(null);
@@ -403,6 +404,17 @@ export default function AgenticCopilot({
   const currentPrompts = rolePrompts[session?.role] || rolePrompts.farmer;
 
   if (!isOpen) return null;
+  if (isDemoMode) return (
+    <div className="agentic-overlay" role="dialog" aria-modal="true" aria-label="AI safety notice">
+      <div className="agentic-panel" style={{ maxWidth: '580px' }}>
+        <button className="agentic-close" onClick={onClose} aria-label="Close"><X size={20} /></button>
+        <p className="eyebrow green">DEMONSTRATION SAFETY GATE</p>
+        <h2>AI copilot is unavailable</h2>
+        <p>This preview cannot verify data sources or safely generate agriculture, pricing, finance, warehouse, or logistics guidance.</p>
+        <p>For a live release, connect authenticated sources and require a human-reviewed workflow before showing advice or allowing actions.</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="agentic-modal-overlay" onClick={onClose}>

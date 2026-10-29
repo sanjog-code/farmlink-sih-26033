@@ -16,6 +16,9 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' });
   }
+  if (process.env.FARMLINK_MODE !== 'production') {
+    return res.status(503).json({ error: 'Demonstration mode', response: 'This demonstration cannot confirm or create operational actions.' });
+  }
 
   try {
     const { sessionId, confirmed, idempotencyKey, farmerId, farmerName, dataContext } = req.body || {};

@@ -1,6 +1,7 @@
 import fs from 'fs';
 
-const key = 'sk_v9yrxpg0_ZzIdidU18EjUTGEFfkajp7OZ';
+const key = process.env.SARVAM_API_KEY || '';
+if (!key) throw new Error('Set SARVAM_API_KEY before running this manual provider test.');
 
 async function test() {
   console.log('Testing Sarvam TTS to generate sample WAV...');

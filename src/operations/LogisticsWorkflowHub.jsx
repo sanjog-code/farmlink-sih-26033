@@ -28,6 +28,7 @@ import {
   WDRA_REGISTERED_WAREHOUSES,
   RAJASTHAN_AGRI_HUBS
 } from '../lib/dataSyncEngine';
+import { DEMO_NOTICE, isDemoMode } from '../lib/platformMode.js';
 
 export const LOGISTICS_STAGES = [
   { id: 'ORDER_CREATED', label: '1. Order Created', desc: 'Buyer order placed / farmer lot ready', color: '#64748b' },
@@ -40,6 +41,7 @@ export const LOGISTICS_STAGES = [
 
 
 export default function LogisticsWorkflowHub({ notify }) {
+  if (isDemoMode) return <section className="account-panel"><p className="eyebrow green">DEMONSTRATION SAFETY GATE</p><h2>Logistics workflow is unavailable</h2><p>{DEMO_NOTICE}</p><p>No driver, vehicle, route, collection, custody, or delivery state shown in this preview represents a real booking or assignment.</p></section>;
   const [shipments, setShipments] = useState(() => getShipments());
   const [isCreatingShipment, setIsCreatingShipment] = useState(false);
   const [newShipment, setNewShipment] = useState({

@@ -392,65 +392,27 @@ export async function executeAutonomousAgent({
         onStep
       });
 
-      // Parse entities to append actionable interactive cards even in Gemini mode
-      const { matchedCrop, quantityKg } = parseGoalEntities(goal);
-      const enwr = tools.tool_calculate_enwr_pledge({ crop: matchedCrop, quantityKg });
-      const mandi = tools.tool_get_mandi_msp({ crop: matchedCrop });
-      const safeModalPrice = Number(mandi?.modalPriceKg) || 30;
-      const safeAdvance = Number(enwr?.pledgeAdvanceAmount) || 15000;
-
-      const geminiActionCards = [
-        {
-          id: 'act-gemini-enwr',
-          type: 'ACTION_APPLY_ENWR',
-          title: language === 'hi' ? '50% e-NWR अग्रिम ऋण प्राप्त करें' : 'Apply for 50% e-NWR Advance',
-          badge: `₹${safeAdvance.toLocaleString('en-IN')} instant loan`,
-          description: `Unlock WDRA 50% advance for ${quantityKg} kg ${matchedCrop} at 7% p.a.`,
-          buttonLabel: language === 'hi' ? 'अग्रिम आवेदन खोलें ➔' : 'Proceed with e-NWR Advance ➔',
-          payload: { crop: matchedCrop, quantityKg, advanceAmount: safeAdvance }
-        },
-        {
-          id: 'act-gemini-listing',
-          type: 'ACTION_PREFILL_LISTING',
-          title: language === 'hi' ? 'अनुकूलतम मूल्य पर मार्केटप्लेस में सूचीबद्ध करें' : 'List Produce with Optimal Price Floor',
-          badge: `₹${(safeModalPrice + 2).toFixed(2)}/kg`,
-          description: 'Direct farmgate sale avoiding APMC commission agents.',
-          buttonLabel: language === 'hi' ? 'लिस्टिंग फॉर्म भरें ➔' : 'Pre-fill Marketplace Listing ➔',
-          payload: { crop: matchedCrop, quantityKg, priceKg: safeModalPrice + 2, grade: 'A' }
-        }
-      ];
-
       return {
         success: true,
         source: 'gemini-cloud',
         text: geminiResult.text,
-        actionCards: geminiActionCards
+        actionCards: []
       };
     } catch (err) {
-      console.warn('Gemini cloud invocation failed, gracefully falling back to autonomous edge ReAct engine:', err.message);
-      onStep({
-        type: 'thought',
-        content: `Notice: KANAK AI Cloud connection returned (${err.message}). Activating FarmLink Autonomous Edge Engine for guaranteed uptime...`
-      });
-      // Fallback to Edge ReAct
-      const edgeResult = await runAutonomousEdgeAgent({
-        goal,
-        userRole,
-        language,
-        runtimeContext,
-        onStep
-      });
-      return { ...edgeResult, source: 'edge-react-fallback' };
+      console.warn('Gemini cloud invocation failed:', err.message);
+      return {
+        success: false,
+        source: 'provider-unavailable',
+        actionCards: [],
+        text: 'AI guidance is temporarily unavailable. No estimate, recommendation, certificate, financing amount, or operational action has been generated. Please retry later or verify information with an official source.'
+      };
     }
   }
 
-  // Built-in Deterministic Edge ReAct Engine (default, ultra-fast, zero-API-key)
-  const edgeResult = await runAutonomousEdgeAgent({
-    goal,
-    userRole,
-    language,
-    runtimeContext,
-    onStep
-  });
-  return { ...edgeResult, source: 'edge-react' };
+  return {
+    success: false,
+    source: 'provider-not-configured',
+    actionCards: [],
+    text: 'AI guidance is not configured. FarmLink will not substitute simulated market, finance, quality, or logistics information.'
+  };
 }

@@ -1,0 +1,97 @@
+/* Calm, tactile UI reset: soft depth for touch targets, clear spatial groups,
+   and deliberately limited decoration for first-time users. */
+:root {
+  --space-bg: #eaf0eb;
+  --space-panel: #eef4ef;
+  --space-highlight: #f8fcf8;
+  --space-shadow-dark: rgba(39, 74, 54, .16);
+  --space-shadow-light: rgba(255, 255, 255, .92);
+  --primary: #176b49;
+  --primary-hover: #0e5437;
+  --text-main: #17372c;
+  --text-muted: #526b5d;
+  --border: rgba(58, 101, 74, .12);
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+}
+
+body { background: var(--space-bg) !important; }
+main { min-height: calc(100vh - 130px); }
+button, input, select, textarea { min-height: 44px; }
+button { transition: transform .16s ease, box-shadow .16s ease, background-color .16s ease; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible {
+  outline: 3px solid #d99032;
+  outline-offset: 3px;
+}
+
+/* One task per visual region: nav, content, then the next decision. */
+.glass-nav {
+  width: min(1500px, calc(100% - 32px));
+  margin: 16px auto 0;
+  min-height: 68px;
+  border: 0 !important;
+  border-radius: 22px;
+  background: var(--space-panel) !important;
+  box-shadow: 10px 10px 22px var(--space-shadow-dark), -9px -9px 20px var(--space-shadow-light);
+}
+.nav-segmented, .top-search-bar, .head-actions-jivexa { gap: 8px; }
+.nav-segmented { padding: 5px !important; border-radius: 16px !important; background: #e3ebe5 !important; box-shadow: inset 3px 3px 7px rgba(39,74,54,.1), inset -3px -3px 7px #fff; }
+.nav-pill { min-height: 38px; border-radius: 12px !important; }
+.nav-pill.active { background: var(--space-highlight) !important; color: var(--primary) !important; box-shadow: 3px 3px 7px rgba(39,74,54,.12), -2px -2px 5px #fff; }
+.top-search-bar { background: var(--space-highlight) !important; border: 0 !important; border-radius: 14px !important; box-shadow: inset 2px 2px 5px rgba(39,74,54,.09), inset -2px -2px 5px #fff; }
+.top-search-input { background: transparent !important; }
+.top-icon-btn, .lang-pill, .top-auth-btn, .top-ai-copilot-btn { border-radius: 14px !important; box-shadow: 3px 3px 7px rgba(39,74,54,.11), -2px -2px 5px #fff; }
+.top-icon-btn:active, .lang-pill:active, .top-auth-btn:active, .top-ai-copilot-btn:active, .primary:active, .secondary:active { transform: translateY(1px); box-shadow: inset 2px 2px 5px rgba(39,74,54,.14) !important; }
+
+.hero-jivexa, .page, .section { width: min(1320px, calc(100% - 32px)); }
+.hero-jivexa { margin-top: 24px; padding: clamp(28px, 5vw, 70px); border-radius: 32px; background: linear-gradient(140deg, #f6fbf5, #e5efe7); box-shadow: 16px 16px 34px var(--space-shadow-dark), -12px -12px 28px var(--space-shadow-light); }
+.hero-copy-jivexa { gap: 20px; }
+.hero-tag { background: #edf5ee; box-shadow: inset 2px 2px 5px rgba(39,74,54,.09), inset -2px -2px 5px #fff; border: 0; }
+.hero-title-jivexa { font-size: clamp(2.55rem, 5.3vw, 4.6rem); max-width: 720px; }
+.hero-subtitle-jivexa { font-size: 1.05rem; max-width: 600px; }
+.hero-btn-primary, .hero-btn-secondary, .primary, .secondary { min-height: 48px; border-radius: 15px !important; }
+.hero-btn-primary, .primary { background: var(--primary) !important; box-shadow: 7px 7px 14px rgba(23,107,73,.2), -2px -2px 5px rgba(255,255,255,.45); }
+.hero-btn-secondary, .secondary { background: #eff5ef !important; color: var(--text-main) !important; border: 0 !important; box-shadow: 5px 5px 12px rgba(39,74,54,.12), -4px -4px 9px #fff; }
+.hero-trust-row { gap: 10px; }
+.hero-trust-item { padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,.5); }
+
+.showcase-glass-card, .lot, .account-panel, .farmer-operations, .admin-control, .intake, .ledger, .my-lots, .finance, .detail-sections article, .modal, .confirm-order-card {
+  border: 0 !important;
+  background: var(--space-panel) !important;
+  box-shadow: 9px 9px 18px var(--space-shadow-dark), -7px -7px 16px var(--space-shadow-light) !important;
+}
+.showcase-glass-card { border-radius: 24px; background: rgba(246, 251, 246, .92) !important; }
+.ticker-item, .metric, .quality-report div, .search-note, .notice { border: 0 !important; background: var(--space-highlight) !important; box-shadow: inset 2px 2px 5px rgba(39,74,54,.08), inset -2px -2px 5px #fff; }
+.lot { border-radius: 20px; overflow: hidden; }
+.lot:hover { transform: translateY(-5px); }
+.lot-body { padding: 20px; }
+.lot-img { border-radius: 16px 16px 0 0; margin: 10px 10px 0; height: 160px; }
+
+.market-tools, .filters, .tabs, .admin-tabs, .crop-category-bar { border: 0 !important; background: var(--space-panel) !important; box-shadow: inset 3px 3px 7px rgba(39,74,54,.1), inset -3px -3px 7px #fff; }
+.market-tools input, .market-tools select, .form-grid input, .form-grid select, .form-grid textarea, input, select, textarea { border: 0 !important; background: var(--space-highlight) !important; border-radius: 12px !important; box-shadow: inset 2px 2px 5px rgba(39,74,54,.09), inset -2px -2px 5px #fff; }
+.tabs button, .filters button, .admin-tabs button { border-radius: 12px !important; }
+.tabs button.selected, .filters .selected, .admin-tabs button.selected { background: var(--primary) !important; }
+
+.page-top { padding-bottom: 16px; border-bottom: 1px solid rgba(58,101,74,.16); }
+.page-top h1, .section h2 { letter-spacing: -.035em; }
+.modal-back, .confirm-order-back { background: rgba(20, 44, 32, .46); backdrop-filter: blur(5px); }
+.modal, .confirm-order-card { border-radius: 26px !important; }
+.toast { border-radius: 16px; box-shadow: 8px 8px 18px rgba(0,0,0,.22); }
+
+@media (max-width: 1080px) {
+  .glass-nav { width: calc(100% - 20px); margin-top: 10px; }
+  .top-search-bar { display: none; }
+  .hero-jivexa, .page, .section { width: calc(100% - 20px); }
+}
+@media (max-width: 760px) {
+  .glass-nav { border-radius: 18px; }
+  .nav-segmented { order: 3; width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .nav-pill { white-space: nowrap; }
+  .hero-jivexa { grid-template-columns: 1fr; gap: 20px; border-radius: 24px; padding: 26px 20px; }
+  .hero-title-jivexa { font-size: clamp(2.2rem, 11vw, 3.3rem); }
+  .hero-cta-row > button { width: 100%; justify-content: center; }
+  .hero-trust-row { display: grid; grid-template-columns: 1fr; }
+  .hero-visual-container { min-height: auto; }
+  .showcase-glass-card { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }

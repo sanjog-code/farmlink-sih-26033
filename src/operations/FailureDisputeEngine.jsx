@@ -13,8 +13,10 @@ import {
   BadgeAlert,
   ArrowRight
 } from "lucide-react";
+import { DEMO_NOTICE, isDemoMode } from '../lib/platformMode.js';
 
 export default function FailureDisputeEngine({ notify = () => {} }) {
+  if (isDemoMode) return <section className="account-panel"><p className="eyebrow green">DEMONSTRATION SAFETY GATE</p><h2>Dispute records are unavailable</h2><p>{DEMO_NOTICE}</p><p>This preview cannot create, resolve, or represent an operational dispute record.</p></section>;
   const [activeScenario, setActiveScenario] = useState("rejection");
   const [resolvedScenarios, setResolvedScenarios] = useState({});
   const [isProcessing, setIsProcessing] = useState(false);

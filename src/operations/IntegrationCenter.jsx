@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../supabase';
+import { DEMO_NOTICE, isDemoMode } from '../lib/platformMode.js';
 
 const labels = { marketData: 'Daily mandi prices', email: 'Order email delivery', whisper: 'Whisper speech recognition', bhashini: 'Bhashini speech recognition', grading: 'Produce photo model', ondcPartner: 'ONDC partner connection' };
 async function check(result) { const { data, error } = await result; if (error) throw error; return data; }
@@ -14,6 +15,9 @@ export function useOperationsRefresh(load, channelName) {
 }
 
 export default function IntegrationCenter({ session, warehouses = [] }) {
+  if (isDemoMode) {
+    return <section className="integration-section account-panel"><p className="eyebrow green">DEMONSTRATION SAFETY GATE</p><h2>Partner integrations are disabled</h2><p>{DEMO_NOTICE}</p><p>No catalogue export, provider queue, warehouse registry update, or finance-review action can run until this deployment is explicitly configured for production and reviewed by an authorised operator.</p></section>;
+  }
   const [services, setServices] = useState(null), [applications, setApplications] = useState([]), [outbox, setOutbox] = useState([]), [message, setMessage] = useState(''), [busy, setBusy] = useState(false);
   const [reviews, setReviews] = useState({}), [registry, setRegistry] = useState({ warehouse: '', reference: '', repository: '' });
   const load = useCallback(async () => {
@@ -40,6 +44,9 @@ export default function IntegrationCenter({ session, warehouses = [] }) {
 }
 
 export function FarmerServices({ session }) {
+  if (isDemoMode) {
+    return <section className="account-panel integration-section"><p className="eyebrow green">DEMONSTRATION SAFETY GATE</p><h3>Warehouse receipts and finance are unavailable</h3><p>{DEMO_NOTICE}</p><p>Do not submit crop, identity, banking, or warehouse data through this preview. A production workflow must obtain verified repository and lender responses before it can display a receipt or finance status.</p></section>;
+  }
   const [lots, setLots] = useState([]), [apps, setApps] = useState([]), [message, setMessage] = useState(''), [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ lot: '', service: 'warehouse_receipt', amount: '', note: '', consent: false });
   const [certModal, setCertModal] = useState(null);

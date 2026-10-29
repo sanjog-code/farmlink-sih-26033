@@ -14,6 +14,9 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' });
   }
+  if (process.env.FARMLINK_MODE !== 'production') {
+    return res.status(503).json({ error: 'Demonstration mode', response: 'This demonstration does not provide AI advice or operational actions. Please verify information with an official source.' });
+  }
 
   try {
     const { sessionId, message, farmerId, farmerName, dataContext } = req.body || {};

@@ -62,6 +62,7 @@ import "./intake-pipeline.css";
 import "./route-planner.css";
 import "./refinements.css";
 import "./jivexa-theme.css";
+import "./spatial-reset.css";
 import { isSupabaseConfigured, supabase } from "./supabase";
 import FreeAdvisory from "./ai/FreeAdvisory";
 import GradeReview from "./ai/GradeReview";
@@ -86,6 +87,7 @@ import IntermediaryPriceBreakdown from "./components/common/IntermediaryPriceBre
 import { transcribeWithSarvam, speakHybrid, stopAllSpeech, DEFAULT_SARVAM_KEY } from "./ai/speechEngine.js";
 import MspFloorBadge from "./components/MspFloorBadge";
 import { getMspFloorForCrop } from "./lib/mspRates";
+import { DEMO_NOTICE, isDemoMode } from "./lib/platformMode.js";
 import {
   getUserListings,
   addUserListing,
@@ -1388,14 +1390,14 @@ function App() {
   if (passwordRecovery) return <PasswordRecovery onComplete={() => { setPasswordRecovery(false); window.history.replaceState({}, "", window.location.pathname); setView("auth"); notify("You can now sign in with your updated password."); }}/>;
   return (
     <>
-      {/* Sleek Announcement Ribbon */}
+      {/* Deployment-state notice: defaults to a safe demo until production is opted in. */}
       <div className="top-announcement-banner">
         <span className="banner-pulse"></span>
         <span className="banner-text">
-          🌾 {tUI("Government e-NWR Integration: WDRA warehouse pledge finance at 50% MSP")}
+          {isDemoMode ? `🌾 ${DEMO_NOTICE}` : tUI("Market and service status are shown with their verified source.")}
         </span>
-        <button type="button" onClick={() => setModal("agentic")} className="banner-action-btn">
-          {tUI("Check Eligibility")} →
+        <button type="button" onClick={() => setView(isDemoMode ? "disclaimer" : "market")} className="banner-action-btn">
+          {isDemoMode ? tUI("Platform disclaimer") : tUI("View marketplace")} →
         </button>
       </div>
 
@@ -1794,7 +1796,9 @@ function SiteFooter({ setView, notify, lang, tUI }) {
             </span>
           </div>
           <p>
-            {tr("Next-generation farm-to-warehouse infrastructure combining WDRA-compliant storage, 50% pledge advances, live Mandi Agmarknet pricing, and multilingual AI voice copilot.")}
+            {isDemoMode
+              ? "A Safe-Data SIH demonstration of marketplace, warehouse, and advisory workflows. No live transaction, certificate, or financing decision is made here."
+              : tr("Source-linked market information and human-reviewed warehouse workflows for connected agricultural trade.")}
           </p>
           <div style={{ display: "flex", gap: "12px", marginTop: "16px" }}>
             <a href="https://www.instagram.com/farmlink_30?stkn=MW5nZGM1NjYzdXh4cw==" target="_blank" rel="noreferrer" aria-label="FarmLink on Instagram" style={{ color: "#94a3b8", fontSize: "0.85rem", padding: "6px 12px", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px" }}>Instagram</a>
@@ -1895,22 +1899,22 @@ function Home({ t, lots, setView, access, reserve, setModal, lang, tUI }) {
         <div className="hero-copy-jivexa">
           <div className="hero-tag">
             <span className="pulse-dot"></span>
-            <span className="hero-tag-text">{tr("India's 1st Dual-Engine Agri Copilot & e-NWR Grid")}</span>
+            <span className="hero-tag-text">{isDemoMode ? tr("Clear agricultural-workflow demonstration") : tr("Source-connected agricultural workflows")}</span>
           </div>
 
           <h1 className="hero-title-jivexa">
-            {tr("Agricultural Trade Works Better")} <br />
-            <span className="text-gradient-emerald">{tr("When It's Connected")}</span>
+            {isDemoMode ? tr("Explore the FarmLink") : tr("Agricultural Trade Works Better")} <br />
+            <span className="text-gradient-emerald">{isDemoMode ? tr("workflow preview") : tr("When It's Connected")}</span>
           </h1>
 
           <p className="hero-subtitle-jivexa">
-            {tr("Next-generation farm-to-warehouse infrastructure combining WDRA-compliant storage, 50% pledge advances, live Mandi Agmarknet pricing, and multilingual AI voice copilot.")}
+            {isDemoMode ? tr("A guided preview of the FarmLink experience. Market data, warehouse records, AI advice, finance, and pickup actions are unavailable until connected and independently verified.") : tr("Source-linked market information and human-reviewed warehouse workflows for connected agricultural trade.")}
           </p>
 
           <div className="hero-cta-row">
-            <button className="hero-btn-primary" onClick={() => setModal("agentic")}>
+            <button className="hero-btn-primary" onClick={() => isDemoMode ? setView("disclaimer") : setModal("agentic")}>
               <Sparkles size={18} />
-              {tr("Launch AI Copilot 🚀")}
+              {isDemoMode ? tr("Read demo limits") : tr("Open AI copilot")}
             </button>
             <button className="hero-btn-secondary" onClick={() => access("consumer", "market")}>
               <Store size={18} />
@@ -1921,15 +1925,15 @@ function Home({ t, lots, setView, access, reserve, setModal, lang, tUI }) {
           <div className="hero-trust-row">
             <div className="hero-trust-item">
               <ShieldCheck size={18} />
-              <span>{tr("e-NWR Compliant")}</span>
+              <span>{isDemoMode ? "Demo workflows" : tr("Source-verified workflows")}</span>
             </div>
             <div className="hero-trust-item">
               <TrendingUp size={18} />
-              <span>{tr("Real-time Mandi Sync")}</span>
+              <span>{isDemoMode ? "No live market feed" : tr("Market data status")}</span>
             </div>
             <div className="hero-trust-item">
               <CheckCircle2 size={18} />
-              <span>{tr("Zero Distress Sales")}</span>
+              <span>{isDemoMode ? "No financial offers" : tr("Human review required")}</span>
             </div>
           </div>
 
@@ -1944,10 +1948,10 @@ function Home({ t, lots, setView, access, reserve, setModal, lang, tUI }) {
             <div className="showcase-header">
               <div className="showcase-title-row">
                 <TrendingUp size={18} color="var(--primary)" />
-                <b style={{ fontSize: "0.95rem", color: "var(--text-main)" }}>{tr("Live Mandi & e-NWR Pulse")}</b>
+                <b style={{ fontSize: "0.95rem", color: "var(--text-main)" }}>{isDemoMode ? "Market-data preview" : tr("Market data status")}</b>
               </div>
               <span className="showcase-live-badge">
-                <span className="pulse-dot"></span> {tr("Agmarknet Live")}
+                <span className="pulse-dot"></span> {isDemoMode ? "Source not connected" : tr("Source status")}
               </span>
             </div>
 
@@ -1961,8 +1965,8 @@ function Home({ t, lots, setView, access, reserve, setModal, lang, tUI }) {
                   </div>
                 </div>
                 <div className="ticker-rate-info">
-                  <div className="ticker-price">₹2,425/qtl</div>
-                  <span className="ticker-trend">+4.2% {tr("Today")}</span>
+                  <div className="ticker-price">{isDemoMode ? "Unavailable" : "₹2,425/qtl"}</div>
+                  <span className="ticker-trend">{isDemoMode ? "Verify at source" : `+4.2% ${tr("Today")}`}</span>
                 </div>
               </div>
 
@@ -1975,8 +1979,8 @@ function Home({ t, lots, setView, access, reserve, setModal, lang, tUI }) {
                   </div>
                 </div>
                 <div className="ticker-rate-info">
-                  <div className="ticker-price">₹5,650/qtl</div>
-                  <span className="ticker-trend">+2.8% {tr("Spread")}</span>
+                  <div className="ticker-price">{isDemoMode ? "Unavailable" : "₹5,650/qtl"}</div>
+                  <span className="ticker-trend">{isDemoMode ? "Verify at source" : `+2.8% ${tr("Spread")}`}</span>
                 </div>
               </div>
 
@@ -1989,22 +1993,24 @@ function Home({ t, lots, setView, access, reserve, setModal, lang, tUI }) {
                   </div>
                 </div>
                 <div className="ticker-rate-info">
-                  <div className="ticker-price">₹27/kg</div>
-                  <span className="ticker-trend">+8.0% {tr("Today")}</span>
+                  <div className="ticker-price">{isDemoMode ? "Unavailable" : "₹27/kg"}</div>
+                  <span className="ticker-trend">{isDemoMode ? "Verify at source" : `+8.0% ${tr("Today")}`}</span>
                 </div>
               </div>
             </div>
 
             <div className="enwr-preview-box">
               <div className="enwr-preview-title">
-                <span>{tr("e-NWR 50% Pledge Loan Advance")}</span>
+                <span>{isDemoMode ? "Warehouse-receipt workflow preview" : tr("Warehouse receipt review")}</span>
                 <Coins size={16} />
               </div>
               <p className="enwr-preview-text">
-                {tr("Deposit harvest in certified warehouse. Avail instant 50% working capital advance against electronic negotiable warehouse receipts.")}
+                {isDemoMode
+                  ? "This demonstration does not issue warehouse receipts, confirm registrations, calculate collateral, or offer financing."
+                  : "Warehouse and lender decisions require a verified partner, source record, and human review."}
               </p>
-              <button type="button" className="enwr-preview-action" onClick={() => setModal("agentic")}>
-                {tr("Calculate Pledge Advance with Copilot")} →
+              <button type="button" className="enwr-preview-action" onClick={() => setView("disclaimer")}>
+                {isDemoMode ? tr("Platform disclaimer") : tr("How verification works")} →
               </button>
             </div>
 
@@ -2302,7 +2308,7 @@ function LotCard({ lot, onClick }) {
         )}
         <div className="lot-img-badges">
           <span className="badge-grade">⭐ {gradeText}</span>
-          <span className="badge-wdra">🛡️ WDRA Certified</span>
+          <span className="badge-wdra">🛡️ {lot.warehouseVerified && !isDemoMode ? "Warehouse verified" : "Verification pending"}</span>
         </div>
         <i className="crop-emoji-badge" aria-label={`${cropName} crop icon`}>{cropEmoji(cropName, lot.category)}</i>
         <div className="lot-img-footer">
@@ -2320,8 +2326,7 @@ function LotCard({ lot, onClick }) {
             </p>
           </div>
           <span className={`lot-trend-badge ${trend >= 0 ? "up" : "down"}`}>
-            {trend >= 0 ? "▲ +" : "▼ "}
-            {Math.abs(trend)}% vs MSP
+            {isDemoMode ? "Market comparison unavailable" : `${trend >= 0 ? "▲ +" : "▼ "}${Math.abs(trend)}% vs MSP`}
           </span>
         </div>
 
@@ -2329,7 +2334,7 @@ function LotCard({ lot, onClick }) {
         <div className="lot-pricing-block">
           <div className="lot-rate-primary">
             <span className="rate-currency">₹</span>
-            <span className="rate-amount">{price}</span>
+            <span className="rate-amount">{price.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
             <span className="rate-unit">/kg</span>
           </div>
           <div className="lot-total-val-badge">
@@ -2353,9 +2358,9 @@ function LotCard({ lot, onClick }) {
 
         {/* Action Row */}
         <div className="lot-action-row">
-          <button type="button" className="lot-reserve-btn" onClick={onClick}>
+          <button type="button" className="lot-reserve-btn" onClick={onClick} disabled={isDemoMode} title={isDemoMode ? "Reservations are disabled in the demonstration" : undefined}>
             <ShoppingBag size={15} />
-            <span>Reserve 10 kg · ₹{price * 10}</span>
+            <span>{isDemoMode ? "Reservation unavailable in demo" : `Reserve 10 kg · ₹${(price * 10).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`}</span>
           </button>
         </div>
       </div>
@@ -5183,8 +5188,8 @@ function FarmerOperations({ notify, session, liveTick, listingPrefill, farmerVer
     [schedulingId, setSchedulingId] = useState(null),
     [pickupCluster, setPickupCluster] = useState("Jaipur North cluster"),
     [pickupTehsil, setPickupTehsil] = useState("chomu"),
-    [pickupAddress, setPickupAddress] = useState("Khasra 412/18, Ward 4"),
-    [targetWarehouse, setTargetWarehouse] = useState(() => WDRA_REGISTERED_WAREHOUSES[0]?.name || "Jaipur North WDRA Hub (CWC)"),
+    [pickupAddress, setPickupAddress] = useState(""),
+    [targetWarehouse, setTargetWarehouse] = useState(() => WDRA_REGISTERED_WAREHOUSES[0]?.name || "Demonstration warehouse"),
     [pickupDate, setPickupDate] = useState(() => new Date(Date.now() + 86400000).toISOString().slice(0, 10)),
     [listingMarket, setListingMarket] = useState(null),
     [listing, setListing] = useState({
@@ -7108,13 +7113,13 @@ function QrCodeSvg({ value, size = 180 }) {
 }
 
 function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, placingOrder }) {
-  const [warehouse, setWarehouse] = useState(warehouses[0]?.name || "Jaipur North WDRA Hub (CWC)");
+  const [warehouse, setWarehouse] = useState(warehouses[0]?.name || "Demonstration warehouse");
   const [deliveryMode, setDeliveryMode] = useState("pickup"); // 'pickup' or 'doorstep'
-  const [consumerName, setConsumerName] = useState("Mukesh Sharma");
-  const [consumerMobile, setConsumerMobile] = useState("+91 98290 44102");
-  const [addressLine, setAddressLine] = useState("Flat 402, Royal Greens, Sikar Road");
-  const [district, setDistrict] = useState("Jaipur");
-  const [pincode, setPincode] = useState("302013");
+  const [consumerName, setConsumerName] = useState("");
+  const [consumerMobile, setConsumerMobile] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [district, setDistrict] = useState("");
+  const [pincode, setPincode] = useState("");
   const [coldChain, setColdChain] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState(null);
 
@@ -7582,6 +7587,13 @@ function Checkout({ cart, warehouses, updateCartQuantity, close, placeOrder, pla
   );
 }
 function Voice({ close, notify, setModal }) {
+  if (isDemoMode) {
+    return <div className="modal-back" role="dialog" aria-modal="true"><div className="modal" style={{ maxWidth: '560px' }}>
+      <p className="eyebrow green">DEMONSTRATION SAFETY GATE</p><h2>Voice assistance is unavailable</h2>
+      <p>{DEMO_NOTICE}</p><p>This preview does not provide live market prices, credit eligibility, pickup confirmation, stock verification, or forecasts.</p>
+      <button className="primary" onClick={close}>Close</button>
+    </div></div>;
+  }
   const [provider, setProvider] = useState("auto");
   const [language, setLanguage] = useState("hi");
   const [recording, setRecording] = useState(false);

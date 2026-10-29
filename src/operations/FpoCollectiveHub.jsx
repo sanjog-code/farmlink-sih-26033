@@ -23,8 +23,10 @@ import {
   getUserListings
 } from "../lib/dataSyncEngine";
 import { getMspFloorForCrop } from "../lib/mspRates";
+import { DEMO_NOTICE, isDemoMode } from '../lib/platformMode.js';
 
 export default function FpoCollectiveHub({ notify = () => {} }) {
+  if (isDemoMode) return <section className="account-panel"><p className="eyebrow green">DEMONSTRATION SAFETY GATE</p><h2>Collective trading is unavailable</h2><p>{DEMO_NOTICE}</p><p>Membership, aggregation, negotiations, and settlement information are disabled until they are backed by verified records.</p></section>;
   const [activeTab, setActiveTab] = useState("batches");
   const [batches, setBatches] = useState(() => getFpoBatches());
   const [isCreatingBatch, setIsCreatingBatch] = useState(false);

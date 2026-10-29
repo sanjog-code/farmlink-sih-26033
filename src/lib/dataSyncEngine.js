@@ -222,9 +222,9 @@ export function scheduleFarmPickup(pickupData) {
       scheduled: true,
       cluster: pickupData.cluster || 'Jaipur North cluster',
       date: pickupData.date || new Date().toISOString().slice(0, 10),
-      status: 'Pickup Scheduled · Dispatch Confirmed',
-      driver: 'Mahendra Singh (Bolero Pickup RJ-14-UB-3021)',
-      gradingStatus: 'Farmgate Electronic Weighment & Digital NIR Quality Assayed'
+      status: 'Pickup request recorded for review',
+      driver: 'Not assigned',
+      gradingStatus: 'No grading decision has been made'
     };
     localStorage.setItem(STORAGE_KEYS.PICKUPS, JSON.stringify(parsed));
 
@@ -235,11 +235,11 @@ export function scheduleFarmPickup(pickupData) {
       quantityKg: pickupData.qty || 100,
       farmer: pickupData.farmer || 'Verified Farmer',
       originCluster: pickupData.cluster,
-      destinationWarehouse: 'Jaipur North WDRA Hub',
+    destinationWarehouse: 'Demo warehouse',
       finalDestination: 'Warehouse Intake Hub',
-      status: 'PICKUP_ASSIGNED',
-      assignedDriver: 'Mahendra Singh (RJ-14-UB-3021)',
-      coldChain: true
+    status: 'PICKUP_REQUESTED',
+    assignedDriver: null,
+    coldChain: false
     });
 
     broadcast('PICKUP_SCHEDULED', parsed[pickupData.lotId]);
@@ -375,92 +375,41 @@ export function resolveDispute(disputeId, resolution) {
   return updated;
 }
 
-// ─── 7. WDRA REGISTERED WAREHOUSES & PROPER ADDRESS REGISTRY ───────────────
+// ─── 7. DEMONSTRATION WAREHOUSES ───────────────────────────────────────────
+// No production registration, address, manager, capacity or accreditation data
+// belongs in the browser bundle. Production data is supplied by the verified API.
 export const WDRA_REGISTERED_WAREHOUSES = [
   {
-    id: 'wdra-jpr-01',
-    name: 'Jaipur North WDRA Hub (CWC)',
-    code: 'WDRA-JPR-CWC-01',
-    wdraRegNo: 'WDRA/RJ/JPR/042',
-    address: 'Central Warehousing Corp, Plot 4A, Road No. 9, VKIA, Sikar Road, Jaipur, Rajasthan',
-    district: 'Jaipur',
-    pincode: '302013',
-    capacityMt: 12500,
-    availableMt: 4200,
-    coldChambers: 4,
-    intakeCrops: ['Mustard', 'Wheat', 'Gram (Chickpea)', 'Barley', 'Tomato'],
-    lat: 26.9620,
-    lng: 75.7780,
-    manager: 'Er. Alok Sharma (+91 94140 33812)',
-    status: 'WDRA Accredited & Inspected'
+    id: 'demo-warehouse-a',
+    name: 'Demonstration warehouse A',
+    code: 'DEMO-WH-A',
+    wdraRegNo: 'Not verified',
+    address: 'Location withheld in demonstration mode',
+    district: 'Demo region',
+    capacityMt: null,
+    availableMt: null,
+    coldChambers: null,
+    intakeCrops: [],
+    lat: null,
+    lng: null,
+    manager: 'Not assigned',
+    status: 'Demonstration only'
   },
   {
-    id: 'wdra-sng-02',
-    name: 'Sanganer Central Agro Terminal (SWC)',
-    code: 'WDRA-SNG-SWC-02',
-    wdraRegNo: 'WDRA/RJ/SNG/029',
-    address: 'Rajasthan State Warehousing Corp, Mandi Yard Phase 2, Tonk Road, Sanganer, Jaipur, Rajasthan',
-    district: 'Jaipur',
-    pincode: '302029',
-    capacityMt: 8000,
-    availableMt: 2600,
-    coldChambers: 2,
-    intakeCrops: ['Wheat', 'Tomato', 'Green Chilli', 'Cluster Bean (Guar)'],
-    lat: 26.8041,
-    lng: 75.7725,
-    manager: 'Devendra Rathore (+91 98291 55204)',
-    status: 'WDRA Accredited & Inspected'
-  },
-  {
-    id: 'wdra-alw-03',
-    name: 'Alwar Agro Cold & Dry Hub (SWC)',
-    code: 'WDRA-ALW-SWC-03',
-    wdraRegNo: 'WDRA/RJ/ALW/018',
-    address: 'RSWC Logistics Depot, Matsya Industrial Area, Delhi Road, Alwar, Rajasthan',
-    district: 'Alwar',
-    pincode: '301030',
-    capacityMt: 15000,
-    availableMt: 5100,
-    coldChambers: 6,
-    intakeCrops: ['Mustard', 'Onion', 'Bajra (Pearl Millet)', 'Wheat'],
-    lat: 27.5530,
-    lng: 76.6346,
-    manager: 'Kailash Chand Meena (+91 97840 11983)',
-    status: 'WDRA Accredited & Inspected'
-  },
-  {
-    id: 'wdra-kta-04',
-    name: 'Kota Grain & Pulse Terminal (CWC)',
-    code: 'WDRA-KTA-CWC-04',
-    wdraRegNo: 'WDRA/RJ/KTA/089',
-    address: 'CWC Depository, Industrial Area Phase 1, Anantpura, Kota, Rajasthan',
-    district: 'Kota',
-    pincode: '324005',
-    capacityMt: 22000,
-    availableMt: 7800,
-    coldChambers: 3,
-    intakeCrops: ['Soybean', 'Paddy (Basmati)', 'Mustard', 'Gram (Chickpea)'],
-    lat: 25.1800,
-    lng: 75.8300,
-    manager: 'Harishankar Gautam (+91 94142 88471)',
-    status: 'WDRA Accredited & Inspected'
-  },
-  {
-    id: 'wdra-jdh-05',
-    name: 'Jodhpur Mandore Seed Hub (SWC)',
-    code: 'WDRA-JDH-SWC-05',
-    wdraRegNo: 'WDRA/RJ/JDH/031',
-    address: 'SWC Complex, Krishi Upaj Mandi, Mandore Road, Jodhpur, Rajasthan',
-    district: 'Jodhpur',
-    pincode: '342007',
-    capacityMt: 11000,
-    availableMt: 3900,
-    coldChambers: 3,
-    intakeCrops: ['Cumin (Jeera)', 'Coriander', 'Isabgol', 'Guar'],
-    lat: 26.2918,
-    lng: 73.0169,
-    manager: 'Pukhraj Choudhary (+91 98290 77391)',
-    status: 'WDRA Accredited & Inspected'
+    id: 'demo-warehouse-b',
+    name: 'Demonstration warehouse B',
+    code: 'DEMO-WH-B',
+    wdraRegNo: 'Not verified',
+    address: 'Location withheld in demonstration mode',
+    district: 'Demo region',
+    capacityMt: null,
+    availableMt: null,
+    coldChambers: null,
+    intakeCrops: [],
+    lat: null,
+    lng: null,
+    manager: 'Not assigned',
+    status: 'Demonstration only'
   }
 ];
 

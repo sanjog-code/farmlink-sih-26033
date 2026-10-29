@@ -219,7 +219,9 @@ export async function convertBlobToWav(blob) {
 
 // ─── 3. SARVAM AI SAARAS ASR & BULBUL TTS ───────────────────────────────────
 
-export const DEFAULT_SARVAM_KEY = 'sk_v9yrxpg0_ZzIdidU18EjUTGEFfkajp7OZ';
+// Browser bundles must never ship provider credentials. Configure a server-side
+// speech proxy for production instead of placing a key in local storage or code.
+export const DEFAULT_SARVAM_KEY = '';
 
 export async function transcribeWithSarvam(audioBlob, { apiKey = DEFAULT_SARVAM_KEY, language = 'hi' } = {}) {
   const activeKey = (apiKey && apiKey.trim()) || DEFAULT_SARVAM_KEY;
